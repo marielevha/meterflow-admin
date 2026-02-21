@@ -8,6 +8,60 @@ With TailAdmin Next.js, you get access to all the necessary dashboard UI compone
 
 TailAdmin utilizes the powerful features of **Next.js 16** and common features of Next.js such as server-side rendering (SSR), static site generation (SSG), and seamless API route integration. Combined with the advancements of **React 19** and the robustness of **TypeScript**, TailAdmin is the perfect solution to help get your project up and running quickly.
 
+## MeterFlow - Implementations Realisees
+
+This repository has been adapted for the **MeterFlow** project (plateforme de gestion des releves de compteurs electriques), with the following key additions:
+
+### 1) Data model (Prisma + PostgreSQL)
+
+- Full schema for core business entities: `users`, `meters`, `meter_states`, `readings`, `reading_events`, `tasks`, `task_items`, `task_comments`, `task_attachments`, `otp_codes`, `auth_sessions`, plus RBAC tables.
+- All business tables include:
+  - `created_at`
+  - `updated_at`
+  - `deleted_at` (soft delete)
+- IDs use UUIDs.
+- Prisma migrations added for RBAC, UUID strategy, password hash, and username login support.
+
+### 2) RBAC
+
+- Roles: `CLIENT`, `AGENT`, `SUPERVISOR`, `ADMIN`.
+- Permissions + role-permission mapping.
+- User-role assignments via dedicated mapping table.
+
+### 3) Authentication
+
+- Web login endpoint: `POST /api/v1/auth/login`
+  - Allowed identifiers: `username` or `email`
+  - Allowed roles for web access: `AGENT`, `SUPERVISOR`, `ADMIN`
+- Mobile login endpoint: `POST /api/v1/mobile/auth/login`
+  - Allowed identifiers: `phone` or `username` or `email`
+  - All active user roles can authenticate
+- Logout endpoint: `POST /api/v1/auth/logout`
+  - Revokes auth session (soft delete + revoked timestamp)
+
+### 4) Session and access protection
+
+- Auth tokens are returned by API and stored in:
+  - HttpOnly cookies (`access_token`, `refresh_token`) for server-side route protection
+  - Local storage (for current dashboard client usage)
+- Dashboard user dropdown now shows data from the logged-in user.
+- Sign out action is wired to real logout logic.
+- `/admin/**` routes are protected by `src/proxy.ts`:
+  - if not authenticated => redirect to `/signin`
+
+### 5) Seed data
+
+- Seed includes RBAC bootstrap + 10 users across multiple profiles.
+- Demo password for seeded users: `ChangeMe@123`
+
+### 6) Main auth test scenarios covered
+
+- Web login with `username` -> success
+- Web login with `email` -> success
+- Web login with `phone` -> rejected
+- Mobile login with `phone` -> success
+- Logout revokes server session and removes access to `/admin`
+
 ## Overview
 
 TailAdmin provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and control panels. It's built on:

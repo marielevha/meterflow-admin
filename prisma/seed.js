@@ -1,7 +1,15 @@
 /* eslint-disable no-console */
+const { randomBytes, scryptSync } = require("node:crypto");
 const { PrismaClient, UserRole, UserStatus } = require("@prisma/client");
 
 const prisma = new PrismaClient();
+const DEMO_PASSWORD = "ChangeMe@123";
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
 
 const roles = [
   { code: "CLIENT", name: "Client", description: "Abonne qui soumet ses releves." },
@@ -56,16 +64,16 @@ const rolePermissionCodes = {
 };
 
 const users = [
-  { phone: "+221700000001", email: "admin@meterflow.local", firstName: "Awa", lastName: "Diallo", role: UserRole.ADMIN, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Plateau" },
-  { phone: "+221700000002", email: "supervisor1@meterflow.local", firstName: "Mamadou", lastName: "Ndiaye", role: UserRole.SUPERVISOR, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Medina" },
-  { phone: "+221700000003", email: "supervisor2@meterflow.local", firstName: "Fatou", lastName: "Sow", role: UserRole.SUPERVISOR, status: UserStatus.ACTIVE, region: "Thies", city: "Thies", zone: "Ouest" },
-  { phone: "+221700000004", email: "agent1@meterflow.local", firstName: "Ibrahima", lastName: "Ba", role: UserRole.AGENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Pikine", zone: "Nord" },
-  { phone: "+221700000005", email: "agent2@meterflow.local", firstName: "Moussa", lastName: "Gueye", role: UserRole.AGENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Guediawaye", zone: "Centre" },
-  { phone: "+221700000006", email: "agent3@meterflow.local", firstName: "Khadija", lastName: "Mbaye", role: UserRole.AGENT, status: UserStatus.ACTIVE, region: "Thies", city: "Mbour", zone: "Sud" },
-  { phone: "+221700000007", email: "client1@meterflow.local", firstName: "Cheikh", lastName: "Fall", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Almadies" },
-  { phone: "+221700000008", email: "client2@meterflow.local", firstName: "Rokhaya", lastName: "Diop", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Mermoz" },
-  { phone: "+221700000009", email: "client3@meterflow.local", firstName: "Abdou", lastName: "Sarr", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Saint-Louis", city: "Saint-Louis", zone: "Nord" },
-  { phone: "+221700000010", email: "client4@meterflow.local", firstName: "Mariama", lastName: "Faye", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Kaolack", city: "Kaolack", zone: "Centre" },
+  { phone: "+221700000001", username: "admin001", email: "admin@meterflow.local", firstName: "Awa", lastName: "Diallo", role: UserRole.ADMIN, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Plateau" },
+  { phone: "+221700000002", username: "supervisor001", email: "supervisor1@meterflow.local", firstName: "Mamadou", lastName: "Ndiaye", role: UserRole.SUPERVISOR, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Medina" },
+  { phone: "+221700000003", username: "supervisor002", email: "supervisor2@meterflow.local", firstName: "Fatou", lastName: "Sow", role: UserRole.SUPERVISOR, status: UserStatus.ACTIVE, region: "Thies", city: "Thies", zone: "Ouest" },
+  { phone: "+221700000004", username: "agent001", email: "agent1@meterflow.local", firstName: "Ibrahima", lastName: "Ba", role: UserRole.AGENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Pikine", zone: "Nord" },
+  { phone: "+221700000005", username: "agent002", email: "agent2@meterflow.local", firstName: "Moussa", lastName: "Gueye", role: UserRole.AGENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Guediawaye", zone: "Centre" },
+  { phone: "+221700000006", username: "agent003", email: "agent3@meterflow.local", firstName: "Khadija", lastName: "Mbaye", role: UserRole.AGENT, status: UserStatus.ACTIVE, region: "Thies", city: "Mbour", zone: "Sud" },
+  { phone: "+221700000007", username: "client001", email: "client1@meterflow.local", firstName: "Cheikh", lastName: "Fall", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Almadies" },
+  { phone: "+221700000008", username: "client002", email: "client2@meterflow.local", firstName: "Rokhaya", lastName: "Diop", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Dakar", city: "Dakar", zone: "Mermoz" },
+  { phone: "+221700000009", username: "client003", email: "client3@meterflow.local", firstName: "Abdou", lastName: "Sarr", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Saint-Louis", city: "Saint-Louis", zone: "Nord" },
+  { phone: "+221700000010", username: "client004", email: "client4@meterflow.local", firstName: "Mariama", lastName: "Faye", role: UserRole.CLIENT, status: UserStatus.ACTIVE, region: "Kaolack", city: "Kaolack", zone: "Centre" },
 ];
 
 async function main() {
@@ -105,11 +113,12 @@ async function main() {
   }
 
   const createdUsers = [];
+  const passwordHash = hashPassword(DEMO_PASSWORD);
   for (const user of users) {
     const saved = await prisma.user.upsert({
       where: { phone: user.phone },
-      update: { ...user, deletedAt: null },
-      create: user,
+      update: { ...user, passwordHash, deletedAt: null },
+      create: { ...user, passwordHash },
     });
     createdUsers.push(saved);
   }
@@ -127,6 +136,7 @@ async function main() {
   }
 
   console.log("Seed complete: roles, permissions, and 10 users inserted.");
+  console.log(`Demo password for all seeded users: ${DEMO_PASSWORD}`);
 }
 
 main()
