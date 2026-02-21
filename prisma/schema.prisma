@@ -1,0 +1,471 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  CLIENT
+  AGENT
+  SUPERVISOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum MeterType {
+  SINGLE_INDEX
+  DUAL_INDEX
+}
+
+enum MeterStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  REPLACED
+}
+
+enum ReadingSource {
+  CLIENT
+  AGENT
+  SYSTEM
+}
+
+enum ReadingStatus {
+  DRAFT
+  PENDING
+  FLAGGED
+  REJECTED
+  VALIDATED
+  RESUBMISSION_REQUESTED
+  CLOSED
+}
+
+enum ReadingEventType {
+  CREATED
+  SUBMITTED
+  VALIDATED
+  FLAGGED
+  REJECTED
+  RESUBMITTED
+  TASK_CREATED
+  TASK_UPDATED
+  OCR_PROCESSED
+  ANOMALY_DETECTED
+}
+
+enum TaskType {
+  FIELD_RECHECK
+  FRAUD_INVESTIGATION
+  METER_VERIFICATION
+  GENERAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskItemStatus {
+  TODO
+  DONE
+  CANCELED
+}
+
+enum OtpPurpose {
+  LOGIN
+  SIGNUP
+  PASSWORD_RESET
+}
+
+enum OtpStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  CANCELED
+}
+
+model User {
+  id                     String               @id @default(uuid()) @db.Uuid
+  phone                  String               @unique
+  email                  String?              @unique
+  firstName              String?              @map("first_name")
+  lastName               String?              @map("last_name")
+  role                   UserRole             @default(CLIENT)
+  status                 UserStatus           @default(PENDING)
+  region                 String?
+  city                   String?
+  zone                   String?
+  lastLoginAt            DateTime?            @map("last_login_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  deletedAt              DateTime?            @map("deleted_at")
+  customerMeters         Meter[]              @relation("CustomerMeters")
+  assignedMeters         Meter[]              @relation("AgentMeters")
+  submittedReadings      Reading[]            @relation("ReadingSubmittedBy")
+  reviewedReadings       Reading[]            @relation("ReadingReviewedBy")
+  readingEvents          ReadingEvent[]
+  assignedTasks          Task[]               @relation("TaskAssignedTo")
+  createdTasks           Task[]               @relation("TaskCreatedBy")
+  closedTasks            Task[]               @relation("TaskClosedBy")
+  completedTaskItems     TaskItem[]           @relation("TaskItemCompletedBy")
+  taskComments           TaskComment[]
+  taskAttachments        TaskAttachment[]
+  otpCodes               OtpCode[]
+  authSessions           AuthSession[]
+  roleAssignments        UserRoleAssignment[] @relation("UserAssignedRoles")
+  grantedRoleAssignments UserRoleAssignment[] @relation("UserGrantedRoles")
+
+  @@index([role, status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id              String               @id @default(uuid()) @db.Uuid
+  code            String               @unique
+  name            String
+  description     String?
+  isSystem        Boolean              @default(true) @map("is_system")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  deletedAt       DateTime?            @map("deleted_at")
+  permissions     RolePermission[]
+  userAssignments UserRoleAssignment[]
+
+  @@index([deletedAt])
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique
+  name            String
+  description     String?
+  resource        String
+  action          String
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  deletedAt       DateTime?        @map("deleted_at")
+  rolePermissions RolePermission[]
+
+  @@index([resource, action])
+  @@index([deletedAt])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@index([deletedAt])
+  @@map("role_permissions")
+}
+
+model UserRoleAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  roleId       String    @map("role_id") @db.Uuid
+  assignedById String?   @map("assigned_by_id") @db.Uuid
+  assignedAt   DateTime  @default(now()) @map("assigned_at")
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  user         User      @relation("UserAssignedRoles", fields: [userId], references: [id])
+  role         Role      @relation(fields: [roleId], references: [id])
+  assignedBy   User?     @relation("UserGrantedRoles", fields: [assignedById], references: [id])
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([assignedById])
+  @@index([deletedAt])
+  @@map("user_role_assignments")
+}
+
+model Meter {
+  id               String       @id @default(uuid()) @db.Uuid
+  serialNumber     String       @unique @map("serial_number")
+  meterReference   String?      @unique @map("meter_reference")
+  customerId       String       @map("customer_id") @db.Uuid
+  assignedAgentId  String?      @map("assigned_agent_id") @db.Uuid
+  type             MeterType    @default(SINGLE_INDEX)
+  status           MeterStatus  @default(ACTIVE)
+  addressLine1     String?      @map("address_line_1")
+  addressLine2     String?      @map("address_line_2")
+  city             String?
+  zone             String?
+  latitude         Decimal?     @db.Decimal(10, 7)
+  longitude        Decimal?     @db.Decimal(10, 7)
+  installedAt      DateTime?    @map("installed_at")
+  lastInspectionAt DateTime?    @map("last_inspection_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+  customer         User         @relation("CustomerMeters", fields: [customerId], references: [id])
+  assignedAgent    User?        @relation("AgentMeters", fields: [assignedAgentId], references: [id])
+  states           MeterState[]
+  readings         Reading[]
+  tasks            Task[]
+  taskItems        TaskItem[]
+
+  @@index([customerId])
+  @@index([assignedAgentId])
+  @@index([status, city, zone])
+  @@index([deletedAt])
+  @@map("meters")
+}
+
+model MeterState {
+  id                String    @id @default(uuid()) @db.Uuid
+  meterId           String    @map("meter_id") @db.Uuid
+  sourceReadingId   String?   @map("source_reading_id") @db.Uuid
+  previousPrimary   Decimal?  @map("previous_primary") @db.Decimal(14, 3)
+  previousSecondary Decimal?  @map("previous_secondary") @db.Decimal(14, 3)
+  currentPrimary    Decimal?  @map("current_primary") @db.Decimal(14, 3)
+  currentSecondary  Decimal?  @map("current_secondary") @db.Decimal(14, 3)
+  effectiveAt       DateTime  @map("effective_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+  meter             Meter     @relation(fields: [meterId], references: [id])
+  sourceReading     Reading?  @relation(fields: [sourceReadingId], references: [id])
+
+  @@index([meterId, effectiveAt])
+  @@index([sourceReadingId])
+  @@index([deletedAt])
+  @@map("meter_states")
+}
+
+model Reading {
+  id                String         @id @default(uuid()) @db.Uuid
+  meterId           String         @map("meter_id") @db.Uuid
+  submittedById     String         @map("submitted_by_id") @db.Uuid
+  reviewedById      String?        @map("reviewed_by_id") @db.Uuid
+  source            ReadingSource  @default(CLIENT)
+  status            ReadingStatus  @default(PENDING)
+  readingAt         DateTime       @map("reading_at")
+  primaryIndex      Decimal        @map("primary_index") @db.Decimal(14, 3)
+  secondaryIndex    Decimal?       @map("secondary_index") @db.Decimal(14, 3)
+  imageUrl          String         @map("image_url")
+  imageHash         String?        @map("image_hash")
+  imageMimeType     String?        @map("image_mime_type")
+  imageSizeBytes    Int?           @map("image_size_bytes")
+  gpsLatitude       Decimal?       @map("gps_latitude") @db.Decimal(10, 7)
+  gpsLongitude      Decimal?       @map("gps_longitude") @db.Decimal(10, 7)
+  gpsAccuracyMeters Decimal?       @map("gps_accuracy_meters") @db.Decimal(10, 2)
+  gpsDistanceMeters Decimal?       @map("gps_distance_meters") @db.Decimal(10, 2)
+  idempotencyKey    String?        @unique @map("idempotency_key")
+  rejectionReason   String?        @map("rejection_reason")
+  flagReason        String?        @map("flag_reason")
+  confidenceScore   Decimal?       @map("confidence_score") @db.Decimal(5, 2)
+  anomalyScore      Decimal?       @map("anomaly_score") @db.Decimal(6, 3)
+  ocrText           String?        @map("ocr_text")
+  reviewedAt        DateTime?      @map("reviewed_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  deletedAt         DateTime?      @map("deleted_at")
+  meter             Meter          @relation(fields: [meterId], references: [id])
+  submittedBy       User           @relation("ReadingSubmittedBy", fields: [submittedById], references: [id])
+  reviewedBy        User?          @relation("ReadingReviewedBy", fields: [reviewedById], references: [id])
+  events            ReadingEvent[]
+  meterStates       MeterState[]
+  tasks             Task[]
+  taskItems         TaskItem[]
+
+  @@index([meterId, status, readingAt])
+  @@index([submittedById, status])
+  @@index([reviewedById])
+  @@index([deletedAt])
+  @@map("readings")
+}
+
+model ReadingEvent {
+  id        String           @id @default(uuid()) @db.Uuid
+  readingId String           @map("reading_id") @db.Uuid
+  userId    String?          @map("user_id") @db.Uuid
+  type      ReadingEventType
+  payload   Json             @default("{}")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  deletedAt DateTime?        @map("deleted_at")
+  reading   Reading          @relation(fields: [readingId], references: [id])
+  user      User?            @relation(fields: [userId], references: [id])
+
+  @@index([readingId, type, createdAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("reading_events")
+}
+
+model Task {
+  id           String           @id @default(uuid()) @db.Uuid
+  meterId      String?          @map("meter_id") @db.Uuid
+  readingId    String?          @map("reading_id") @db.Uuid
+  assignedToId String?          @map("assigned_to_id") @db.Uuid
+  createdById  String?          @map("created_by_id") @db.Uuid
+  closedById   String?          @map("closed_by_id") @db.Uuid
+  type         TaskType         @default(GENERAL)
+  status       TaskStatus       @default(OPEN)
+  priority     TaskPriority     @default(MEDIUM)
+  title        String
+  description  String?
+  dueAt        DateTime?        @map("due_at")
+  closedAt     DateTime?        @map("closed_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  deletedAt    DateTime?        @map("deleted_at")
+  meter        Meter?           @relation(fields: [meterId], references: [id])
+  reading      Reading?         @relation(fields: [readingId], references: [id])
+  assignedTo   User?            @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdBy    User?            @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  closedBy     User?            @relation("TaskClosedBy", fields: [closedById], references: [id])
+  items        TaskItem[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+
+  @@index([status, priority, dueAt])
+  @@index([assignedToId])
+  @@index([meterId, readingId])
+  @@index([deletedAt])
+  @@map("tasks")
+}
+
+model TaskItem {
+  id            String         @id @default(uuid()) @db.Uuid
+  taskId        String         @map("task_id") @db.Uuid
+  readingId     String?        @map("reading_id") @db.Uuid
+  meterId       String?        @map("meter_id") @db.Uuid
+  completedById String?        @map("completed_by_id") @db.Uuid
+  title         String
+  details       String?
+  status        TaskItemStatus @default(TODO)
+  sortOrder     Int            @default(0) @map("sort_order")
+  completedAt   DateTime?      @map("completed_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
+  task          Task           @relation(fields: [taskId], references: [id])
+  reading       Reading?       @relation(fields: [readingId], references: [id])
+  meter         Meter?         @relation(fields: [meterId], references: [id])
+  completedBy   User?          @relation("TaskItemCompletedBy", fields: [completedById], references: [id])
+
+  @@index([taskId, sortOrder])
+  @@index([status, completedAt])
+  @@index([deletedAt])
+  @@map("task_items")
+}
+
+model TaskComment {
+  id         String    @id @default(uuid()) @db.Uuid
+  taskId     String    @map("task_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  comment    String
+  isInternal Boolean   @default(true) @map("is_internal")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  task       Task      @relation(fields: [taskId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id            String    @id @default(uuid()) @db.Uuid
+  taskId        String    @map("task_id") @db.Uuid
+  uploadedById  String    @map("uploaded_by_id") @db.Uuid
+  fileUrl       String    @map("file_url")
+  fileName      String    @map("file_name")
+  mimeType      String?   @map("mime_type")
+  fileHash      String?   @map("file_hash")
+  fileSizeBytes Int?      @map("file_size_bytes")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+  task          Task      @relation(fields: [taskId], references: [id])
+  uploadedBy    User      @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId, createdAt])
+  @@index([uploadedById])
+  @@index([deletedAt])
+  @@map("task_attachments")
+}
+
+model OtpCode {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String?    @map("user_id") @db.Uuid
+  phone      String
+  purpose    OtpPurpose
+  status     OtpStatus  @default(PENDING)
+  codeHash   String     @map("code_hash")
+  attempts   Int        @default(0)
+  expiresAt  DateTime   @map("expires_at")
+  verifiedAt DateTime?  @map("verified_at")
+  metadata   Json?      @default("{}")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  deletedAt  DateTime?  @map("deleted_at")
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([phone, purpose, status, expiresAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("otp_codes")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  tokenFamily      String?   @map("token_family")
+  refreshTokenHash String    @map("refresh_token_hash")
+  accessTokenJti   String?   @map("access_token_jti")
+  deviceId         String?   @map("device_id")
+  deviceName       String?   @map("device_name")
+  platform         String?
+  appVersion       String?   @map("app_version")
+  ipAddress        String?   @map("ip_address")
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+  user             User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, expiresAt])
+  @@index([tokenFamily])
+  @@index([deletedAt])
+  @@map("auth_sessions")
+}
