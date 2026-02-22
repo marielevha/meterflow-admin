@@ -218,6 +218,29 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - correction des acces potentiellement `undefined` (`meter`, `gpsDistanceMeters`)
   - conversion numerique defensive sur les valeurs decimales Prisma
 
+### 17) Settings centralises (DB + API + UI)
+
+- Ajout d'une table de configuration applicative:
+  - `app_settings` (Prisma model: `AppSetting`)
+  - colonnes: `id`, `key`, `value(JSON)`, `created_at`, `updated_at`, `deleted_at`
+  - migration SQL ajoutee: `20260222121500_add_app_settings`
+- Nouveau service serveur:
+  - `src/lib/settings/serverSettings.ts`
+  - `getAppSettings()` pour lecture avec fallback sur defaults
+  - `saveAppSettings()` pour merge + upsert en base
+- Normalisation stricte des settings:
+  - `src/lib/settings/appSettings.ts`
+  - `normalizeAppSettings()` pour typer/sanitzer les valeurs JSON
+- API backoffice des settings:
+  - `GET /api/v1/settings` (staff connecte)
+  - `PATCH /api/v1/settings` (ADMIN uniquement)
+- Page `/admin/settings` branchee sur la base:
+  - chargement initial server-side des valeurs
+  - sauvegarde via API (plus de persistance locale uniquement)
+- Page `/admin/overview` branchee sur les settings DB:
+  - affichage/masquage des graphiques selon les cases cochees dans settings
+  - seuil GPS anti-fraude utilise depuis `maxGpsDistanceMeters` configure en settings
+
 
 ## Overview
 

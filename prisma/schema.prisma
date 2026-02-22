@@ -472,3 +472,15 @@ model AuthSession {
   @@index([deletedAt])
   @@map("auth_sessions")
 }
+
+model AppSetting {
+  id        String    @id @default(uuid()) @db.Uuid
+  key       String    @unique
+  value     Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([deletedAt])
+  @@map("app_settings")
+}

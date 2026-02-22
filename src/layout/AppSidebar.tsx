@@ -64,6 +64,11 @@ const navItems: NavItem[] = [
     name: "User Profile",
     path: "/admin/profile",
   },
+  {
+    icon: <PlugInIcon />,
+    name: "Settings",
+    path: "/admin/settings",
+  },
 
   {
     name: "Forms",

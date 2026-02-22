@@ -10,6 +10,7 @@ import OverviewActivityCharts from "@/components/overview/OverviewActivityCharts
 import ValidationRateTrendChart from "@/components/overview/ValidationRateTrendChart";
 import OperationsKpisSection from "@/components/overview/OperationsKpisSection";
 import { prisma } from "@/lib/prisma";
+import { getAppSettings } from "@/lib/settings/serverSettings";
 
 export const metadata: Metadata = {
   title: "Overview | MeterFlow Dashboard",
@@ -38,6 +39,7 @@ type BucketRow = {
 };
 
 export default async function OverviewPage() {
+  const appSettingsPromise = getAppSettings();
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
@@ -190,6 +192,7 @@ export default async function OverviewPage() {
       orderBy: { createdAt: "asc" },
     }),
   ]);
+  const appSettings = await appSettingsPromise;
 
   const totalCustomersCount = totalCustomers._count.id;
   const activeCustomersCount = activeCustomers._count.id;
@@ -394,7 +397,9 @@ export default async function OverviewPage() {
     const isSuspicious =
       reading.status === ReadingStatus.FLAGGED ||
       reading.status === ReadingStatus.REJECTED ||
-      (gpsDistance !== null && Number.isFinite(gpsDistance) && gpsDistance > 200);
+      (gpsDistance !== null &&
+        Number.isFinite(gpsDistance) &&
+        gpsDistance > appSettings.maxGpsDistanceMeters);
 
     const mKey = submittedAt.toISOString().slice(0, 10);
     const qKey = weekStart(submittedAt).toISOString().slice(0, 10);
@@ -658,13 +663,12 @@ export default async function OverviewPage() {
         />
       </div>
 
-      <div className="mb-6">
-        <ValidationRateTrendChart
-          monthly={validationRateMonthly}
-          quarterly={validationRateQuarterly}
-          annual={validationRateAnnual}
-        />
-      </div>
+      <ValidationRateTrendChart
+        monthly={validationRateMonthly}
+        quarterly={validationRateQuarterly}
+        annual={validationRateAnnual}
+        visible={appSettings.showOverviewValidationRate}
+      />
 
       <OverviewActivityCharts
         dailyLabels={dailyLabels}
@@ -683,6 +687,14 @@ export default async function OverviewPage() {
         riskyZoneValues={riskyZoneValues}
         userRoleLabels={userRoleLabels}
         userRoleValues={userRoleValues}
+        visibility={{
+          activityTrend: appSettings.showOverviewActivityTrend,
+          statusMix: appSettings.showOverviewStatusMix,
+          tasksByStatus: appSettings.showOverviewTasksByStatus,
+          topAgents: appSettings.showOverviewTopAgents,
+          riskiestZones: appSettings.showOverviewRiskiestZones,
+          userDistribution: appSettings.showOverviewUserDistribution,
+        }}
       />
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -808,30 +820,34 @@ export default async function OverviewPage() {
         </ComponentCard>
       </div>
 
-      <div className="mt-6">
-        <OperationsKpisSection
-          processingDelay={{
-            monthly: monthlyDelay,
-            quarterly: quarterlyDelay,
-            annual: annualDelay,
-          }}
-          pendingBacklog={{
-            monthly: monthlyBacklog,
-            quarterly: quarterlyBacklog,
-            annual: annualBacklog,
-          }}
-          anomalyRate={{
-            monthly: monthlyAnomaly,
-            quarterly: quarterlyAnomaly,
-            annual: annualAnomaly,
-          }}
-          submittedVolume={{
-            monthly: monthlyVolume,
-            quarterly: quarterlyVolume,
-            annual: annualVolume,
-          }}
-        />
-      </div>
+      <OperationsKpisSection
+        processingDelay={{
+          monthly: monthlyDelay,
+          quarterly: quarterlyDelay,
+          annual: annualDelay,
+        }}
+        pendingBacklog={{
+          monthly: monthlyBacklog,
+          quarterly: quarterlyBacklog,
+          annual: annualBacklog,
+        }}
+        anomalyRate={{
+          monthly: monthlyAnomaly,
+          quarterly: quarterlyAnomaly,
+          annual: annualAnomaly,
+        }}
+        submittedVolume={{
+          monthly: monthlyVolume,
+          quarterly: quarterlyVolume,
+          annual: annualVolume,
+        }}
+        visibility={{
+          delay: appSettings.showOverviewOpsDelay,
+          backlog: appSettings.showOverviewOpsBacklog,
+          anomaly: appSettings.showOverviewOpsAnomaly,
+          volume: appSettings.showOverviewOpsVolume,
+        }}
+      />
     </div>
   );
 }

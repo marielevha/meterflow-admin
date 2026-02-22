@@ -22,6 +22,14 @@ type OverviewActivityChartsProps = {
   riskyZoneValues: number[];
   userRoleLabels: string[];
   userRoleValues: number[];
+  visibility: {
+    activityTrend: boolean;
+    statusMix: boolean;
+    tasksByStatus: boolean;
+    topAgents: boolean;
+    riskiestZones: boolean;
+    userDistribution: boolean;
+  };
 };
 
 export default function OverviewActivityCharts({
@@ -41,7 +49,18 @@ export default function OverviewActivityCharts({
   riskyZoneValues,
   userRoleLabels,
   userRoleValues,
+  visibility,
 }: OverviewActivityChartsProps) {
+  const hasVisibleChart =
+    visibility.activityTrend ||
+    visibility.statusMix ||
+    visibility.tasksByStatus ||
+    visibility.topAgents ||
+    visibility.riskiestZones ||
+    visibility.userDistribution;
+
+  if (!hasVisibleChart) return null;
+
   const activityOptions: ApexOptions = {
     chart: {
       type: "area",
@@ -187,97 +206,109 @@ export default function OverviewActivityCharts({
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-8">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          Activity Trend (30 jours)
-        </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Volumetrie quotidienne des releves et distribution des decisions.
-        </p>
-        <div className="mt-4">
-          <Chart
-            type="area"
-            height={320}
-            options={activityOptions}
-            series={[
-              { name: "Total", data: dailyTotal },
-              { name: "Pending", data: dailyPending },
-              { name: "Validated", data: dailyValidated },
-              { name: "Flagged", data: dailyFlagged },
-              { name: "Rejected", data: dailyRejected },
-            ]}
-          />
+      {visibility.activityTrend ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-8">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+            Activity Trend (30 jours)
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Volumetrie quotidienne des releves et distribution des decisions.
+          </p>
+          <div className="mt-4">
+            <Chart
+              type="area"
+              height={320}
+              options={activityOptions}
+              series={[
+                { name: "Total", data: dailyTotal },
+                { name: "Pending", data: dailyPending },
+                { name: "Validated", data: dailyValidated },
+                { name: "Flagged", data: dailyFlagged },
+                { name: "Rejected", data: dailyRejected },
+              ]}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          Status Mix (30 jours)
-        </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Repartition des statuts de releves.
-        </p>
-        <div className="mt-4">
-          <Chart type="donut" height={320} options={statusOptions} series={statusValues} />
+      {visibility.statusMix ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+            Status Mix (30 jours)
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Repartition des statuts de releves.
+          </p>
+          <div className="mt-4">
+            <Chart type="donut" height={320} options={statusOptions} series={statusValues} />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          Tasks by Status
-        </h3>
-        <div className="mt-4">
-          <Chart
-            type="bar"
-            height={260}
-            options={taskOptions}
-            series={[{ name: "Tasks", data: taskStatusValues }]}
-          />
+      {visibility.tasksByStatus ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+            Tasks by Status
+          </h3>
+          <div className="mt-4">
+            <Chart
+              type="bar"
+              height={260}
+              options={taskOptions}
+              series={[{ name: "Tasks", data: taskStatusValues }]}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          Top Agents (7 jours)
-        </h3>
-        <div className="mt-4">
-          <Chart
-            type="bar"
-            height={260}
-            options={{
-              ...topAgentsOptions,
-              xaxis: { ...topAgentsOptions.xaxis, categories: topAgentLabels },
-            }}
-            series={[{ name: "Reviews", data: topAgentValues }]}
-          />
+      {visibility.topAgents ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+            Top Agents (7 jours)
+          </h3>
+          <div className="mt-4">
+            <Chart
+              type="bar"
+              height={260}
+              options={{
+                ...topAgentsOptions,
+                xaxis: { ...topAgentsOptions.xaxis, categories: topAgentLabels },
+              }}
+              series={[{ name: "Reviews", data: topAgentValues }]}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          Riskiest Zones (30 jours)
-        </h3>
-        <div className="mt-4">
-          <Chart
-            type="bar"
-            height={260}
-            options={riskZoneOptions}
-            series={[{ name: "Risk %", data: riskyZoneValues }]}
-          />
+      {visibility.riskiestZones ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+            Riskiest Zones (30 jours)
+          </h3>
+          <div className="mt-4">
+            <Chart
+              type="bar"
+              height={260}
+              options={riskZoneOptions}
+              series={[{ name: "Risk %", data: riskyZoneValues }]}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          User Distribution
-        </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Repartition des utilisateurs par role.
-        </p>
-        <div className="mt-4">
-          <Chart type="donut" height={260} options={userRoleOptions} series={userRoleValues} />
+      {visibility.userDistribution ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+            User Distribution
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Repartition des utilisateurs par role.
+          </p>
+          <div className="mt-4">
+            <Chart type="donut" height={260} options={userRoleOptions} series={userRoleValues} />
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

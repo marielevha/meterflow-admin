@@ -15,6 +15,7 @@ type ValidationRateTrendChartProps = {
   monthly: SeriesData;
   quarterly: SeriesData;
   annual: SeriesData;
+  visible: boolean;
 };
 
 type Mode = "monthly" | "quarterly" | "annual";
@@ -23,6 +24,7 @@ export default function ValidationRateTrendChart({
   monthly,
   quarterly,
   annual,
+  visible,
 }: ValidationRateTrendChartProps) {
   const [mode, setMode] = useState<Mode>("monthly");
 
@@ -73,8 +75,10 @@ export default function ValidationRateTrendChart({
     },
   };
 
+  if (!visible) return null;
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
+    <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
