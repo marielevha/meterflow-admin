@@ -10,104 +10,115 @@ TailAdmin utilizes the powerful features of **Next.js 16** and common features o
 
 ## MeterFlow - Implementations Realisees
 
-This repository has been adapted for the **MeterFlow** project (plateforme de gestion des releves de compteurs electriques), with the following key additions:
+Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de gestion des releves de compteurs electriques).
 
-### 1) Data model (Prisma + PostgreSQL)
+### 1) Base de donnees et Prisma
 
-- Full schema for core business entities: `users`, `meters`, `meter_states`, `readings`, `reading_events`, `tasks`, `task_items`, `task_comments`, `task_attachments`, `otp_codes`, `auth_sessions`, plus RBAC tables.
-- All business tables include:
-  - `created_at`
-  - `updated_at`
-  - `deleted_at` (soft delete)
-- IDs use UUIDs.
-- Prisma migrations added for RBAC, UUID strategy, password hash, username login support, and user activation date (`activated_at`).
+- Schema Prisma complet pour les entites metier:
+  - `users`, `roles`, `permissions`, `user_roles`, `role_permissions`
+  - `meters`, `meter_states`
+  - `readings`, `reading_events`
+  - `tasks`, `task_items`, `task_comments`, `task_attachments`
+  - `auth_sessions`, `otp_codes`
+- UUID comme identifiants par defaut.
+- Colonnes de tracabilite sur les tables metier:
+  - `created_at`, `updated_at`, `deleted_at` (soft delete)
+- `users.activated_at` ajoute pour tracer la date d'activation de compte.
+- Migrations Prisma ajoutees pour RBAC, auth, activation OTP et evolutions du modele.
 
-### 2) RBAC
+### 2) RBAC (roles/permissions)
 
-- Roles: `CLIENT`, `AGENT`, `SUPERVISOR`, `ADMIN`.
-- Permissions + role-permission mapping.
-- User-role assignments via dedicated mapping table.
+- Roles metier: `CLIENT`, `AGENT`, `SUPERVISOR`, `ADMIN`.
+- Mapping roles/permissions via tables dediees.
+- Controle d'acces applique dans les endpoints sensibles (mobile client vs staff/admin).
 
-### 3) Authentication
+### 3) Authentification Web et Mobile
 
-- Web login endpoint: `POST /api/v1/auth/login`
-  - Allowed identifiers: `username` or `email`
-  - Allowed roles for web access: `AGENT`, `SUPERVISOR`, `ADMIN`
-- Mobile login endpoint: `POST /api/v1/mobile/auth/login`
-  - Allowed identifiers: `phone` or `username` or `email`
-  - All active user roles can authenticate
-- Logout endpoint: `POST /api/v1/auth/logout`
-  - Revokes auth session (soft delete + revoked timestamp)
-- Mobile signup and account activation:
-  - `POST /api/v1/mobile/auth/signup` (creates `CLIENT` in `PENDING`)
-  - `POST /api/v1/mobile/auth/activate` (OTP verification -> `ACTIVE` + `activated_at`)
+- Web staff:
+  - `POST /api/v1/auth/login` (identifiant: `username` ou `email`)
+  - autorise seulement `AGENT`, `SUPERVISOR`, `ADMIN`
+  - `POST /api/v1/auth/logout`
+- Mobile:
+  - `POST /api/v1/mobile/auth/login` (identifiant: `phone` ou `username` ou `email`)
+  - `POST /api/v1/mobile/auth/signup` (creation `CLIENT` en statut `PENDING`)
+  - `POST /api/v1/mobile/auth/activate` (OTP -> compte `ACTIVE` + `activated_at`)
   - `POST /api/v1/mobile/auth/resend-otp`
-- Mobile forgot-password (CLIENT only):
   - `POST /api/v1/mobile/auth/forgot-password/request`
   - `POST /api/v1/mobile/auth/forgot-password/confirm`
+- Protection d'acces dashboard:
+  - routes `/admin/**` protegees
+  - utilisateur non connecte redirige vers `/signin`
 
-### 4) Session and access protection
+### 4) API mobile - compte client
 
-- Auth tokens are returned by API and stored in:
-  - HttpOnly cookies (`access_token`, `refresh_token`) for server-side route protection
-  - Local storage (for current dashboard client usage)
-- Dashboard user dropdown now shows data from the logged-in user.
-- Sign out action is wired to real logout logic.
-- `/admin/**` routes are protected by `src/proxy.ts`:
-  - if not authenticated => redirect to `/signin`
+- `GET /api/v1/mobile/me`
+- `PATCH /api/v1/mobile/me`
+- `PATCH /api/v1/mobile/me/password`
 
-### 5) Seed data
+### 5) API mobile - compteurs client
 
-- Seed includes RBAC bootstrap + users across multiple profiles (Congo-Brazzaville / Senegal Dakar context).
-- Seed includes coherent `meters` and `meter_states` linked to seeded users.
-- Demo password for seeded users: `ChangeMe@123`
+- `GET /api/v1/mobile/meters`
+- `GET /api/v1/mobile/meters/:meterId`
+- `GET /api/v1/mobile/meters/:meterId/states`
 
-### 6) Mobile client account APIs
+### 6) API mobile - releves (coeur metier)
 
-- `GET /api/v1/mobile/me` (current profile)
-- `PATCH /api/v1/mobile/me` (limited update: `firstName`, `lastName`, `city`, `zone`)
-- `PATCH /api/v1/mobile/me/password` (password change + active sessions revocation)
+- `POST /api/v1/mobile/readings`
+- `GET /api/v1/mobile/readings`
+- `GET /api/v1/mobile/readings/:readingId`
+- `POST /api/v1/mobile/readings/:readingId/resubmit`
+- Generation d'evenements d'audit (`reading_events`) sur les transitions clefs.
 
-### 7) Mobile meters APIs
+### 7) API mobile - upload fichiers (S3/MinIO)
 
-- `GET /api/v1/mobile/meters` (list customer meters + latest state)
-- `GET /api/v1/mobile/meters/:meterId` (meter detail + latest state)
-- `GET /api/v1/mobile/meters/:meterId/states` (states history)
-- Ownership checks enforced: a client only accesses their own meters.
+- `POST /api/v1/mobile/uploads/presign`
+- `POST /api/v1/mobile/uploads/complete`
+- Flow supporte:
+  1. Demande URL signee
+  2. Upload direct objet vers bucket
+  3. Confirmation metadata (hash/taille/mime)
+- Dependances ajoutees:
+  - `@aws-sdk/client-s3`
+  - `@aws-sdk/s3-request-presigner`
 
-### 8) Mobile readings APIs
+### 8) API backoffice - traitement des releves
 
-- `POST /api/v1/mobile/readings` (create reading with index/photo/GPS/idempotency key)
-- `GET /api/v1/mobile/readings` (history with `status/date` filters)
-- `GET /api/v1/mobile/readings/:readingId` (detail + events)
-- `POST /api/v1/mobile/readings/:readingId/resubmit` (for rejected/resubmission-requested readings)
-- Reading events are generated (`CREATED`, `SUBMITTED`, `RESUBMITTED`) for audit traceability.
+- `GET /api/v1/readings/pending`
+- `POST /api/v1/readings/:id/validate`
+- `POST /api/v1/readings/:id/flag`
+- `POST /api/v1/readings/:id/reject`
+- `POST /api/v1/readings/:id/tasks`
 
-### 9) Mobile uploads APIs (S3/MinIO)
+### 9) API backoffice - taches terrain
 
-- `POST /api/v1/mobile/uploads/presign` (signed PUT URL generation + upload token)
-- `POST /api/v1/mobile/uploads/complete` (metadata validation: hash/size/mime)
-- Presigned upload flow supports direct file upload from mobile to object storage.
-- Related dependencies added: `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`.
+- `GET /api/v1/tasks`
+- `GET /api/v1/tasks/:id`
+- `PATCH /api/v1/tasks/:id`
+- `POST /api/v1/tasks/:id/comments`
+- `POST /api/v1/tasks/:id/attachments`
 
-### 10) Helper script
+### 10) API audit + anti-fraude MVP
 
-- `scripts/mobile_reading_flow.sh`
-  - End-to-end automation for:
-    1. mobile login
-    2. upload presign
-    3. file upload
-    4. upload complete
-    5. reading creation
-  - Useful for API integration testing before mobile app implementation.
+- `POST /api/v1/readings/:id/checks` (coherence index + distance GPS)
+- `GET /api/v1/readings/:id/events`
+- `GET /api/v1/alerts`
 
-### 11) Main auth test scenarios covered
+### 11) API dashboard admin
 
-- Web login with `username` -> success
-- Web login with `email` -> success
-- Web login with `phone` -> rejected
-- Mobile login with `phone` -> success
-- Logout revokes server session and removes access to `/admin`
+- `GET /api/v1/dashboard/kpis`
+- `GET /api/v1/dashboard/top-agents`
+- `GET /api/v1/dashboard/suspicions/gps`
+- Acces reserve au role `ADMIN`.
+
+### 12) Seeds et outils de test
+
+- Seeds users (profils differents, contexte Congo-Brazzaville / Senegal-Dakar).
+- Seeds coherents `meters` + `meter_states`.
+- Mot de passe demo des seeds: `ChangeMe@123`.
+- Script d'integration API:
+  - `scripts/mobile_reading_flow.sh`
+  - enchaine login -> presign -> upload -> complete -> reading.
+
 
 ## Overview
 
