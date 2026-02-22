@@ -186,6 +186,38 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - UX sidebar:
   - correction de l'etat actif pour eviter double activation (`/admin/meters` et `/admin/meters/create`).
 
+### 16) Dashboard Overview (pilotage activite)
+
+- Menu `Dashboard` enrichi:
+  - `Ecommerce`
+  - `Overview` (`/admin/overview`)
+- Page `Overview` connectee a la base Prisma avec un dashboard orienté pilotage:
+  - cards KPI en tete avec style modernise (icone + valeur + variation)
+  - graphique Apex `Taux de validation des releves` avec switch:
+    - `Monthly` (journalier sur 30 jours)
+    - `Quarterly` (hebdo sur 12 semaines)
+    - `Annual` (mensuel sur 12 mois)
+  - bloc charts multi-KPI (Apex):
+    - tendance activite releves (total/pending/validated/flagged/rejected)
+    - mix des statuts releves (donut)
+    - distribution des users par role (donut)
+    - taches par statut (bar)
+    - top agents (bar horizontal)
+    - zones a risque (bar %)
+  - bloc `KPIs operationnels` en bas de page avec formats varies:
+    - Delai moyen de traitement (`reading_at` -> `reviewed_at`)
+    - Backlog des releves en attente (`PENDING`)
+    - Taux d'anomalies/suspicions (`flagged + rejected + GPS suspect`) / total soumis
+    - Volume de releves soumis
+    - switch commun `Monthly / Quarterly / Annual`
+  - tables operationnelles:
+    - `Recent readings`
+    - `Recent tasks`
+- Robustesse / correctifs runtime:
+  - suppression des doublons de declarations de variables (build error)
+  - correction des acces potentiellement `undefined` (`meter`, `gpsDistanceMeters`)
+  - conversion numerique defensive sur les valeurs decimales Prisma
+
 
 ## Overview
 
