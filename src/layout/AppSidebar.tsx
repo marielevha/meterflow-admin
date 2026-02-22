@@ -41,6 +41,17 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <ListIcon />,
+    name: "Operations",
+    subItems: [
+      { name: "Meters", path: "/admin/meters", pro: false },
+      { name: "Add meter", path: "/admin/meters/create", pro: false },
+      { name: "Readings", path: "/admin/readings", pro: false },
+      { name: "History", path: "/admin/history", pro: false },
+      { name: "Consumption", path: "/admin/consumption", pro: false },
+    ],
+  },
+  {
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/admin/calendar",
@@ -186,12 +197,15 @@ const AppSidebar: React.FC = () => {
               }}
             >
               <ul className="mt-2 space-y-1 ml-9">
-                {nav.subItems.map((subItem) => (
+                {nav.subItems.map((subItem) => {
+                  const activeSubItemPath = getActiveSubItemPath(nav.subItems || []);
+                  const isSubItemActive = activeSubItemPath === subItem.path;
+                  return (
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
                       className={`menu-dropdown-item ${
-                        isActive(subItem.path)
+                        isSubItemActive
                           ? "menu-dropdown-item-active"
                           : "menu-dropdown-item-inactive"
                       }`}
@@ -201,7 +215,7 @@ const AppSidebar: React.FC = () => {
                         {subItem.new && (
                           <span
                             className={`ml-auto ${
-                              isActive(subItem.path)
+                              isSubItemActive
                                 ? "menu-dropdown-badge-active"
                                 : "menu-dropdown-badge-inactive"
                             } menu-dropdown-badge `}
@@ -212,7 +226,7 @@ const AppSidebar: React.FC = () => {
                         {subItem.pro && (
                           <span
                             className={`ml-auto ${
-                              isActive(subItem.path)
+                              isSubItemActive
                                 ? "menu-dropdown-badge-active"
                                 : "menu-dropdown-badge-inactive"
                             } menu-dropdown-badge `}
@@ -223,7 +237,8 @@ const AppSidebar: React.FC = () => {
                       </span>
                     </Link>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -243,6 +258,18 @@ const AppSidebar: React.FC = () => {
 
   const isActive = useCallback(
     (path: string) => pathname === path || pathname.startsWith(`${path}/`),
+    [pathname]
+  );
+
+  const getActiveSubItemPath = useCallback(
+    (subItems: { path: string }[]) => {
+      const matches = subItems
+        .map((item) => item.path)
+        .filter((path) => pathname === path || pathname.startsWith(`${path}/`))
+        .sort((a, b) => b.length - a.length);
+
+      return matches[0] || null;
+    },
     [pathname]
   );
 

@@ -161,6 +161,31 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - `previewUsersImportFromCsv`
   - `importUsersRows`
 
+### 15) Operations dashboard (meters/readings/history/consumption)
+
+- Nouveau bloc menu `Operations` avec sous-options:
+  - `Meters`
+  - `Add meter`
+  - `Readings`
+  - `History`
+  - `Consumption`
+- Meters:
+  - `/admin/meters` avec colonne `Actions` (icones `view` et `edit`)
+  - `/admin/meters/:id` page detail compteur (identite, affectations, localisation, derniers states/readings)
+  - `/admin/meters/:id/edit` page edition complete
+  - `/admin/meters/create` page creation complete
+  - `Customer` et `Assigned agent` en select searchable (recherche nom/telephone + selection par id)
+- History:
+  - `/admin/history` avec filtres + pagination distincts par tableau
+  - `Meter states history`: recherche serial, filtre source (`with/without`), per-page, pagination
+  - `Reading events audit trail`: recherche serial/acteur/phone, filtre type event, per-page, pagination
+- Consumption:
+  - `/admin/consumption` section `Consumption by meter` amelioree
+  - filtres auto-appliques (recherche, ville, zone)
+  - pagination + per-page en bas du tableau
+- UX sidebar:
+  - correction de l'etat actif pour eviter double activation (`/admin/meters` et `/admin/meters/create`).
+
 
 ## Overview
 
