@@ -143,6 +143,24 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - `syncRolePermissions`
   - `syncUserRoles`
 
+### 14) Import users (Excel-compatible)
+
+- Page `/admin/users`:
+  - bouton `Import users`
+  - modal d'import avec verification automatique a la selection du fichier
+  - previsualisation des lignes valides/invalides avant import
+  - import final des lignes valides vers la base
+- Template pret a remplir:
+  - telechargement via `GET /api/v1/users/import/template`
+  - format CSV compatible Excel (ouvrable/modifiable dans Excel)
+- API import:
+  - `POST /api/v1/users/import/preview` (verification coherence + dedoublonnage + preview)
+  - `POST /api/v1/users/import/commit` (creation users + affectation roles)
+- Service metier import:
+  - `src/lib/backoffice/usersImport.ts`
+  - `previewUsersImportFromCsv`
+  - `importUsersRows`
+
 
 ## Overview
 

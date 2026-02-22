@@ -37,6 +37,11 @@ export function getRefreshToken() {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+export function getAccessToken() {
+  if (!hasWindow()) return null;
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
 export function getAuthUser(): AuthUser | null {
   if (!hasWindow()) return null;
   const raw = localStorage.getItem(AUTH_USER_KEY);

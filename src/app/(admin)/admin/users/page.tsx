@@ -6,6 +6,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import UsersFilters from "@/components/users/UsersFilters";
+import ImportUsersModal from "@/components/users/ImportUsersModal";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -176,6 +177,10 @@ export default async function UsersPage({
           <p className="text-sm text-gray-500 dark:text-gray-400">Staff users</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{totalStaffUsers}</h3>
         </div>
+      </div>
+
+      <div className="mb-4 flex justify-end">
+        <ImportUsersModal />
       </div>
 
       <ComponentCard
