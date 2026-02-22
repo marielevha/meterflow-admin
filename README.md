@@ -40,6 +40,7 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - `POST /api/v1/auth/logout`
 - Mobile:
   - `POST /api/v1/mobile/auth/login` (identifiant: `phone` ou `username` ou `email`)
+  - `POST /api/v1/mobile/auth/refresh` (rotation refresh/access token, evite relogin force)
   - `POST /api/v1/mobile/auth/signup` (creation `CLIENT` en statut `PENDING`)
   - `POST /api/v1/mobile/auth/activate` (OTP -> compte `ACTIVE` + `activated_at`)
   - `POST /api/v1/mobile/auth/resend-otp`
