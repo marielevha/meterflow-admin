@@ -20,7 +20,7 @@ This repository has been adapted for the **MeterFlow** project (plateforme de ge
   - `updated_at`
   - `deleted_at` (soft delete)
 - IDs use UUIDs.
-- Prisma migrations added for RBAC, UUID strategy, password hash, and username login support.
+- Prisma migrations added for RBAC, UUID strategy, password hash, username login support, and user activation date (`activated_at`).
 
 ### 2) RBAC
 
@@ -38,6 +38,13 @@ This repository has been adapted for the **MeterFlow** project (plateforme de ge
   - All active user roles can authenticate
 - Logout endpoint: `POST /api/v1/auth/logout`
   - Revokes auth session (soft delete + revoked timestamp)
+- Mobile signup and account activation:
+  - `POST /api/v1/mobile/auth/signup` (creates `CLIENT` in `PENDING`)
+  - `POST /api/v1/mobile/auth/activate` (OTP verification -> `ACTIVE` + `activated_at`)
+  - `POST /api/v1/mobile/auth/resend-otp`
+- Mobile forgot-password (CLIENT only):
+  - `POST /api/v1/mobile/auth/forgot-password/request`
+  - `POST /api/v1/mobile/auth/forgot-password/confirm`
 
 ### 4) Session and access protection
 
@@ -51,10 +58,50 @@ This repository has been adapted for the **MeterFlow** project (plateforme de ge
 
 ### 5) Seed data
 
-- Seed includes RBAC bootstrap + 10 users across multiple profiles.
+- Seed includes RBAC bootstrap + users across multiple profiles (Congo-Brazzaville / Senegal Dakar context).
+- Seed includes coherent `meters` and `meter_states` linked to seeded users.
 - Demo password for seeded users: `ChangeMe@123`
 
-### 6) Main auth test scenarios covered
+### 6) Mobile client account APIs
+
+- `GET /api/v1/mobile/me` (current profile)
+- `PATCH /api/v1/mobile/me` (limited update: `firstName`, `lastName`, `city`, `zone`)
+- `PATCH /api/v1/mobile/me/password` (password change + active sessions revocation)
+
+### 7) Mobile meters APIs
+
+- `GET /api/v1/mobile/meters` (list customer meters + latest state)
+- `GET /api/v1/mobile/meters/:meterId` (meter detail + latest state)
+- `GET /api/v1/mobile/meters/:meterId/states` (states history)
+- Ownership checks enforced: a client only accesses their own meters.
+
+### 8) Mobile readings APIs
+
+- `POST /api/v1/mobile/readings` (create reading with index/photo/GPS/idempotency key)
+- `GET /api/v1/mobile/readings` (history with `status/date` filters)
+- `GET /api/v1/mobile/readings/:readingId` (detail + events)
+- `POST /api/v1/mobile/readings/:readingId/resubmit` (for rejected/resubmission-requested readings)
+- Reading events are generated (`CREATED`, `SUBMITTED`, `RESUBMITTED`) for audit traceability.
+
+### 9) Mobile uploads APIs (S3/MinIO)
+
+- `POST /api/v1/mobile/uploads/presign` (signed PUT URL generation + upload token)
+- `POST /api/v1/mobile/uploads/complete` (metadata validation: hash/size/mime)
+- Presigned upload flow supports direct file upload from mobile to object storage.
+- Related dependencies added: `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`.
+
+### 10) Helper script
+
+- `scripts/mobile_reading_flow.sh`
+  - End-to-end automation for:
+    1. mobile login
+    2. upload presign
+    3. file upload
+    4. upload complete
+    5. reading creation
+  - Useful for API integration testing before mobile app implementation.
+
+### 11) Main auth test scenarios covered
 
 - Web login with `username` -> success
 - Web login with `email` -> success

@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 function base64Url(input: Buffer | string): string {
   return Buffer.from(input)
@@ -6,6 +6,12 @@ function base64Url(input: Buffer | string): string {
     .replace(/=/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
+}
+
+function fromBase64Url(input: string): Buffer {
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  return Buffer.from(padded, "base64");
 }
 
 function parseDurationToSeconds(value: string, fallbackSeconds: number): number {
@@ -55,4 +61,41 @@ export function authDurations() {
   const access = parseDurationToSeconds(process.env.JWT_ACCESS_TOKEN_TTL ?? "15m", 15 * 60);
   const refresh = parseDurationToSeconds(process.env.JWT_REFRESH_TOKEN_TTL ?? "30d", 30 * 86400);
   return { access, refresh };
+}
+
+export type SignedTokenPayload = {
+  sub: string;
+  role: string;
+  typ: "access" | "refresh";
+  exp: number;
+  jti?: string;
+  fam?: string;
+};
+
+export function verifySignedToken(token: string): SignedTokenPayload | null {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || !token) return null;
+
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  const [encodedHeader, encodedPayload, signaturePart] = parts;
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const expectedSignature = createHmac("sha256", secret).update(signingInput).digest();
+  const receivedSignature = fromBase64Url(signaturePart);
+  if (expectedSignature.length !== receivedSignature.length) return null;
+  if (!timingSafeEqual(expectedSignature, receivedSignature)) return null;
+
+  try {
+    const header = JSON.parse(fromBase64Url(encodedHeader).toString("utf8")) as { alg?: string; typ?: string };
+    if (header.alg !== "HS256" || header.typ !== "JWT") return null;
+
+    const payload = JSON.parse(fromBase64Url(encodedPayload).toString("utf8")) as SignedTokenPayload;
+    if (!payload?.sub || !payload?.role || !payload?.typ || !payload?.exp) return null;
+    if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
