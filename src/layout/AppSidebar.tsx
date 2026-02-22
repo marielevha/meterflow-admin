@@ -33,6 +33,14 @@ const navItems: NavItem[] = [
     subItems: [{ name: "Ecommerce", path: "/admin", pro: false }],
   },
   {
+    icon: <UserCircleIcon />,
+    name: "User management",
+    subItems: [
+      { name: "Users", path: "/admin/users", pro: false },
+      { name: "Rules & Permissions", path: "/admin/rules-permissions", pro: false },
+    ],
+  },
+  {
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/admin/calendar",
@@ -233,8 +241,10 @@ const AppSidebar: React.FC = () => {
   );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // const isActive = (path: string) => path === pathname;
-   const isActive = useCallback((path: string) => path === pathname, [pathname]);
+  const isActive = useCallback(
+    (path: string) => pathname === path || pathname.startsWith(`${path}/`),
+    [pathname]
+  );
 
   useEffect(() => {
     // Check if the current path matches any submenu item

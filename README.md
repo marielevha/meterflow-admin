@@ -120,6 +120,29 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - `scripts/mobile_reading_flow.sh`
   - enchaine login -> presign -> upload -> complete -> reading.
 
+### 13) Dashboard users + RBAC (admin)
+
+- Menu dashboard:
+  - `User management`
+  - `Users`
+  - `Rules & Permissions`
+- Pages users:
+  - `/admin/users` (liste, KPIs, recherche/filtres auto, pagination, actions)
+  - `/admin/users/:id` (detail utilisateur)
+  - `/admin/users/:id/edit` (edition profil + affectation multi-roles)
+- Pages RBAC:
+  - `/admin/rules-permissions` (roles + permission matrix, filtres auto, pagination dediee par tableau)
+  - `/admin/rules-permissions/roles/:id` (gestion des permissions d'un role via checkboxes)
+- Endpoints RBAC admin:
+  - `GET /api/v1/roles/:id/permissions`
+  - `PATCH /api/v1/roles/:id/permissions` (sync des permissions du role)
+  - `GET /api/v1/users/:id/roles`
+  - `PATCH /api/v1/users/:id/roles` (sync des roles du user)
+- Service metier partage:
+  - `src/lib/backoffice/rbac.ts`
+  - `syncRolePermissions`
+  - `syncUserRoles`
+
 
 ## Overview
 

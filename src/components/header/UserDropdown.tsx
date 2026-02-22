@@ -2,14 +2,14 @@
 import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { clearSession, getAuthUser, getRefreshToken } from "@/lib/auth/clientSession";
+import { AuthUser, clearSession, getAuthUser, getRefreshToken } from "@/lib/auth/clientSession";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [authUser, setAuthUser] = useState(getAuthUser());
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const router = useRouter();
 
   useEffect(() => {
