@@ -9,12 +9,23 @@ export type AppSettings = {
   maxGpsDistanceMeters: number;
   allowClientResubmission: boolean;
   reviewSlaHours: number;
+  readingReminderEnabled: boolean;
+  readingWindowStartDay: number;
+  readingWindowEndDay: number;
+  readingReminderHour: number;
+  readingReminderTimezone: string;
+  readingReminderCadence: "DAILY" | "EVERY_2_DAYS" | "EVERY_3_DAYS";
+  readingReminderMinIntervalHours: number;
+  readingReminderMaxPerWindow: number;
+  readingReminderUseWhatsapp: boolean;
+  readingReminderUseEmail: boolean;
+  readingReminderUsePush: boolean;
   enableAnomalyScoring: boolean;
   anomalyThreshold: number;
   strictMonotonicIndex: boolean;
   requirePhotoHash: boolean;
   emailNotificationsEnabled: boolean;
-  smsNotificationsEnabled: boolean;
+  whatsappNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   dailyDigestHour: number;
   maxImageSizeMb: number;
@@ -46,12 +57,23 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   maxGpsDistanceMeters: 200,
   allowClientResubmission: true,
   reviewSlaHours: 24,
+  readingReminderEnabled: true,
+  readingWindowStartDay: 20,
+  readingWindowEndDay: 5,
+  readingReminderHour: 9,
+  readingReminderTimezone: "Africa/Brazzaville",
+  readingReminderCadence: "DAILY",
+  readingReminderMinIntervalHours: 24,
+  readingReminderMaxPerWindow: 3,
+  readingReminderUseWhatsapp: true,
+  readingReminderUseEmail: true,
+  readingReminderUsePush: false,
   enableAnomalyScoring: true,
   anomalyThreshold: 65,
   strictMonotonicIndex: true,
   requirePhotoHash: true,
   emailNotificationsEnabled: true,
-  smsNotificationsEnabled: false,
+  whatsappNotificationsEnabled: false,
   pushNotificationsEnabled: true,
   dailyDigestHour: 8,
   maxImageSizeMb: 8,
@@ -98,6 +120,22 @@ function asNumber(value: unknown, fallback: number) {
   return fallback;
 }
 
+function clampInt(value: number, min: number, max: number, fallback: number) {
+  const rounded = Math.round(value);
+  if (!Number.isFinite(rounded)) return fallback;
+  return Math.min(max, Math.max(min, rounded));
+}
+
+function asCadence(
+  value: unknown,
+  fallback: AppSettings["readingReminderCadence"],
+): AppSettings["readingReminderCadence"] {
+  if (value === "DAILY" || value === "EVERY_2_DAYS" || value === "EVERY_3_DAYS") {
+    return value;
+  }
+  return fallback;
+}
+
 export function normalizeAppSettings(input: unknown): AppSettings {
   const candidate = asRecord(input);
   if (!candidate) return { ...DEFAULT_APP_SETTINGS };
@@ -123,6 +161,66 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       DEFAULT_APP_SETTINGS.allowClientResubmission,
     ),
     reviewSlaHours: asNumber(candidate.reviewSlaHours, DEFAULT_APP_SETTINGS.reviewSlaHours),
+    readingReminderEnabled: asBoolean(
+      candidate.readingReminderEnabled,
+      DEFAULT_APP_SETTINGS.readingReminderEnabled,
+    ),
+    readingWindowStartDay: clampInt(
+      asNumber(candidate.readingWindowStartDay, DEFAULT_APP_SETTINGS.readingWindowStartDay),
+      1,
+      31,
+      DEFAULT_APP_SETTINGS.readingWindowStartDay,
+    ),
+    readingWindowEndDay: clampInt(
+      asNumber(candidate.readingWindowEndDay, DEFAULT_APP_SETTINGS.readingWindowEndDay),
+      1,
+      31,
+      DEFAULT_APP_SETTINGS.readingWindowEndDay,
+    ),
+    readingReminderHour: clampInt(
+      asNumber(candidate.readingReminderHour, DEFAULT_APP_SETTINGS.readingReminderHour),
+      0,
+      23,
+      DEFAULT_APP_SETTINGS.readingReminderHour,
+    ),
+    readingReminderTimezone: asString(
+      candidate.readingReminderTimezone,
+      DEFAULT_APP_SETTINGS.readingReminderTimezone,
+    ),
+    readingReminderCadence: asCadence(
+      candidate.readingReminderCadence,
+      DEFAULT_APP_SETTINGS.readingReminderCadence,
+    ),
+    readingReminderMinIntervalHours: clampInt(
+      asNumber(
+        candidate.readingReminderMinIntervalHours,
+        DEFAULT_APP_SETTINGS.readingReminderMinIntervalHours,
+      ),
+      1,
+      168,
+      DEFAULT_APP_SETTINGS.readingReminderMinIntervalHours,
+    ),
+    readingReminderMaxPerWindow: clampInt(
+      asNumber(
+        candidate.readingReminderMaxPerWindow,
+        DEFAULT_APP_SETTINGS.readingReminderMaxPerWindow,
+      ),
+      1,
+      31,
+      DEFAULT_APP_SETTINGS.readingReminderMaxPerWindow,
+    ),
+    readingReminderUseWhatsapp: asBoolean(
+      candidate.readingReminderUseWhatsapp ?? candidate.readingReminderUseSms,
+      DEFAULT_APP_SETTINGS.readingReminderUseWhatsapp,
+    ),
+    readingReminderUseEmail: asBoolean(
+      candidate.readingReminderUseEmail,
+      DEFAULT_APP_SETTINGS.readingReminderUseEmail,
+    ),
+    readingReminderUsePush: asBoolean(
+      candidate.readingReminderUsePush,
+      DEFAULT_APP_SETTINGS.readingReminderUsePush,
+    ),
     enableAnomalyScoring: asBoolean(
       candidate.enableAnomalyScoring,
       DEFAULT_APP_SETTINGS.enableAnomalyScoring,
@@ -137,9 +235,9 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       candidate.emailNotificationsEnabled,
       DEFAULT_APP_SETTINGS.emailNotificationsEnabled,
     ),
-    smsNotificationsEnabled: asBoolean(
-      candidate.smsNotificationsEnabled,
-      DEFAULT_APP_SETTINGS.smsNotificationsEnabled,
+    whatsappNotificationsEnabled: asBoolean(
+      candidate.whatsappNotificationsEnabled ?? candidate.smsNotificationsEnabled,
+      DEFAULT_APP_SETTINGS.whatsappNotificationsEnabled,
     ),
     pushNotificationsEnabled: asBoolean(
       candidate.pushNotificationsEnabled,
@@ -209,5 +307,20 @@ export function normalizeAppSettings(input: unknown): AppSettings {
 export function mergeAppSettings(base: AppSettings, patch: unknown): AppSettings {
   const patchObj = asRecord(patch);
   if (!patchObj) return { ...base };
-  return normalizeAppSettings({ ...base, ...patchObj });
+
+  const normalizedPatch = { ...patchObj };
+  if (
+    typeof normalizedPatch.readingReminderUseSms === "boolean" &&
+    typeof normalizedPatch.readingReminderUseWhatsapp !== "boolean"
+  ) {
+    normalizedPatch.readingReminderUseWhatsapp = normalizedPatch.readingReminderUseSms;
+  }
+  if (
+    typeof normalizedPatch.smsNotificationsEnabled === "boolean" &&
+    typeof normalizedPatch.whatsappNotificationsEnabled !== "boolean"
+  ) {
+    normalizedPatch.whatsappNotificationsEnabled = normalizedPatch.smsNotificationsEnabled;
+  }
+
+  return normalizeAppSettings({ ...base, ...normalizedPatch });
 }

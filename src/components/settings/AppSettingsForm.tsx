@@ -128,6 +128,112 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+          Reading reminder window
+        </h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Configure la periode mensuelle de relance client pour l&apos;auto-releve (ex: du 20 au 5).
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Toggle
+            label="Enable client reminders"
+            checked={settings.readingReminderEnabled}
+            onChange={(checked) => setSettings((prev) => ({ ...prev, readingReminderEnabled: checked }))}
+          />
+          <Field label="Reminder timezone">
+            <Input
+              value={settings.readingReminderTimezone}
+              onChange={(e) => setSettings((prev) => ({ ...prev, readingReminderTimezone: e.target.value }))}
+            />
+          </Field>
+          <Field label="Window start day (1-31)">
+            <Input
+              type="number"
+              value={settings.readingWindowStartDay}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, readingWindowStartDay: Number(e.target.value || "1") }))
+              }
+            />
+          </Field>
+          <Field label="Window end day (1-31)">
+            <Input
+              type="number"
+              value={settings.readingWindowEndDay}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, readingWindowEndDay: Number(e.target.value || "1") }))
+              }
+            />
+          </Field>
+          <Field label="Reminder hour (0-23)">
+            <Input
+              type="number"
+              value={settings.readingReminderHour}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, readingReminderHour: Number(e.target.value || "0") }))
+              }
+            />
+          </Field>
+          <Field label="Reminder cadence">
+            <select
+              value={settings.readingReminderCadence}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  readingReminderCadence: e.target.value as AppSettings["readingReminderCadence"],
+                }))
+              }
+              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            >
+              <option value="DAILY">Daily</option>
+              <option value="EVERY_2_DAYS">Every 2 days</option>
+              <option value="EVERY_3_DAYS">Every 3 days</option>
+            </select>
+          </Field>
+          <Field label="Min interval between reminders (hours)">
+            <Input
+              type="number"
+              value={settings.readingReminderMinIntervalHours}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  readingReminderMinIntervalHours: Number(e.target.value || "1"),
+                }))
+              }
+            />
+          </Field>
+          <Field label="Max reminders per window">
+            <Input
+              type="number"
+              value={settings.readingReminderMaxPerWindow}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  readingReminderMaxPerWindow: Number(e.target.value || "1"),
+                }))
+              }
+            />
+          </Field>
+          <Toggle
+            label="Use WhatsApp channel"
+            checked={settings.readingReminderUseWhatsapp}
+            onChange={(checked) =>
+              setSettings((prev) => ({ ...prev, readingReminderUseWhatsapp: checked }))
+            }
+          />
+          <Toggle
+            label="Use Email channel"
+            checked={settings.readingReminderUseEmail}
+            onChange={(checked) => setSettings((prev) => ({ ...prev, readingReminderUseEmail: checked }))}
+          />
+          <Toggle
+            label="Use Push channel"
+            checked={settings.readingReminderUsePush}
+            onChange={(checked) => setSettings((prev) => ({ ...prev, readingReminderUsePush: checked }))}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Anti-fraud</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Toggle
@@ -164,9 +270,11 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
             onChange={(checked) => setSettings((prev) => ({ ...prev, emailNotificationsEnabled: checked }))}
           />
           <Toggle
-            label="SMS notifications"
-            checked={settings.smsNotificationsEnabled}
-            onChange={(checked) => setSettings((prev) => ({ ...prev, smsNotificationsEnabled: checked }))}
+            label="WhatsApp notifications"
+            checked={settings.whatsappNotificationsEnabled}
+            onChange={(checked) =>
+              setSettings((prev) => ({ ...prev, whatsappNotificationsEnabled: checked }))
+            }
           />
           <Toggle
             label="Push notifications"

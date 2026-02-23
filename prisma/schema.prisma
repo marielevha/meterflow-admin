@@ -90,6 +90,68 @@ enum TaskItemStatus {
   CANCELED
 }
 
+enum BillingCampaignStatus {
+  DRAFT
+  READY
+  RUNNING
+  GENERATED
+  ISSUED
+  CLOSED
+  CANCELED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING_REVIEW
+  ISSUED
+  DELIVERED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELED
+}
+
+enum InvoiceLineType {
+  CONSUMPTION
+  FIXED_FEE
+  TAX
+  ADJUSTMENT
+  PENALTY
+}
+
+enum DeliveryChannel {
+  SMS
+  EMAIL
+  PORTAL
+  PRINT
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  CARD
+  BANK_TRANSFER
+  ADJUSTMENT
+}
+
+enum ReminderChannel {
+  SMS
+  EMAIL
+  PUSH
+}
+
+enum ReminderStatus {
+  SENT
+  FAILED
+  SKIPPED
+}
+
 enum OtpPurpose {
   LOGIN
   SIGNUP
@@ -136,6 +198,15 @@ model User {
   authSessions           AuthSession[]
   roleAssignments        UserRoleAssignment[] @relation("UserAssignedRoles")
   grantedRoleAssignments UserRoleAssignment[] @relation("UserGrantedRoles")
+  billingCampaigns       BillingCampaign[]    @relation("BillingCampaignCreatedBy")
+  billedInvoices         Invoice[]            @relation("InvoiceCustomer")
+  generatedInvoices      Invoice[]            @relation("InvoiceGeneratedBy")
+  approvedInvoices       Invoice[]            @relation("InvoiceApprovedBy")
+  canceledInvoices       Invoice[]            @relation("InvoiceCanceledBy")
+  createdInvoiceEvents   InvoiceEvent[]
+  receivedPayments       Payment[]            @relation("PaymentReceivedBy")
+  deliveryLogs           InvoiceDelivery[]    @relation("InvoiceDeliveryTriggeredBy")
+  readingReminderLogs    ReadingReminderLog[]
 
   @@index([role, status])
   @@index([deletedAt])
@@ -239,6 +310,7 @@ model Meter {
   readings         Reading[]
   tasks            Task[]
   taskItems        TaskItem[]
+  invoices         Invoice[]
 
   @@index([customerId])
   @@index([assignedAgentId])
@@ -303,6 +375,9 @@ model Reading {
   meterStates       MeterState[]
   tasks             Task[]
   taskItems         TaskItem[]
+  invoices          Invoice[]      @relation("InvoiceSourceReading")
+  fromInvoices      Invoice[]      @relation("InvoiceFromReading")
+  toInvoices        Invoice[]      @relation("InvoiceToReading")
 
   @@index([meterId, status, readingAt])
   @@index([submittedById, status])
@@ -483,4 +558,256 @@ model AppSetting {
 
   @@index([deletedAt])
   @@map("app_settings")
+}
+
+model BillingCampaign {
+  id                String                @id @default(uuid()) @db.Uuid
+  code              String                @unique
+  name              String
+  periodStart       DateTime              @map("period_start")
+  periodEnd         DateTime              @map("period_end")
+  submissionStartAt DateTime?             @map("submission_start_at")
+  submissionEndAt   DateTime?             @map("submission_end_at")
+  cutoffAt          DateTime?             @map("cutoff_at")
+  frequency         String
+  city              String?
+  zone              String?
+  status            BillingCampaignStatus @default(DRAFT)
+  tariffPlanId      String?               @map("tariff_plan_id") @db.Uuid
+  createdById       String?               @map("created_by_id") @db.Uuid
+  launchedAt        DateTime?             @map("launched_at")
+  generatedAt       DateTime?             @map("generated_at")
+  issuedAt          DateTime?             @map("issued_at")
+  finalizedAt       DateTime?             @map("finalized_at")
+  notes             String?
+  settingsSnapshot  Json?                 @map("settings_snapshot")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  deletedAt         DateTime?             @map("deleted_at")
+  tariffPlan        TariffPlan?           @relation(fields: [tariffPlanId], references: [id])
+  createdBy         User?                 @relation("BillingCampaignCreatedBy", fields: [createdById], references: [id])
+  invoices          Invoice[]
+
+  @@index([status, periodStart, periodEnd])
+  @@index([city, zone, status])
+  @@index([tariffPlanId])
+  @@index([createdById])
+  @@index([deletedAt])
+  @@map("billing_campaigns")
+}
+
+model TariffPlan {
+  id             String            @id @default(uuid()) @db.Uuid
+  code           String            @unique
+  name           String
+  description    String?
+  currency       String            @default("XAF")
+  fixedCharge    Decimal           @default(0) @map("fixed_charge") @db.Decimal(14, 2)
+  taxPercent     Decimal           @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  lateFeePercent Decimal           @default(0) @map("late_fee_percent") @db.Decimal(5, 2)
+  isDefault      Boolean           @default(false) @map("is_default")
+  isActive       Boolean           @default(true) @map("is_active")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  deletedAt      DateTime?         @map("deleted_at")
+  tiers          TariffTier[]
+  campaigns      BillingCampaign[]
+  invoices       Invoice[]
+
+  @@index([isActive, isDefault])
+  @@index([deletedAt])
+  @@map("tariff_plans")
+}
+
+model TariffTier {
+  id             String     @id @default(uuid()) @db.Uuid
+  tariffPlanId   String     @map("tariff_plan_id") @db.Uuid
+  minConsumption Decimal    @map("min_consumption") @db.Decimal(14, 3)
+  maxConsumption Decimal?   @map("max_consumption") @db.Decimal(14, 3)
+  unitPrice      Decimal    @map("unit_price") @db.Decimal(14, 3)
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  deletedAt      DateTime?  @map("deleted_at")
+  tariffPlan     TariffPlan @relation(fields: [tariffPlanId], references: [id])
+
+  @@index([tariffPlanId, minConsumption, maxConsumption])
+  @@index([deletedAt])
+  @@map("tariff_tiers")
+}
+
+model Invoice {
+  id                   String            @id @default(uuid()) @db.Uuid
+  invoiceNumber        String            @unique @map("invoice_number")
+  campaignId           String?           @map("campaign_id") @db.Uuid
+  tariffPlanId         String?           @map("tariff_plan_id") @db.Uuid
+  customerId           String            @map("customer_id") @db.Uuid
+  meterId              String            @map("meter_id") @db.Uuid
+  sourceReadingId      String?           @map("source_reading_id") @db.Uuid
+  fromReadingId        String?           @map("from_reading_id") @db.Uuid
+  toReadingId          String?           @map("to_reading_id") @db.Uuid
+  generatedById        String?           @map("generated_by_id") @db.Uuid
+  approvedById         String?           @map("approved_by_id") @db.Uuid
+  canceledById         String?           @map("canceled_by_id") @db.Uuid
+  status               InvoiceStatus     @default(DRAFT)
+  currency             String            @default("XAF")
+  periodStart          DateTime          @map("period_start")
+  periodEnd            DateTime          @map("period_end")
+  dueDate              DateTime?         @map("due_date")
+  fromPrimaryIndex     Decimal?          @map("from_primary_index") @db.Decimal(14, 3)
+  toPrimaryIndex       Decimal?          @map("to_primary_index") @db.Decimal(14, 3)
+  fromSecondaryIndex   Decimal?          @map("from_secondary_index") @db.Decimal(14, 3)
+  toSecondaryIndex     Decimal?          @map("to_secondary_index") @db.Decimal(14, 3)
+  previousPrimary      Decimal?          @map("previous_primary") @db.Decimal(14, 3)
+  currentPrimary       Decimal?          @map("current_primary") @db.Decimal(14, 3)
+  previousSecondary    Decimal?          @map("previous_secondary") @db.Decimal(14, 3)
+  currentSecondary     Decimal?          @map("current_secondary") @db.Decimal(14, 3)
+  consumptionPrimary   Decimal           @default(0) @map("consumption_primary") @db.Decimal(14, 3)
+  consumptionSecondary Decimal?          @default(0) @map("consumption_secondary") @db.Decimal(14, 3)
+  isEstimated          Boolean           @default(false) @map("is_estimated")
+  estimationMethod     String?           @map("estimation_method")
+  hasException         Boolean           @default(false) @map("has_exception")
+  subtotal             Decimal           @default(0) @db.Decimal(14, 2)
+  taxAmount            Decimal           @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  fixedAmount          Decimal           @default(0) @map("fixed_amount") @db.Decimal(14, 2)
+  adjustmentAmount     Decimal           @default(0) @map("adjustment_amount") @db.Decimal(14, 2)
+  totalAmount          Decimal           @default(0) @map("total_amount") @db.Decimal(14, 2)
+  paidAmount           Decimal           @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  issuedAt             DateTime?         @map("issued_at")
+  deliveredAt          DateTime?         @map("delivered_at")
+  canceledAt           DateTime?         @map("canceled_at")
+  cycleFinalizedAt     DateTime?         @map("cycle_finalized_at")
+  cancelReason         String?           @map("cancel_reason")
+  metadata             Json?             @default("{}")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  deletedAt            DateTime?         @map("deleted_at")
+  campaign             BillingCampaign?  @relation(fields: [campaignId], references: [id])
+  tariffPlan           TariffPlan?       @relation(fields: [tariffPlanId], references: [id])
+  customer             User              @relation("InvoiceCustomer", fields: [customerId], references: [id])
+  meter                Meter             @relation(fields: [meterId], references: [id])
+  sourceReading        Reading?          @relation("InvoiceSourceReading", fields: [sourceReadingId], references: [id])
+  fromReading          Reading?          @relation("InvoiceFromReading", fields: [fromReadingId], references: [id])
+  toReading            Reading?          @relation("InvoiceToReading", fields: [toReadingId], references: [id])
+  generatedBy          User?             @relation("InvoiceGeneratedBy", fields: [generatedById], references: [id])
+  approvedBy           User?             @relation("InvoiceApprovedBy", fields: [approvedById], references: [id])
+  canceledBy           User?             @relation("InvoiceCanceledBy", fields: [canceledById], references: [id])
+  lines                InvoiceLine[]
+  events               InvoiceEvent[]
+  payments             Payment[]
+  deliveries           InvoiceDelivery[]
+
+  @@unique([campaignId, meterId])
+  @@index([campaignId, status])
+  @@index([customerId, status, periodStart])
+  @@index([meterId, periodStart, periodEnd])
+  @@index([tariffPlanId])
+  @@index([sourceReadingId])
+  @@index([fromReadingId])
+  @@index([toReadingId])
+  @@index([deletedAt])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id        String          @id @default(uuid()) @db.Uuid
+  invoiceId String          @map("invoice_id") @db.Uuid
+  type      InvoiceLineType
+  label     String
+  quantity  Decimal         @default(0) @db.Decimal(14, 3)
+  unitPrice Decimal         @default(0) @map("unit_price") @db.Decimal(14, 3)
+  amount    Decimal         @default(0) @db.Decimal(14, 2)
+  meta      Json?           @default("{}")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  deletedAt DateTime?       @map("deleted_at")
+  invoice   Invoice         @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId, type])
+  @@index([deletedAt])
+  @@map("invoice_lines")
+}
+
+model InvoiceEvent {
+  id        String    @id @default(uuid()) @db.Uuid
+  invoiceId String    @map("invoice_id") @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  type      String
+  payload   Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  invoice   Invoice   @relation(fields: [invoiceId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([invoiceId, type, createdAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("invoice_events")
+}
+
+model Payment {
+  id           String        @id @default(uuid()) @db.Uuid
+  invoiceId    String        @map("invoice_id") @db.Uuid
+  amount       Decimal       @db.Decimal(14, 2)
+  method       PaymentMethod
+  reference    String?
+  paidAt       DateTime      @map("paid_at")
+  receivedById String?       @map("received_by_id") @db.Uuid
+  metadata     Json?         @default("{}")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id])
+  receivedBy   User?         @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+
+  @@index([invoiceId, paidAt])
+  @@index([receivedById])
+  @@index([deletedAt])
+  @@map("payments")
+}
+
+model InvoiceDelivery {
+  id                String          @id @default(uuid()) @db.Uuid
+  invoiceId         String          @map("invoice_id") @db.Uuid
+  channel           DeliveryChannel
+  recipient         String
+  status            DeliveryStatus  @default(PENDING)
+  providerMessageId String?         @map("provider_message_id")
+  errorMessage      String?         @map("error_message")
+  sentAt            DateTime?       @map("sent_at")
+  triggeredById     String?         @map("triggered_by_id") @db.Uuid
+  metadata          Json?           @default("{}")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  invoice           Invoice         @relation(fields: [invoiceId], references: [id])
+  triggeredBy       User?           @relation("InvoiceDeliveryTriggeredBy", fields: [triggeredById], references: [id])
+
+  @@index([invoiceId, channel, status])
+  @@index([triggeredById])
+  @@index([deletedAt])
+  @@map("invoice_deliveries")
+}
+
+model ReadingReminderLog {
+  id                String          @id @default(uuid()) @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  channel           ReminderChannel
+  status            ReminderStatus
+  reminderWindowKey String          @map("reminder_window_key")
+  windowStart       DateTime        @map("window_start")
+  windowEnd         DateTime        @map("window_end")
+  pendingMeters     Int             @default(0) @map("pending_meters")
+  reason            String?
+  providerMessageId String?         @map("provider_message_id")
+  payload           Json?           @default("{}")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  user              User            @relation(fields: [userId], references: [id])
+
+  @@index([userId, channel, createdAt])
+  @@index([reminderWindowKey, channel, status])
+  @@index([deletedAt])
+  @@map("reading_reminder_logs")
 }

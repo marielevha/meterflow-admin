@@ -55,6 +55,16 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <PieChartIcon />,
+    name: "Billing",
+    subItems: [
+      { name: "Overview", path: "/admin/billing", pro: false },
+      { name: "Tariffs", path: "/admin/billing/tariffs", pro: false },
+      { name: "Campaigns", path: "/admin/billing/campaigns", pro: false },
+      { name: "Invoices", path: "/admin/billing/invoices", pro: false },
+    ],
+  },
+  {
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/admin/calendar",

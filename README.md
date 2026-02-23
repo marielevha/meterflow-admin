@@ -241,6 +241,62 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - affichage/masquage des graphiques selon les cases cochees dans settings
   - seuil GPS anti-fraude utilise depuis `maxGpsDistanceMeters` configure en settings
 
+### 18) Module billing complet (campagnes, tarifs, factures)
+
+- Nouveau bloc menu `Billing` avec sous-pages:
+  - `/admin/billing`
+  - `/admin/billing/tariffs`
+  - `/admin/billing/campaigns`
+  - `/admin/billing/invoices`
+  - `/admin/billing/invoices/:id`
+- Backend billing:
+  - service metier `src/lib/backoffice/billing.ts`
+  - server actions billing `src/app/(admin)/admin/billing/actions.ts`
+  - APIs REST:
+    - `GET/POST /api/v1/billing/tariffs`
+    - `PATCH /api/v1/billing/tariffs/:id`
+    - `GET/POST /api/v1/billing/campaigns`
+    - `POST /api/v1/billing/campaigns/:id/generate`
+    - `POST /api/v1/billing/campaigns/:id/issue`
+    - `GET /api/v1/billing/invoices`
+    - `GET /api/v1/billing/invoices/:id`
+    - `POST /api/v1/billing/invoices/:id/issue`
+    - `POST /api/v1/billing/invoices/:id/deliveries`
+    - `POST /api/v1/billing/invoices/:id/payments`
+    - `POST /api/v1/billing/invoices/:id/cancel`
+- Modele billing Prisma (migrations inclues):
+  - `billing_campaigns`, `tariff_plans`, `tariff_tiers`, `invoices`, `invoice_lines`, `invoice_events`, `invoice_deliveries`, `payments`
+  - robustesse cycle: references `fromReadingId` / `toReadingId` + indexes source/cible et finalisation de cycle
+  - garde-fou: unicite facture par compteur et campagne (`@@unique([campaignId, meterId])`)
+
+### 19) Rappels automatiques de releve (cron + WhatsApp/Email/Push)
+
+- Fenetre de releve configurable dans settings:
+  - `readingWindowStartDay`, `readingWindowEndDay`, `readingReminderHour`, `readingReminderTimezone`, `readingReminderCadence`
+  - cadence `DAILY`, `EVERY_2_DAYS`, `EVERY_3_DAYS`
+- Limites anti-spam configurees:
+  - `readingReminderMinIntervalHours`
+  - `readingReminderMaxPerWindow`
+- Canaux configurables:
+  - `readingReminderUseWhatsapp`, `readingReminderUseEmail`, `readingReminderUsePush`
+  - `whatsappNotificationsEnabled`, `emailNotificationsEnabled`, `pushNotificationsEnabled`
+- Compatibilite retroactive settings:
+  - fallback auto des anciennes cles `readingReminderUseSms` et `smsNotificationsEnabled`
+- Nouveau job metier:
+  - `src/lib/reminders/readingReminders.ts`
+  - calcule clients eligibles (CLIENT actifs avec compteurs actifs non releves dans la fenetre)
+  - envoi + journalisation dans `reading_reminder_logs`
+- Endpoint cron securise:
+  - `POST /api/v1/cron/reading-reminders`
+  - auth via `x-cron-secret` ou `Authorization: Bearer <CRON_SECRET>`
+  - body optionnel: `{ "force": true, "runAt": "ISO_DATE" }`
+- Envoi WhatsApp Twilio:
+  - canal Twilio Messages avec prefixe `whatsapp:`
+  - variables `.env`: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`
+- Envoi Email/Push:
+  - email via Resend (`RESEND_API_KEY`, `REMINDER_EMAIL_FROM`)
+  - push via webhook (`REMINDER_PUSH_WEBHOOK_URL`)
+
 
 ## Overview
 
