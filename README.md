@@ -280,6 +280,9 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - Canaux configurables:
   - `readingReminderUseWhatsapp`, `readingReminderUseEmail`, `readingReminderUsePush`
   - `whatsappNotificationsEnabled`, `emailNotificationsEnabled`, `pushNotificationsEnabled`
+- Provider email API configurable depuis settings:
+  - `emailApiProvider`: `RESEND` ou `MAILTRAP`
+  - UI settings mise a jour en radio boutons (Resend/Mailtrap)
 - Compatibilite retroactive settings:
   - fallback auto des anciennes cles `readingReminderUseSms` et `smsNotificationsEnabled`
 - Nouveau job metier:
@@ -294,7 +297,7 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - canal Twilio Messages avec prefixe `whatsapp:`
   - variables `.env`: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`
 - Envoi Email/Push:
-  - email via Resend (`RESEND_API_KEY`, `REMINDER_EMAIL_FROM`)
+  - email via Resend ou Mailtrap (`RESEND_API_KEY` ou `MAILTRAP_API_KEY`, plus `REMINDER_EMAIL_FROM`)
   - push via webhook (`REMINDER_PUSH_WEBHOOK_URL`)
 
 

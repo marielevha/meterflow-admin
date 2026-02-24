@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAppSettings } from "@/lib/settings/serverSettings";
+import type { EmailApiProvider } from "@/lib/settings/appSettings";
 import {
   getReminderWindowBounds,
   shouldTriggerReadingReminder,
@@ -163,7 +164,13 @@ async function sendWhatsApp(to: string, text: string) {
   }
 }
 
-async function sendEmail(to: string, subject: string, text: string, html: string) {
+function extractEmailAddress(fromValue: string) {
+  const trimmed = fromValue.trim();
+  const match = trimmed.match(/<([^>]+)>/);
+  return (match?.[1] || trimmed).trim();
+}
+
+async function sendEmailViaResend(to: string, subject: string, text: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.REMINDER_EMAIL_FROM?.trim();
 
@@ -209,6 +216,78 @@ async function sendEmail(to: string, subject: string, text: string, html: string
       providerMessageId: null,
     };
   }
+}
+
+async function sendEmailViaMailtrap(to: string, subject: string, text: string, html: string) {
+  const apiKey = process.env.MAILTRAP_API_KEY?.trim();
+  const from = process.env.REMINDER_EMAIL_FROM?.trim();
+  const fromEmail = from ? extractEmailAddress(from) : "";
+
+  if (!apiKey || !fromEmail) {
+    return {
+      status: ReminderStatus.SKIPPED,
+      reason: "email_provider_not_configured",
+      providerMessageId: null,
+    };
+  }
+
+  try {
+    const response = await fetch("https://send.api.mailtrap.io/api/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: {
+          email: fromEmail,
+          name: "MeterFlow",
+        },
+        to: [{ email: to }],
+        subject,
+        text,
+        html,
+        category: "reading_reminder",
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { message_ids?: string[]; errors?: unknown; message?: string }
+      | null;
+
+    if (!response.ok) {
+      return {
+        status: ReminderStatus.FAILED,
+        reason: payload?.message || `mailtrap_http_${response.status}`,
+        providerMessageId: null,
+      };
+    }
+
+    return {
+      status: ReminderStatus.SENT,
+      reason: null,
+      providerMessageId: payload?.message_ids?.[0] || null,
+    };
+  } catch {
+    return {
+      status: ReminderStatus.FAILED,
+      reason: "mailtrap_request_failed",
+      providerMessageId: null,
+    };
+  }
+}
+
+async function sendEmail(
+  provider: EmailApiProvider,
+  to: string,
+  subject: string,
+  text: string,
+  html: string,
+) {
+  if (provider === "MAILTRAP") {
+    return sendEmailViaMailtrap(to, subject, text, html);
+  }
+  return sendEmailViaResend(to, subject, text, html);
 }
 
 async function sendPush(userId: string, title: string, body: string) {
@@ -505,6 +584,7 @@ export async function executeReadingRemindersJob(
           };
         } else {
           sendResult = await sendEmail(
+            settings.emailApiProvider,
             client.email,
             message.emailSubject,
             message.emailText,

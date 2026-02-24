@@ -264,6 +264,32 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Notifications & storage</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Email API provider">
+            <div className="flex flex-wrap items-center gap-6 rounded-lg border border-gray-300 px-4 py-3 dark:border-gray-700">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  name="emailApiProvider"
+                  value="RESEND"
+                  checked={settings.emailApiProvider === "RESEND"}
+                  onChange={() => setSettings((prev) => ({ ...prev, emailApiProvider: "RESEND" }))}
+                  className="h-4 w-4 text-brand-500 focus:ring-brand-500"
+                />
+                Resend
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  name="emailApiProvider"
+                  value="MAILTRAP"
+                  checked={settings.emailApiProvider === "MAILTRAP"}
+                  onChange={() => setSettings((prev) => ({ ...prev, emailApiProvider: "MAILTRAP" }))}
+                  className="h-4 w-4 text-brand-500 focus:ring-brand-500"
+                />
+                Mailtrap
+              </label>
+            </div>
+          </Field>
           <Toggle
             label="Email notifications"
             checked={settings.emailNotificationsEnabled}

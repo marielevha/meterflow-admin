@@ -1,5 +1,7 @@
 export const APP_SETTINGS_DB_KEY = "global";
 
+export type EmailApiProvider = "RESEND" | "MAILTRAP";
+
 export type AppSettings = {
   companyName: string;
   defaultCountryCode: string;
@@ -24,6 +26,7 @@ export type AppSettings = {
   anomalyThreshold: number;
   strictMonotonicIndex: boolean;
   requirePhotoHash: boolean;
+  emailApiProvider: EmailApiProvider;
   emailNotificationsEnabled: boolean;
   whatsappNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
@@ -72,6 +75,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   anomalyThreshold: 65,
   strictMonotonicIndex: true,
   requirePhotoHash: true,
+  emailApiProvider: "RESEND",
   emailNotificationsEnabled: true,
   whatsappNotificationsEnabled: false,
   pushNotificationsEnabled: true,
@@ -133,6 +137,11 @@ function asCadence(
   if (value === "DAILY" || value === "EVERY_2_DAYS" || value === "EVERY_3_DAYS") {
     return value;
   }
+  return fallback;
+}
+
+function asEmailApiProvider(value: unknown, fallback: EmailApiProvider): EmailApiProvider {
+  if (value === "RESEND" || value === "MAILTRAP") return value;
   return fallback;
 }
 
@@ -231,6 +240,10 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       DEFAULT_APP_SETTINGS.strictMonotonicIndex,
     ),
     requirePhotoHash: asBoolean(candidate.requirePhotoHash, DEFAULT_APP_SETTINGS.requirePhotoHash),
+    emailApiProvider: asEmailApiProvider(
+      candidate.emailApiProvider,
+      DEFAULT_APP_SETTINGS.emailApiProvider,
+    ),
     emailNotificationsEnabled: asBoolean(
       candidate.emailNotificationsEnabled,
       DEFAULT_APP_SETTINGS.emailNotificationsEnabled,
