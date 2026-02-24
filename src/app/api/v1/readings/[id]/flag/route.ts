@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { flagReading } from "@/lib/backoffice/readings";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function POST(
+async function postFlagReading(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -24,3 +25,5 @@ export async function POST(
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 }
+
+export const POST = withRouteInstrumentation("api.v1.readings.flag", postFlagReading);

@@ -9,6 +9,7 @@ import {
   UserStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isTaskTransitionAllowed } from "@/lib/workflows/stateMachines";
 
 type StaffUser = {
   id: string;
@@ -632,14 +633,8 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   if (payload.status !== undefined) {
     const parsed = parseTaskStatus(payload.status);
     if (!parsed) return { status: 400, body: { error: "invalid_status" } };
-
-    if (
-      !manager &&
-      parsed !== TaskStatus.IN_PROGRESS &&
-      parsed !== TaskStatus.BLOCKED &&
-      parsed !== TaskStatus.DONE
-    ) {
-      return { status: 403, body: { error: "status_not_allowed_for_agent" } };
+    if (!isTaskTransitionAllowed(staff.role, existing.status, parsed)) {
+      return { status: 409, body: { error: "invalid_status_transition" } };
     }
 
     data.status = parsed;

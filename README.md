@@ -330,6 +330,60 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - audit trail du detail releve:
     - remplacement du JSON brut par une presentation lisible (cle/valeur formatee pour utilisateur final).
 
+### 21) P0/P1/P2 robustesse, observabilite et exploitation
+
+- Stabilite navigation/sidebar:
+  - correction d'un risque de boucle de rendu dans `AppSidebar` (gestion d'ouverture des sous-menus, etat actif par chemin le plus specifique).
+  - activation du sous-menu coherent sur les pages detail/edit (users/meters/readings/tasks).
+
+- Renforcement workflows metier:
+  - machine d'etats centralisee pour transitions (`src/lib/workflows/stateMachines.ts`).
+  - garde-fous sur transitions Tasks/Readings pour limiter les regressions de statut.
+  - audit harmonise sur modifications manuelles.
+
+- Observabilite API:
+  - wrapper d'instrumentation `withRouteInstrumentation`:
+    - generation/propagation `x-request-id`
+    - mesure de latence
+    - logs de succes/erreur standardises.
+  - integration sur endpoints critiques auth/readings/tasks/dashboard/billing.
+
+- Logging serveur avec rotation type rolling files:
+  - logger JSON structure (`src/lib/observability/logger.ts`)
+  - ecriture disque:
+    - `logs/application.log`
+    - `logs/error.log`
+  - rotation par taille + retention fichiers archives (`.1`, `.2`, ...).
+  - variables de config:
+    - `LOG_DIR`
+    - `LOG_MAX_FILE_SIZE_MB`
+    - `LOG_MAX_FILES`
+    - `LOG_LEVEL`
+    - `LOG_TO_CONSOLE`
+
+- Exploitation / readiness:
+  - endpoint health:
+    - `GET /api/health` (etat app + connectivite DB, `ok`/`degraded`).
+  - smoke checks P2:
+    - script `scripts/p2_smoke_checks.sh`
+    - commande `npm run smoke:p2`
+    - verification rapide: health -> login -> endpoint protege + presence `x-request-id`.
+
+- Scalabilite requetes admin:
+  - extraction de la logique Overview vers un service dedie `src/lib/backoffice/overview.ts`.
+  - cache serveur (`unstable_cache`, revalidate 60s) pour reduire la charge SQL.
+  - indexes Prisma/SQL ajoutes:
+    - `meter_states(deleted_at, effective_at)`
+    - `readings(deleted_at, created_at)`
+    - `readings(deleted_at, status, created_at)`
+    - `reading_events(deleted_at, created_at)`
+    - `tasks(deleted_at, created_at)`
+  - migration: `prisma/migrations/20260224164000_add_perf_indexes`.
+
+- Branding applicatif centralise:
+  - suppression de l'usage hardcode du nom produit dans les rappels.
+  - les messages reminders utilisent maintenant `settings.companyName` (DB settings) comme source unique.
+
 
 ## Overview
 

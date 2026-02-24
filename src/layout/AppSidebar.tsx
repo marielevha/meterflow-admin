@@ -26,6 +26,7 @@ type NavItem = {
   path?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
+const SHOW_DEMO_MENU = process.env.NEXT_PUBLIC_SHOW_DEMO_MENU === "1";
 
 const navItems: NavItem[] = [
   {
@@ -89,6 +90,9 @@ const navItems: NavItem[] = [
     path: "/admin/settings",
   },
 
+];
+
+const demoMainItems: NavItem[] = [
   {
     name: "Forms",
     icon: <ListIcon />,
@@ -109,7 +113,7 @@ const navItems: NavItem[] = [
   },
 ];
 
-const othersItems: NavItem[] = [
+const demoOtherItems: NavItem[] = [
   {
     icon: <PieChartIcon />,
     name: "Charts",
@@ -143,13 +147,15 @@ const othersItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const effectiveMainItems = SHOW_DEMO_MENU ? [...navItems, ...demoMainItems] : navItems;
+  const effectiveOtherItems = SHOW_DEMO_MENU ? demoOtherItems : [];
 
   const renderMenuItems = (
-    navItems: NavItem[],
+    menuItems: NavItem[],
     menuType: "main" | "others"
   ) => (
     <ul className="flex flex-col gap-4">
-      {navItems.map((nav, index) => (
+      {menuItems.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
@@ -324,8 +330,8 @@ const AppSidebar: React.FC = () => {
       });
     };
 
-    inspect(navItems, "main");
-    inspect(othersItems, "others");
+    inspect(effectiveMainItems, "main");
+    inspect(effectiveOtherItems, "others");
     return best;
   })();
 
@@ -416,25 +422,27 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(effectiveMainItems, "main")}
             </div>
 
-            <div className="">
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(othersItems, "others")}
-            </div>
+            {effectiveOtherItems.length > 0 ? (
+              <div className="">
+                <h2
+                  className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    "Others"
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(effectiveOtherItems, "others")}
+              </div>
+            ) : null}
           </div>
         </nav>
         {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}

@@ -335,6 +335,7 @@ model MeterState {
   sourceReading     Reading?  @relation(fields: [sourceReadingId], references: [id])
 
   @@index([meterId, effectiveAt])
+  @@index([deletedAt, effectiveAt])
   @@index([sourceReadingId])
   @@index([deletedAt])
   @@map("meter_states")
@@ -382,6 +383,8 @@ model Reading {
   @@index([meterId, status, readingAt])
   @@index([submittedById, status])
   @@index([reviewedById])
+  @@index([deletedAt, createdAt])
+  @@index([deletedAt, status, createdAt])
   @@index([deletedAt])
   @@map("readings")
 }
@@ -399,6 +402,7 @@ model ReadingEvent {
   user      User?            @relation(fields: [userId], references: [id])
 
   @@index([readingId, type, createdAt])
+  @@index([deletedAt, createdAt])
   @@index([userId])
   @@index([deletedAt])
   @@map("reading_events")
@@ -431,6 +435,7 @@ model Task {
   attachments  TaskAttachment[]
 
   @@index([status, priority, dueAt])
+  @@index([deletedAt, createdAt])
   @@index([assignedToId])
   @@index([meterId, readingId])
   @@index([deletedAt])

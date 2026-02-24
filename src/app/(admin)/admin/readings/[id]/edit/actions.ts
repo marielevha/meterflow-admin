@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { prisma } from "@/lib/prisma";
+import { isReadingTransitionAllowed } from "@/lib/workflows/stateMachines";
 
 function asString(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -34,13 +35,6 @@ function parseStatus(value: string): ReadingStatus | null {
   return Object.values(ReadingStatus).includes(value as ReadingStatus)
     ? (value as ReadingStatus)
     : null;
-}
-
-function buildEventType(status: ReadingStatus) {
-  if (status === ReadingStatus.VALIDATED) return ReadingEventType.VALIDATED;
-  if (status === ReadingStatus.FLAGGED) return ReadingEventType.FLAGGED;
-  if (status === ReadingStatus.REJECTED) return ReadingEventType.REJECTED;
-  return ReadingEventType.SUBMITTED;
 }
 
 export async function updateReadingAction(readingId: string, formData: FormData) {
@@ -116,6 +110,10 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     redirect(`/admin/readings?error=reading_not_found`);
   }
 
+  if (!isReadingTransitionAllowed(staff.role, existing.status, status)) {
+    redirect(`/admin/readings/${readingId}/edit?error=invalid_status_transition`);
+  }
+
   const now = new Date();
   const isReviewed = [ReadingStatus.VALIDATED, ReadingStatus.FLAGGED, ReadingStatus.REJECTED].includes(status);
 
@@ -188,11 +186,17 @@ export async function updateReadingAction(readingId: string, formData: FormData)
         data: {
           readingId,
           userId: staff.id,
-          type: buildEventType(status),
+          type: ReadingEventType.TASK_UPDATED,
           payload: {
+            action: "reading_manual_edit",
             source: "admin_edit",
+            editedById: staff.id,
             editedByRole: staff.role,
             editedAt: now.toISOString(),
+            statusTransition: {
+              from: existing.status,
+              to: status,
+            },
             changes,
           },
         },

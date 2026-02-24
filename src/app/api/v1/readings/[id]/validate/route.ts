@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { validateReading } from "@/lib/backoffice/readings";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function POST(
+async function postValidateReading(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -19,3 +20,5 @@ export async function POST(
   const result = await validateReading({ id: auth.user.id, role: auth.user.role }, id);
   return NextResponse.json(result.body, { status: result.status });
 }
+
+export const POST = withRouteInstrumentation("api.v1.readings.validate", postValidateReading);

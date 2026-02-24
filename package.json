@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "smoke:p2": "bash scripts/p2_smoke_checks.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.995.0",

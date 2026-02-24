@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { createTask, listTasks } from "@/lib/backoffice/tasks";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function GET(request: Request) {
+async function getTasks(request: Request) {
   const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
   return NextResponse.json(result.body, { status: result.status });
 }
 
-export async function POST(request: Request) {
+async function postTask(request: Request) {
   const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:create"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
@@ -39,3 +40,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 }
+
+export const GET = withRouteInstrumentation("api.v1.tasks.list", getTasks);
+export const POST = withRouteInstrumentation("api.v1.tasks.create", postTask);
