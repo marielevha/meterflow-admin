@@ -6,7 +6,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -24,7 +24,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

@@ -6,7 +6,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

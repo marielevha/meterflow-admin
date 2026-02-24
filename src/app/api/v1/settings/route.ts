@@ -4,7 +4,7 @@ import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { getAppSettings, saveAppSettings } from "@/lib/settings/serverSettings";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["dashboard:view"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:manage"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

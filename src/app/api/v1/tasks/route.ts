@@ -3,7 +3,7 @@ import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { createTask, listTasks } from "@/lib/backoffice/tasks";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:create"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

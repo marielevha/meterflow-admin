@@ -3,7 +3,7 @@ import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { buildUsersImportTemplateCsv } from "@/lib/backoffice/usersImport";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:manage"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

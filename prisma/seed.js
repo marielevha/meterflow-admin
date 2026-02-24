@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 const { randomBytes, scryptSync } = require("node:crypto");
 const { PrismaClient, MeterStatus, MeterType, UserRole, UserStatus } = require("@prisma/client");
 
