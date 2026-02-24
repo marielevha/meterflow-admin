@@ -14,6 +14,7 @@ import {
   PageIcon,
   PieChartIcon,
   PlugInIcon,
+  TaskIcon,
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
@@ -52,6 +53,14 @@ const navItems: NavItem[] = [
       { name: "Readings", path: "/admin/readings", pro: false },
       { name: "History", path: "/admin/history", pro: false },
       { name: "Consumption", path: "/admin/consumption", pro: false },
+    ],
+  },
+  {
+    icon: <TaskIcon />,
+    name: "Tasks management",
+    subItems: [
+      { name: "Tasks", path: "/admin/tasks", pro: false },
+      { name: "Add task", path: "/admin/tasks/create", pro: false },
     ],
   },
   {

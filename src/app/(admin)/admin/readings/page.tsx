@@ -1,10 +1,12 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { ReadingStatus } from "@prisma/client";
+import { Prisma, ReadingStatus } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import ReadingsFilters from "@/components/readings/ReadingsFilters";
+import { EyeIcon, PencilIcon } from "@/icons";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -13,10 +15,15 @@ export const metadata: Metadata = {
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 function firstValue(input: string | string[] | undefined): string {
   if (Array.isArray(input)) return input[0] ?? "";
   return input ?? "";
+}
+
+function normalizeStatus(value: string): ReadingStatus | "" {
+  return (Object.values(ReadingStatus) as string[]).includes(value) ? (value as ReadingStatus) : "";
 }
 
 function statusBadge(status: ReadingStatus) {
@@ -27,13 +34,21 @@ function statusBadge(status: ReadingStatus) {
   return "light" as const;
 }
 
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
 export default async function ReadingsPage({ searchParams }: { searchParams: SearchParams }) {
   const resolved = await searchParams;
-  const status = firstValue(resolved.status).trim() as ReadingStatus | "";
+  const q = firstValue(resolved.q).trim();
+  const status = normalizeStatus(firstValue(resolved.status).trim());
   const dateFrom = firstValue(resolved.dateFrom).trim();
   const dateTo = firstValue(resolved.dateTo).trim();
+  const pageSizeRaw = Number(firstValue(resolved.pageSize) || "10");
+  const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeRaw) ? pageSizeRaw : 10;
+  const requestedPage = Math.max(1, Number(firstValue(resolved.page) || "1"));
 
-  const where = {
+  const where: Prisma.ReadingWhereInput = {
     deletedAt: null,
     ...(status ? { status } : {}),
     ...(dateFrom || dateTo
@@ -44,25 +59,67 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
           },
         }
       : {}),
+    ...(q
+      ? {
+          OR: [
+            { meter: { serialNumber: { contains: q, mode: "insensitive" } } },
+            { meter: { meterReference: { contains: q, mode: "insensitive" } } },
+            { submittedBy: { phone: { contains: q } } },
+            { submittedBy: { firstName: { contains: q, mode: "insensitive" } } },
+            { submittedBy: { lastName: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
   };
 
-  const [total, pending, validated, flagged, rejected, readings] = await prisma.$transaction([
+  const [total, pending, validated, flagged, rejected, totalFiltered] = await prisma.$transaction([
     prisma.reading.count({ where: { deletedAt: null } }),
     prisma.reading.count({ where: { deletedAt: null, status: ReadingStatus.PENDING } }),
     prisma.reading.count({ where: { deletedAt: null, status: ReadingStatus.VALIDATED } }),
     prisma.reading.count({ where: { deletedAt: null, status: ReadingStatus.FLAGGED } }),
     prisma.reading.count({ where: { deletedAt: null, status: ReadingStatus.REJECTED } }),
-    prisma.reading.findMany({
-      where,
-      orderBy: { readingAt: "desc" },
-      take: 100,
-      include: {
-        meter: { select: { serialNumber: true, meterReference: true } },
-        submittedBy: { select: { firstName: true, lastName: true, phone: true } },
-        reviewedBy: { select: { firstName: true, lastName: true } },
-      },
-    }),
+    prisma.reading.count({ where }),
   ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const skip = (page - 1) * pageSize;
+
+  const readings = await prisma.reading.findMany({
+    where,
+    orderBy: { readingAt: "desc" },
+    skip,
+    take: pageSize,
+    include: {
+      meter: { select: { serialNumber: true, meterReference: true } },
+      submittedBy: { select: { firstName: true, lastName: true, phone: true } },
+      reviewedBy: { select: { firstName: true, lastName: true } },
+    },
+  });
+
+  const buildHref = (overrides: Record<string, string | number | undefined>) => {
+    const params = new URLSearchParams();
+    const nextQ = overrides.q ?? q;
+    const nextStatus = overrides.status ?? status;
+    const nextDateFrom = overrides.dateFrom ?? dateFrom;
+    const nextDateTo = overrides.dateTo ?? dateTo;
+    const nextPageSize = overrides.pageSize ?? pageSize;
+    const nextPage = overrides.page ?? page;
+
+    if (nextQ) params.set("q", String(nextQ));
+    if (nextStatus) params.set("status", String(nextStatus));
+    if (nextDateFrom) params.set("dateFrom", String(nextDateFrom));
+    if (nextDateTo) params.set("dateTo", String(nextDateTo));
+    params.set("pageSize", String(nextPageSize));
+    if (Number(nextPage) > 1) params.set("page", String(nextPage));
+
+    const query = params.toString();
+    return query ? `/admin/readings?${query}` : "/admin/readings";
+  };
+
+  const startPage = Math.max(1, page - 2);
+  const endPage = Math.min(totalPages, startPage + 4);
+  const visiblePages = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
   return (
     <div>
@@ -77,55 +134,18 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
       </div>
 
       <ComponentCard title="Readings queue" desc="Suivi des relevés et décisions de validation.">
-        <form method="GET" className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
-          <div className="lg:col-span-3">
-            <select
-              name="status"
-              defaultValue={status}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-            >
-              <option value="">All status</option>
-              {Object.values(ReadingStatus).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="lg:col-span-3">
-            <input
-              type="date"
-              name="dateFrom"
-              defaultValue={dateFrom}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-            />
-          </div>
-          <div className="lg:col-span-3">
-            <input
-              type="date"
-              name="dateTo"
-              defaultValue={dateTo}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-            />
-          </div>
-          <div className="lg:col-span-3 flex gap-2">
-            <button
-              type="submit"
-              className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-            >
-              Filter
-            </button>
-            <Link
-              href="/admin/readings"
-              className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-            >
-              Reset
-            </Link>
-          </div>
-        </form>
+        <ReadingsFilters
+          initialQ={q}
+          initialStatus={status}
+          initialDateFrom={dateFrom}
+          initialDateTo={dateTo}
+          initialPageSize={pageSize}
+          statusOptions={Object.values(ReadingStatus)}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+        />
 
         <div className="max-w-full overflow-x-auto">
-          <div className="min-w-[1250px] overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+          <div className="min-w-[1280px] overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
             <Table>
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
@@ -136,12 +156,13 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                   <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Submitted by</TableCell>
                   <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Reviewed by</TableCell>
                   <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">GPS distance</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {readings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <TableCell colSpan={8} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                       No reading found.
                     </TableCell>
                   </TableRow>
@@ -153,13 +174,14 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                         .join(" ")
                         .trim() || reading.submittedBy.phone;
                     const reviewedBy =
-                      [reading.reviewedBy?.firstName, reading.reviewedBy?.lastName].filter(Boolean).join(" ").trim() ||
-                      "N/A";
+                      [reading.reviewedBy?.firstName, reading.reviewedBy?.lastName]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() || "N/A";
+
                     return (
                       <TableRow key={reading.id}>
-                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          {reading.readingAt.toISOString().slice(0, 19).replace("T", " ")}
-                        </TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatDate(reading.readingAt)}</TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <p className="font-medium">{reading.meter.serialNumber}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">{reading.meter.meterReference || "N/A"}</p>
@@ -175,8 +197,16 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{submittedBy}</TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{reviewedBy}</TableCell>
-                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          {reading.gpsDistanceMeters?.toString() || "N/A"}
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{reading.gpsDistanceMeters?.toString() || "N/A"}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Link href={`/admin/readings/${reading.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title="View reading" aria-label="View reading">
+                              <EyeIcon className="h-4 w-4" />
+                            </Link>
+                            <Link href={`/admin/readings/${reading.id}/edit`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title="Edit reading" aria-label="Edit reading">
+                              <PencilIcon className="h-4 w-4" />
+                            </Link>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -184,6 +214,51 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                 )}
               </TableBody>
             </Table>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {readings.length === 0 ? 0 : skip + 1} - {Math.min(skip + readings.length, totalFiltered)} of {totalFiltered}
+          </p>
+          <div className="flex items-center gap-2">
+            <Link
+              href={buildHref({ page: page - 1 })}
+              aria-disabled={page <= 1}
+              className={`inline-flex h-10 items-center justify-center rounded-lg border px-3 text-sm ${
+                page <= 1
+                  ? "pointer-events-none border-gray-200 text-gray-400 dark:border-gray-800 dark:text-gray-600"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+              }`}
+            >
+              Previous
+            </Link>
+
+            {visiblePages.map((pageNumber) => (
+              <Link
+                key={pageNumber}
+                href={buildHref({ page: pageNumber })}
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium ${
+                  pageNumber === page
+                    ? "bg-brand-500 text-white"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                }`}
+              >
+                {pageNumber}
+              </Link>
+            ))}
+
+            <Link
+              href={buildHref({ page: page + 1 })}
+              aria-disabled={page >= totalPages}
+              className={`inline-flex h-10 items-center justify-center rounded-lg border px-3 text-sm ${
+                page >= totalPages
+                  ? "pointer-events-none border-gray-200 text-gray-400 dark:border-gray-800 dark:text-gray-600"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+              }`}
+            >
+              Next
+            </Link>
           </div>
         </div>
       </ComponentCard>

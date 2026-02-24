@@ -300,6 +300,36 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - email via Resend ou Mailtrap (`RESEND_API_KEY` ou `MAILTRAP_API_KEY`, plus `REMINDER_EMAIL_FROM`)
   - push via webhook (`REMINDER_PUSH_WEBHOOK_URL`)
 
+### 20) Module Tasks management + refonte Readings (admin)
+
+- Tasks management (backoffice):
+  - bloc menu dedie `Tasks management` (avec icone metier) dans la sidebar
+  - pages:
+    - `/admin/tasks` (liste, KPIs, filtres auto, pagination)
+    - `/admin/tasks/create` (creation)
+    - `/admin/tasks/:id` (detail complet: statut rapide, checklist, commentaires, pieces jointes, timeline)
+    - `/admin/tasks/:id/edit` (edition orientee workflow)
+  - APIs completees:
+    - `GET/POST /api/v1/tasks`
+    - `GET/PATCH /api/v1/tasks/:id`
+    - `GET /api/v1/tasks/stats`
+    - `POST /api/v1/tasks/:id/comments`
+    - `POST /api/v1/tasks/:id/attachments`
+    - `POST /api/v1/tasks/:id/items`
+    - `PATCH /api/v1/tasks/:id/items/:itemId`
+  - audit: ecriture d'evenements `reading_events` quand une tache liee a un releve est modifiee.
+
+- Readings admin UX:
+  - `/admin/readings` refait avec:
+    - recherche + filtres (status/date) auto-appliques (sans bouton Apply)
+    - pagination + per-page
+    - colonne `Actions` en icones `voir` / `editer`
+  - nouvelles pages:
+    - `/admin/readings/:id` (detail complet du releve: preuve image, acteurs, compteur, taches liees, audit trail)
+    - `/admin/readings/:id/edit` (edition releve + journalisation d'audit)
+  - audit trail du detail releve:
+    - remplacement du JSON brut par une presentation lisible (cle/valeur formatee pour utilisateur final).
+
 
 ## Overview
 

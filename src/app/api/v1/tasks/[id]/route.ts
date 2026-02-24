@@ -16,7 +16,7 @@ export async function GET(
     return NextResponse.json({ error: "task_id_required" }, { status: 400 });
   }
 
-  const result = await getTaskDetail(id);
+  const result = await getTaskDetail({ id: auth.user.id, role: auth.user.role }, id);
   return NextResponse.json(result.body, { status: result.status });
 }
 
