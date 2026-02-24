@@ -2,61 +2,59 @@
 
 import { useMemo, useState } from "react";
 import { Background, Controls, Edge, MarkerType, Node, ReactFlow } from "@xyflow/react";
+import { TaskStatus } from "@prisma/client";
 import { useRouter } from "next/navigation";
-
-type TaskStatusValue = "OPEN" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELED";
 
 type TaskLifecycleFlowProps = {
   taskId: string;
-  currentStatus: TaskStatusValue;
+  currentStatus: TaskStatus;
   canCancel: boolean;
 };
 
-type TransitionMap = Record<TaskStatusValue, TaskStatusValue[]>;
-
-const TASK_STATUSES: TaskStatusValue[] = ["OPEN", "IN_PROGRESS", "BLOCKED", "DONE", "CANCELED"];
+type TransitionMap = Record<TaskStatus, TaskStatus[]>;
 
 const BASE_TRANSITIONS: TransitionMap = {
-  OPEN: ["IN_PROGRESS", "BLOCKED", "DONE"],
-  IN_PROGRESS: ["BLOCKED", "DONE", "OPEN"],
-  BLOCKED: ["IN_PROGRESS", "DONE", "OPEN"],
-  DONE: ["IN_PROGRESS"],
-  CANCELED: ["OPEN"],
+  [TaskStatus.OPEN]: [TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.DONE],
+  [TaskStatus.IN_PROGRESS]: [TaskStatus.BLOCKED, TaskStatus.DONE, TaskStatus.OPEN],
+  [TaskStatus.BLOCKED]: [TaskStatus.IN_PROGRESS, TaskStatus.DONE, TaskStatus.OPEN],
+  [TaskStatus.DONE]: [TaskStatus.IN_PROGRESS],
+  [TaskStatus.CANCELED]: [TaskStatus.OPEN],
 };
 
 function transitionsForRole(canCancel: boolean): TransitionMap {
   if (!canCancel) return BASE_TRANSITIONS;
   return {
     ...BASE_TRANSITIONS,
-    OPEN: [...BASE_TRANSITIONS.OPEN, "CANCELED"],
-    IN_PROGRESS: [...BASE_TRANSITIONS.IN_PROGRESS, "CANCELED"],
-    BLOCKED: [...BASE_TRANSITIONS.BLOCKED, "CANCELED"],
+    [TaskStatus.OPEN]: [...BASE_TRANSITIONS[TaskStatus.OPEN], TaskStatus.CANCELED],
+    [TaskStatus.IN_PROGRESS]: [...BASE_TRANSITIONS[TaskStatus.IN_PROGRESS], TaskStatus.CANCELED],
+    [TaskStatus.BLOCKED]: [...BASE_TRANSITIONS[TaskStatus.BLOCKED], TaskStatus.CANCELED],
   };
 }
 
-const POSITIONS: Record<TaskStatusValue, { x: number; y: number }> = {
-  OPEN: { x: 30, y: 130 },
-  IN_PROGRESS: { x: 300, y: 30 },
-  BLOCKED: { x: 300, y: 230 },
-  DONE: { x: 570, y: 30 },
-  CANCELED: { x: 570, y: 230 },
+const POSITIONS: Record<TaskStatus, { x: number; y: number }> = {
+  [TaskStatus.OPEN]: { x: 30, y: 130 },
+  [TaskStatus.IN_PROGRESS]: { x: 300, y: 30 },
+  [TaskStatus.BLOCKED]: { x: 300, y: 230 },
+  [TaskStatus.DONE]: { x: 570, y: 30 },
+  [TaskStatus.CANCELED]: { x: 570, y: 230 },
 };
 
-function labelForStatus(status: TaskStatusValue) {
-  if (status === "IN_PROGRESS") return "IN PROGRESS";
+function labelForStatus(status: TaskStatus) {
+  if (status === TaskStatus.IN_PROGRESS) return "IN PROGRESS";
   return status;
 }
 
 export default function TaskLifecycleFlow({ taskId, currentStatus, canCancel }: TaskLifecycleFlowProps) {
   const router = useRouter();
-  const [busyTarget, setBusyTarget] = useState<TaskStatusValue | null>(null);
+  const [busyTarget, setBusyTarget] = useState<TaskStatus | null>(null);
   const [error, setError] = useState<string>("");
 
   const transitions = useMemo(() => transitionsForRole(canCancel), [canCancel]);
   const allowedTargets = useMemo(() => new Set(transitions[currentStatus] || []), [transitions, currentStatus]);
 
   const nodes = useMemo<Node[]>(() => {
-    return TASK_STATUSES.map((status) => {
+    const statuses = Object.values(TaskStatus);
+    return statuses.map((status) => {
       const isCurrent = status === currentStatus;
       const canTransition = allowedTargets.has(status);
       const isBusy = busyTarget === status;
@@ -89,7 +87,7 @@ export default function TaskLifecycleFlow({ taskId, currentStatus, canCancel }: 
 
   const edges = useMemo<Edge[]>(() => {
     const list: Edge[] = [];
-    (Object.keys(transitions) as TaskStatusValue[]).forEach((from) => {
+    (Object.keys(transitions) as TaskStatus[]).forEach((from) => {
       transitions[from].forEach((to) => {
         const isActive = from === currentStatus;
         list.push({
@@ -108,7 +106,7 @@ export default function TaskLifecycleFlow({ taskId, currentStatus, canCancel }: 
     return list;
   }, [currentStatus, transitions]);
 
-  const onTransition = async (nextStatus: TaskStatusValue) => {
+  const onTransition = async (nextStatus: TaskStatus) => {
     if (busyTarget || nextStatus === currentStatus || !allowedTargets.has(nextStatus)) return;
     setError("");
     setBusyTarget(nextStatus);
@@ -154,7 +152,7 @@ export default function TaskLifecycleFlow({ taskId, currentStatus, canCancel }: 
           edges={edges}
           fitView
           fitViewOptions={{ padding: 0.2 }}
-          onNodeClick={(_, node) => onTransition(node.id as TaskStatusValue)}
+          onNodeClick={(_, node) => onTransition(node.id as TaskStatus)}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}

@@ -1,16 +1,16 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { TaskItemStatus, TaskStatus, UserRole } from "@prisma/client";
+import { TaskItemStatus, TaskStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
-import TaskLifecycleFlow from "@/components/tasks/TaskLifecycleFlow";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
 import {
   addTaskAttachmentAction,
   addTaskCommentAction,
   addTaskItemAction,
+  quickUpdateTaskStatusAction,
   toggleTaskItemStatusAction,
 } from "./actions";
 
@@ -54,10 +54,6 @@ function messageFromParams(search: Record<string, string | string[] | undefined>
   });
   if (anySuccess) return { type: "success" as const, text: "Action completed successfully." };
   return null;
-}
-
-function isManager(role: UserRole) {
-  return role === UserRole.ADMIN || role === UserRole.SUPERVISOR;
 }
 
 export default async function TaskDetailPage({
@@ -118,16 +114,21 @@ export default async function TaskDetailPage({
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <section className="xl:col-span-2 space-y-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Lifecycle workflow</h3>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Interactive BPM-style flow of task statuses. Select the next step directly in the graph.
-            </p>
-            <div className="mt-4">
-              <TaskLifecycleFlow
-                taskId={task.id}
-                currentStatus={task.status}
-                canCancel={isManager(staff.role)}
-              />
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Quick status actions</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.DONE].map((status) => {
+                const action = quickUpdateTaskStatusAction.bind(null, task.id, status);
+                return (
+                  <form key={status} action={action}>
+                    <button
+                      type="submit"
+                      className="inline-flex h-9 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                    >
+                      {status}
+                    </button>
+                  </form>
+                );
+              })}
             </div>
           </div>
 
