@@ -1,0 +1,813 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  CLIENT
+  AGENT
+  SUPERVISOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum MeterType {
+  SINGLE_INDEX
+  DUAL_INDEX
+}
+
+enum MeterStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  REPLACED
+}
+
+enum ReadingSource {
+  CLIENT
+  AGENT
+  SYSTEM
+}
+
+enum ReadingStatus {
+  DRAFT
+  PENDING
+  FLAGGED
+  REJECTED
+  VALIDATED
+  RESUBMISSION_REQUESTED
+  CLOSED
+}
+
+enum ReadingEventType {
+  CREATED
+  SUBMITTED
+  VALIDATED
+  FLAGGED
+  REJECTED
+  RESUBMITTED
+  TASK_CREATED
+  TASK_UPDATED
+  OCR_PROCESSED
+  ANOMALY_DETECTED
+}
+
+enum TaskType {
+  FIELD_RECHECK
+  FRAUD_INVESTIGATION
+  METER_VERIFICATION
+  GENERAL
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskItemStatus {
+  TODO
+  DONE
+  CANCELED
+}
+
+enum BillingCampaignStatus {
+  DRAFT
+  READY
+  RUNNING
+  GENERATED
+  ISSUED
+  CLOSED
+  CANCELED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING_REVIEW
+  ISSUED
+  DELIVERED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELED
+}
+
+enum InvoiceLineType {
+  CONSUMPTION
+  FIXED_FEE
+  TAX
+  ADJUSTMENT
+  PENALTY
+}
+
+enum DeliveryChannel {
+  SMS
+  EMAIL
+  PORTAL
+  PRINT
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  CARD
+  BANK_TRANSFER
+  ADJUSTMENT
+}
+
+enum ReminderChannel {
+  SMS
+  EMAIL
+  PUSH
+}
+
+enum ReminderStatus {
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum OtpPurpose {
+  LOGIN
+  SIGNUP
+  PASSWORD_RESET
+}
+
+enum OtpStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  CANCELED
+}
+
+model User {
+  id                     String               @id @default(uuid()) @db.Uuid
+  phone                  String               @unique
+  username               String?              @unique
+  email                  String?              @unique
+  passwordHash           String?              @map("password_hash")
+  firstName              String?              @map("first_name")
+  lastName               String?              @map("last_name")
+  role                   UserRole             @default(CLIENT)
+  status                 UserStatus           @default(PENDING)
+  region                 String?
+  city                   String?
+  zone                   String?
+  activatedAt            DateTime?            @map("activated_at")
+  lastLoginAt            DateTime?            @map("last_login_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  deletedAt              DateTime?            @map("deleted_at")
+  customerMeters         Meter[]              @relation("CustomerMeters")
+  assignedMeters         Meter[]              @relation("AgentMeters")
+  submittedReadings      Reading[]            @relation("ReadingSubmittedBy")
+  reviewedReadings       Reading[]            @relation("ReadingReviewedBy")
+  readingEvents          ReadingEvent[]
+  assignedTasks          Task[]               @relation("TaskAssignedTo")
+  createdTasks           Task[]               @relation("TaskCreatedBy")
+  closedTasks            Task[]               @relation("TaskClosedBy")
+  completedTaskItems     TaskItem[]           @relation("TaskItemCompletedBy")
+  taskComments           TaskComment[]
+  taskAttachments        TaskAttachment[]
+  otpCodes               OtpCode[]
+  authSessions           AuthSession[]
+  roleAssignments        UserRoleAssignment[] @relation("UserAssignedRoles")
+  grantedRoleAssignments UserRoleAssignment[] @relation("UserGrantedRoles")
+  billingCampaigns       BillingCampaign[]    @relation("BillingCampaignCreatedBy")
+  billedInvoices         Invoice[]            @relation("InvoiceCustomer")
+  generatedInvoices      Invoice[]            @relation("InvoiceGeneratedBy")
+  approvedInvoices       Invoice[]            @relation("InvoiceApprovedBy")
+  canceledInvoices       Invoice[]            @relation("InvoiceCanceledBy")
+  createdInvoiceEvents   InvoiceEvent[]
+  receivedPayments       Payment[]            @relation("PaymentReceivedBy")
+  deliveryLogs           InvoiceDelivery[]    @relation("InvoiceDeliveryTriggeredBy")
+  readingReminderLogs    ReadingReminderLog[]
+
+  @@index([role, status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id              String               @id @default(uuid()) @db.Uuid
+  code            String               @unique
+  name            String
+  description     String?
+  isSystem        Boolean              @default(true) @map("is_system")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  deletedAt       DateTime?            @map("deleted_at")
+  permissions     RolePermission[]
+  userAssignments UserRoleAssignment[]
+
+  @@index([deletedAt])
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique
+  name            String
+  description     String?
+  resource        String
+  action          String
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  deletedAt       DateTime?        @map("deleted_at")
+  rolePermissions RolePermission[]
+
+  @@index([resource, action])
+  @@index([deletedAt])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@index([deletedAt])
+  @@map("role_permissions")
+}
+
+model UserRoleAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  roleId       String    @map("role_id") @db.Uuid
+  assignedById String?   @map("assigned_by_id") @db.Uuid
+  assignedAt   DateTime  @default(now()) @map("assigned_at")
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  user         User      @relation("UserAssignedRoles", fields: [userId], references: [id])
+  role         Role      @relation(fields: [roleId], references: [id])
+  assignedBy   User?     @relation("UserGrantedRoles", fields: [assignedById], references: [id])
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([assignedById])
+  @@index([deletedAt])
+  @@map("user_role_assignments")
+}
+
+model Meter {
+  id               String       @id @default(uuid()) @db.Uuid
+  serialNumber     String       @unique @map("serial_number")
+  meterReference   String?      @unique @map("meter_reference")
+  customerId       String       @map("customer_id") @db.Uuid
+  assignedAgentId  String?      @map("assigned_agent_id") @db.Uuid
+  type             MeterType    @default(SINGLE_INDEX)
+  status           MeterStatus  @default(ACTIVE)
+  addressLine1     String?      @map("address_line_1")
+  addressLine2     String?      @map("address_line_2")
+  city             String?
+  zone             String?
+  latitude         Decimal?     @db.Decimal(10, 7)
+  longitude        Decimal?     @db.Decimal(10, 7)
+  installedAt      DateTime?    @map("installed_at")
+  lastInspectionAt DateTime?    @map("last_inspection_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+  customer         User         @relation("CustomerMeters", fields: [customerId], references: [id])
+  assignedAgent    User?        @relation("AgentMeters", fields: [assignedAgentId], references: [id])
+  states           MeterState[]
+  readings         Reading[]
+  tasks            Task[]
+  taskItems        TaskItem[]
+  invoices         Invoice[]
+
+  @@index([customerId])
+  @@index([assignedAgentId])
+  @@index([status, city, zone])
+  @@index([deletedAt])
+  @@map("meters")
+}
+
+model MeterState {
+  id                String    @id @default(uuid()) @db.Uuid
+  meterId           String    @map("meter_id") @db.Uuid
+  sourceReadingId   String?   @map("source_reading_id") @db.Uuid
+  previousPrimary   Decimal?  @map("previous_primary") @db.Decimal(14, 3)
+  previousSecondary Decimal?  @map("previous_secondary") @db.Decimal(14, 3)
+  currentPrimary    Decimal?  @map("current_primary") @db.Decimal(14, 3)
+  currentSecondary  Decimal?  @map("current_secondary") @db.Decimal(14, 3)
+  effectiveAt       DateTime  @map("effective_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+  meter             Meter     @relation(fields: [meterId], references: [id])
+  sourceReading     Reading?  @relation(fields: [sourceReadingId], references: [id])
+
+  @@index([meterId, effectiveAt])
+  @@index([sourceReadingId])
+  @@index([deletedAt])
+  @@map("meter_states")
+}
+
+model Reading {
+  id                String         @id @default(uuid()) @db.Uuid
+  meterId           String         @map("meter_id") @db.Uuid
+  submittedById     String         @map("submitted_by_id") @db.Uuid
+  reviewedById      String?        @map("reviewed_by_id") @db.Uuid
+  source            ReadingSource  @default(CLIENT)
+  status            ReadingStatus  @default(PENDING)
+  readingAt         DateTime       @map("reading_at")
+  primaryIndex      Decimal        @map("primary_index") @db.Decimal(14, 3)
+  secondaryIndex    Decimal?       @map("secondary_index") @db.Decimal(14, 3)
+  imageUrl          String         @map("image_url")
+  imageHash         String?        @map("image_hash")
+  imageMimeType     String?        @map("image_mime_type")
+  imageSizeBytes    Int?           @map("image_size_bytes")
+  gpsLatitude       Decimal?       @map("gps_latitude") @db.Decimal(10, 7)
+  gpsLongitude      Decimal?       @map("gps_longitude") @db.Decimal(10, 7)
+  gpsAccuracyMeters Decimal?       @map("gps_accuracy_meters") @db.Decimal(10, 2)
+  gpsDistanceMeters Decimal?       @map("gps_distance_meters") @db.Decimal(10, 2)
+  idempotencyKey    String?        @unique @map("idempotency_key")
+  rejectionReason   String?        @map("rejection_reason")
+  flagReason        String?        @map("flag_reason")
+  confidenceScore   Decimal?       @map("confidence_score") @db.Decimal(5, 2)
+  anomalyScore      Decimal?       @map("anomaly_score") @db.Decimal(6, 3)
+  ocrText           String?        @map("ocr_text")
+  reviewedAt        DateTime?      @map("reviewed_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  deletedAt         DateTime?      @map("deleted_at")
+  meter             Meter          @relation(fields: [meterId], references: [id])
+  submittedBy       User           @relation("ReadingSubmittedBy", fields: [submittedById], references: [id])
+  reviewedBy        User?          @relation("ReadingReviewedBy", fields: [reviewedById], references: [id])
+  events            ReadingEvent[]
+  meterStates       MeterState[]
+  tasks             Task[]
+  taskItems         TaskItem[]
+  invoices          Invoice[]      @relation("InvoiceSourceReading")
+  fromInvoices      Invoice[]      @relation("InvoiceFromReading")
+  toInvoices        Invoice[]      @relation("InvoiceToReading")
+
+  @@index([meterId, status, readingAt])
+  @@index([submittedById, status])
+  @@index([reviewedById])
+  @@index([deletedAt])
+  @@map("readings")
+}
+
+model ReadingEvent {
+  id        String           @id @default(uuid()) @db.Uuid
+  readingId String           @map("reading_id") @db.Uuid
+  userId    String?          @map("user_id") @db.Uuid
+  type      ReadingEventType
+  payload   Json             @default("{}")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  deletedAt DateTime?        @map("deleted_at")
+  reading   Reading          @relation(fields: [readingId], references: [id])
+  user      User?            @relation(fields: [userId], references: [id])
+
+  @@index([readingId, type, createdAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("reading_events")
+}
+
+model Task {
+  id           String           @id @default(uuid()) @db.Uuid
+  meterId      String?          @map("meter_id") @db.Uuid
+  readingId    String?          @map("reading_id") @db.Uuid
+  assignedToId String?          @map("assigned_to_id") @db.Uuid
+  createdById  String?          @map("created_by_id") @db.Uuid
+  closedById   String?          @map("closed_by_id") @db.Uuid
+  type         TaskType         @default(GENERAL)
+  status       TaskStatus       @default(OPEN)
+  priority     TaskPriority     @default(MEDIUM)
+  title        String
+  description  String?
+  dueAt        DateTime?        @map("due_at")
+  closedAt     DateTime?        @map("closed_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  deletedAt    DateTime?        @map("deleted_at")
+  meter        Meter?           @relation(fields: [meterId], references: [id])
+  reading      Reading?         @relation(fields: [readingId], references: [id])
+  assignedTo   User?            @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdBy    User?            @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  closedBy     User?            @relation("TaskClosedBy", fields: [closedById], references: [id])
+  items        TaskItem[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+
+  @@index([status, priority, dueAt])
+  @@index([assignedToId])
+  @@index([meterId, readingId])
+  @@index([deletedAt])
+  @@map("tasks")
+}
+
+model TaskItem {
+  id            String         @id @default(uuid()) @db.Uuid
+  taskId        String         @map("task_id") @db.Uuid
+  readingId     String?        @map("reading_id") @db.Uuid
+  meterId       String?        @map("meter_id") @db.Uuid
+  completedById String?        @map("completed_by_id") @db.Uuid
+  title         String
+  details       String?
+  status        TaskItemStatus @default(TODO)
+  sortOrder     Int            @default(0) @map("sort_order")
+  completedAt   DateTime?      @map("completed_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
+  task          Task           @relation(fields: [taskId], references: [id])
+  reading       Reading?       @relation(fields: [readingId], references: [id])
+  meter         Meter?         @relation(fields: [meterId], references: [id])
+  completedBy   User?          @relation("TaskItemCompletedBy", fields: [completedById], references: [id])
+
+  @@index([taskId, sortOrder])
+  @@index([status, completedAt])
+  @@index([deletedAt])
+  @@map("task_items")
+}
+
+model TaskComment {
+  id         String    @id @default(uuid()) @db.Uuid
+  taskId     String    @map("task_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  comment    String
+  isInternal Boolean   @default(true) @map("is_internal")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  task       Task      @relation(fields: [taskId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id            String    @id @default(uuid()) @db.Uuid
+  taskId        String    @map("task_id") @db.Uuid
+  uploadedById  String    @map("uploaded_by_id") @db.Uuid
+  fileUrl       String    @map("file_url")
+  fileName      String    @map("file_name")
+  mimeType      String?   @map("mime_type")
+  fileHash      String?   @map("file_hash")
+  fileSizeBytes Int?      @map("file_size_bytes")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+  task          Task      @relation(fields: [taskId], references: [id])
+  uploadedBy    User      @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId, createdAt])
+  @@index([uploadedById])
+  @@index([deletedAt])
+  @@map("task_attachments")
+}
+
+model OtpCode {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String?    @map("user_id") @db.Uuid
+  phone      String
+  purpose    OtpPurpose
+  status     OtpStatus  @default(PENDING)
+  codeHash   String     @map("code_hash")
+  attempts   Int        @default(0)
+  expiresAt  DateTime   @map("expires_at")
+  verifiedAt DateTime?  @map("verified_at")
+  metadata   Json?      @default("{}")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  deletedAt  DateTime?  @map("deleted_at")
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([phone, purpose, status, expiresAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("otp_codes")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  tokenFamily      String?   @map("token_family")
+  refreshTokenHash String    @map("refresh_token_hash")
+  accessTokenJti   String?   @map("access_token_jti")
+  deviceId         String?   @map("device_id")
+  deviceName       String?   @map("device_name")
+  platform         String?
+  appVersion       String?   @map("app_version")
+  ipAddress        String?   @map("ip_address")
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+  user             User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, expiresAt])
+  @@index([tokenFamily])
+  @@index([deletedAt])
+  @@map("auth_sessions")
+}
+
+model AppSetting {
+  id        String    @id @default(uuid()) @db.Uuid
+  key       String    @unique
+  value     Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([deletedAt])
+  @@map("app_settings")
+}
+
+model BillingCampaign {
+  id                String                @id @default(uuid()) @db.Uuid
+  code              String                @unique
+  name              String
+  periodStart       DateTime              @map("period_start")
+  periodEnd         DateTime              @map("period_end")
+  submissionStartAt DateTime?             @map("submission_start_at")
+  submissionEndAt   DateTime?             @map("submission_end_at")
+  cutoffAt          DateTime?             @map("cutoff_at")
+  frequency         String
+  city              String?
+  zone              String?
+  status            BillingCampaignStatus @default(DRAFT)
+  tariffPlanId      String?               @map("tariff_plan_id") @db.Uuid
+  createdById       String?               @map("created_by_id") @db.Uuid
+  launchedAt        DateTime?             @map("launched_at")
+  generatedAt       DateTime?             @map("generated_at")
+  issuedAt          DateTime?             @map("issued_at")
+  finalizedAt       DateTime?             @map("finalized_at")
+  notes             String?
+  settingsSnapshot  Json?                 @map("settings_snapshot")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  deletedAt         DateTime?             @map("deleted_at")
+  tariffPlan        TariffPlan?           @relation(fields: [tariffPlanId], references: [id])
+  createdBy         User?                 @relation("BillingCampaignCreatedBy", fields: [createdById], references: [id])
+  invoices          Invoice[]
+
+  @@index([status, periodStart, periodEnd])
+  @@index([city, zone, status])
+  @@index([tariffPlanId])
+  @@index([createdById])
+  @@index([deletedAt])
+  @@map("billing_campaigns")
+}
+
+model TariffPlan {
+  id             String            @id @default(uuid()) @db.Uuid
+  code           String            @unique
+  name           String
+  description    String?
+  currency       String            @default("XAF")
+  fixedCharge    Decimal           @default(0) @map("fixed_charge") @db.Decimal(14, 2)
+  taxPercent     Decimal           @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  lateFeePercent Decimal           @default(0) @map("late_fee_percent") @db.Decimal(5, 2)
+  isDefault      Boolean           @default(false) @map("is_default")
+  isActive       Boolean           @default(true) @map("is_active")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  deletedAt      DateTime?         @map("deleted_at")
+  tiers          TariffTier[]
+  campaigns      BillingCampaign[]
+  invoices       Invoice[]
+
+  @@index([isActive, isDefault])
+  @@index([deletedAt])
+  @@map("tariff_plans")
+}
+
+model TariffTier {
+  id             String     @id @default(uuid()) @db.Uuid
+  tariffPlanId   String     @map("tariff_plan_id") @db.Uuid
+  minConsumption Decimal    @map("min_consumption") @db.Decimal(14, 3)
+  maxConsumption Decimal?   @map("max_consumption") @db.Decimal(14, 3)
+  unitPrice      Decimal    @map("unit_price") @db.Decimal(14, 3)
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  deletedAt      DateTime?  @map("deleted_at")
+  tariffPlan     TariffPlan @relation(fields: [tariffPlanId], references: [id])
+
+  @@index([tariffPlanId, minConsumption, maxConsumption])
+  @@index([deletedAt])
+  @@map("tariff_tiers")
+}
+
+model Invoice {
+  id                   String            @id @default(uuid()) @db.Uuid
+  invoiceNumber        String            @unique @map("invoice_number")
+  campaignId           String?           @map("campaign_id") @db.Uuid
+  tariffPlanId         String?           @map("tariff_plan_id") @db.Uuid
+  customerId           String            @map("customer_id") @db.Uuid
+  meterId              String            @map("meter_id") @db.Uuid
+  sourceReadingId      String?           @map("source_reading_id") @db.Uuid
+  fromReadingId        String?           @map("from_reading_id") @db.Uuid
+  toReadingId          String?           @map("to_reading_id") @db.Uuid
+  generatedById        String?           @map("generated_by_id") @db.Uuid
+  approvedById         String?           @map("approved_by_id") @db.Uuid
+  canceledById         String?           @map("canceled_by_id") @db.Uuid
+  status               InvoiceStatus     @default(DRAFT)
+  currency             String            @default("XAF")
+  periodStart          DateTime          @map("period_start")
+  periodEnd            DateTime          @map("period_end")
+  dueDate              DateTime?         @map("due_date")
+  fromPrimaryIndex     Decimal?          @map("from_primary_index") @db.Decimal(14, 3)
+  toPrimaryIndex       Decimal?          @map("to_primary_index") @db.Decimal(14, 3)
+  fromSecondaryIndex   Decimal?          @map("from_secondary_index") @db.Decimal(14, 3)
+  toSecondaryIndex     Decimal?          @map("to_secondary_index") @db.Decimal(14, 3)
+  previousPrimary      Decimal?          @map("previous_primary") @db.Decimal(14, 3)
+  currentPrimary       Decimal?          @map("current_primary") @db.Decimal(14, 3)
+  previousSecondary    Decimal?          @map("previous_secondary") @db.Decimal(14, 3)
+  currentSecondary     Decimal?          @map("current_secondary") @db.Decimal(14, 3)
+  consumptionPrimary   Decimal           @default(0) @map("consumption_primary") @db.Decimal(14, 3)
+  consumptionSecondary Decimal?          @default(0) @map("consumption_secondary") @db.Decimal(14, 3)
+  isEstimated          Boolean           @default(false) @map("is_estimated")
+  estimationMethod     String?           @map("estimation_method")
+  hasException         Boolean           @default(false) @map("has_exception")
+  subtotal             Decimal           @default(0) @db.Decimal(14, 2)
+  taxAmount            Decimal           @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  fixedAmount          Decimal           @default(0) @map("fixed_amount") @db.Decimal(14, 2)
+  adjustmentAmount     Decimal           @default(0) @map("adjustment_amount") @db.Decimal(14, 2)
+  totalAmount          Decimal           @default(0) @map("total_amount") @db.Decimal(14, 2)
+  paidAmount           Decimal           @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  issuedAt             DateTime?         @map("issued_at")
+  deliveredAt          DateTime?         @map("delivered_at")
+  canceledAt           DateTime?         @map("canceled_at")
+  cycleFinalizedAt     DateTime?         @map("cycle_finalized_at")
+  cancelReason         String?           @map("cancel_reason")
+  metadata             Json?             @default("{}")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  deletedAt            DateTime?         @map("deleted_at")
+  campaign             BillingCampaign?  @relation(fields: [campaignId], references: [id])
+  tariffPlan           TariffPlan?       @relation(fields: [tariffPlanId], references: [id])
+  customer             User              @relation("InvoiceCustomer", fields: [customerId], references: [id])
+  meter                Meter             @relation(fields: [meterId], references: [id])
+  sourceReading        Reading?          @relation("InvoiceSourceReading", fields: [sourceReadingId], references: [id])
+  fromReading          Reading?          @relation("InvoiceFromReading", fields: [fromReadingId], references: [id])
+  toReading            Reading?          @relation("InvoiceToReading", fields: [toReadingId], references: [id])
+  generatedBy          User?             @relation("InvoiceGeneratedBy", fields: [generatedById], references: [id])
+  approvedBy           User?             @relation("InvoiceApprovedBy", fields: [approvedById], references: [id])
+  canceledBy           User?             @relation("InvoiceCanceledBy", fields: [canceledById], references: [id])
+  lines                InvoiceLine[]
+  events               InvoiceEvent[]
+  payments             Payment[]
+  deliveries           InvoiceDelivery[]
+
+  @@unique([campaignId, meterId])
+  @@index([campaignId, status])
+  @@index([customerId, status, periodStart])
+  @@index([meterId, periodStart, periodEnd])
+  @@index([tariffPlanId])
+  @@index([sourceReadingId])
+  @@index([fromReadingId])
+  @@index([toReadingId])
+  @@index([deletedAt])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id        String          @id @default(uuid()) @db.Uuid
+  invoiceId String          @map("invoice_id") @db.Uuid
+  type      InvoiceLineType
+  label     String
+  quantity  Decimal         @default(0) @db.Decimal(14, 3)
+  unitPrice Decimal         @default(0) @map("unit_price") @db.Decimal(14, 3)
+  amount    Decimal         @default(0) @db.Decimal(14, 2)
+  meta      Json?           @default("{}")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  deletedAt DateTime?       @map("deleted_at")
+  invoice   Invoice         @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId, type])
+  @@index([deletedAt])
+  @@map("invoice_lines")
+}
+
+model InvoiceEvent {
+  id        String    @id @default(uuid()) @db.Uuid
+  invoiceId String    @map("invoice_id") @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  type      String
+  payload   Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  invoice   Invoice   @relation(fields: [invoiceId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([invoiceId, type, createdAt])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("invoice_events")
+}
+
+model Payment {
+  id           String        @id @default(uuid()) @db.Uuid
+  invoiceId    String        @map("invoice_id") @db.Uuid
+  amount       Decimal       @db.Decimal(14, 2)
+  method       PaymentMethod
+  reference    String?
+  paidAt       DateTime      @map("paid_at")
+  receivedById String?       @map("received_by_id") @db.Uuid
+  metadata     Json?         @default("{}")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id])
+  receivedBy   User?         @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+
+  @@index([invoiceId, paidAt])
+  @@index([receivedById])
+  @@index([deletedAt])
+  @@map("payments")
+}
+
+model InvoiceDelivery {
+  id                String          @id @default(uuid()) @db.Uuid
+  invoiceId         String          @map("invoice_id") @db.Uuid
+  channel           DeliveryChannel
+  recipient         String
+  status            DeliveryStatus  @default(PENDING)
+  providerMessageId String?         @map("provider_message_id")
+  errorMessage      String?         @map("error_message")
+  sentAt            DateTime?       @map("sent_at")
+  triggeredById     String?         @map("triggered_by_id") @db.Uuid
+  metadata          Json?           @default("{}")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  invoice           Invoice         @relation(fields: [invoiceId], references: [id])
+  triggeredBy       User?           @relation("InvoiceDeliveryTriggeredBy", fields: [triggeredById], references: [id])
+
+  @@index([invoiceId, channel, status])
+  @@index([triggeredById])
+  @@index([deletedAt])
+  @@map("invoice_deliveries")
+}
+
+model ReadingReminderLog {
+  id                String          @id @default(uuid()) @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  channel           ReminderChannel
+  status            ReminderStatus
+  reminderWindowKey String          @map("reminder_window_key")
+  windowStart       DateTime        @map("window_start")
+  windowEnd         DateTime        @map("window_end")
+  pendingMeters     Int             @default(0) @map("pending_meters")
+  reason            String?
+  providerMessageId String?         @map("provider_message_id")
+  payload           Json?           @default("{}")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  user              User            @relation(fields: [userId], references: [id])
+
+  @@index([userId, channel, createdAt])
+  @@index([reminderWindowKey, channel, status])
+  @@index([deletedAt])
+  @@map("reading_reminder_logs")
+}
