@@ -10,6 +10,7 @@ import {
   issueCampaignInvoicesAction,
 } from "@/app/(admin)/admin/billing/actions";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
+import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 
 export const metadata: Metadata = {
   title: "Billing Campaigns",
@@ -18,7 +19,15 @@ export const metadata: Metadata = {
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type CampaignRow = Prisma.BillingCampaignGetPayload<{
-  include: {
+  select: {
+    id: true;
+    code: true;
+    name: true;
+    periodStart: true;
+    periodEnd: true;
+    city: true;
+    zone: true;
+    status: true;
     tariffPlan: { select: { id: true; code: true; name: true } };
     _count: { select: { invoices: true } };
   };
@@ -46,7 +55,15 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
     [campaigns, tariffPlans] = await prisma.$transaction([
       prisma.billingCampaign.findMany({
         where: { deletedAt: null },
-        include: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          periodStart: true,
+          periodEnd: true,
+          city: true,
+          zone: true,
+          status: true,
           tariffPlan: { select: { id: true, code: true, name: true } },
           _count: { select: { invoices: true } },
         },
@@ -58,11 +75,12 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
         orderBy: [{ isDefault: "desc" }, { code: "asc" }],
       }),
     ]);
-  } catch {
+  } catch (error) {
+    const errorState = getBillingPageErrorState(error, "billing.campaigns");
     return (
       <div>
         <PageBreadcrumb pageTitle="Billing campaigns" />
-        <BillingSchemaNotice />
+        <BillingSchemaNotice {...errorState} />
       </div>
     );
   }

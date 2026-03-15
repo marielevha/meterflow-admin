@@ -442,7 +442,15 @@ export async function updateTariffPlan(
 export async function listBillingCampaigns() {
   const campaigns = await prisma.billingCampaign.findMany({
     where: { deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      periodStart: true,
+      periodEnd: true,
+      city: true,
+      zone: true,
+      status: true,
       tariffPlan: { select: { id: true, code: true, name: true } },
       _count: { select: { invoices: true } },
     },

@@ -4,6 +4,7 @@ import { InvoiceStatus } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import { prisma } from "@/lib/prisma";
+import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 
 export const metadata: Metadata = {
   title: "Billing",
@@ -42,11 +43,12 @@ export default async function BillingPage() {
       prisma.invoice.count({ where: { deletedAt: null, status: InvoiceStatus.PAID } }),
       prisma.invoice.count({ where: { deletedAt: null, status: InvoiceStatus.OVERDUE } }),
     ]);
-  } catch {
+  } catch (error) {
+    const errorState = getBillingPageErrorState(error, "billing.overview");
     return (
       <div>
         <PageBreadcrumb pageTitle="Billing" />
-        <BillingSchemaNotice />
+        <BillingSchemaNotice {...errorState} />
       </div>
     );
   }

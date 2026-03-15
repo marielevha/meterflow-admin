@@ -4,6 +4,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createTariffPlanAction, toggleTariffPlanAction } from "@/app/(admin)/admin/billing/actions";
 
@@ -40,11 +41,12 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
       },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     });
-  } catch {
+  } catch (error) {
+    const errorState = getBillingPageErrorState(error, "billing.tariffs");
     return (
       <div>
         <PageBreadcrumb pageTitle="Billing tariffs" />
-        <BillingSchemaNotice />
+        <BillingSchemaNotice {...errorState} />
       </div>
     );
   }

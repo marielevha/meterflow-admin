@@ -16,9 +16,11 @@ export const metadata: Metadata = {
   description: "Operational activity dashboard",
 };
 
-function formatDate(value: Date | null) {
+function formatDate(value: Date | string | null) {
   if (!value) return "N/A";
-  return value.toISOString().slice(0, 19).replace("T", " ");
+  const normalized = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(normalized.getTime())) return "N/A";
+  return normalized.toISOString().slice(0, 19).replace("T", " ");
 }
 
 function readingStatusColor(status: ReadingStatus) {

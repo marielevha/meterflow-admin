@@ -5,6 +5,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { listInvoices } from "@/lib/backoffice/billing";
 import { cancelInvoiceAction, issueInvoiceAction } from "@/app/(admin)/admin/billing/actions";
 
@@ -38,11 +39,12 @@ export default async function BillingInvoicesPage({ searchParams }: { searchPara
   let result: Awaited<ReturnType<typeof listInvoices>>;
   try {
     result = await listInvoices({ status, search, city, zone, page, perPage });
-  } catch {
+  } catch (error) {
+    const errorState = getBillingPageErrorState(error, "billing.invoices");
     return (
       <div>
         <PageBreadcrumb pageTitle="Billing invoices" />
-        <BillingSchemaNotice />
+        <BillingSchemaNotice {...errorState} />
       </div>
     );
   }

@@ -385,6 +385,36 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - les messages reminders utilisent maintenant `settings.companyName` (DB settings) comme source unique.
   - les titres de pages utilisent maintenant `companyName` via le layout global Next.js (`generateMetadata`) au lieu d'un suffixe `MeterFlow` hardcode.
 
+### 22) Correctifs billing et resilience overview
+
+- Diagnostic billing plus precis:
+  - remplacement du message generique "module non initialise" par une analyse d'erreur Prisma plus utile.
+  - distinction entre:
+    - tables manquantes
+    - colonnes manquantes / schema mismatch
+    - probleme de connexion Prisma
+    - erreur inattendue
+  - fichiers:
+    - `src/lib/backoffice/billingPageErrors.ts`
+    - `src/components/billing/BillingSchemaNotice.tsx`
+
+- Reparation de drift du schema billing:
+  - ajout d'une migration corrective idempotente:
+    - `prisma/migrations/20260315120000_repair_billing_schema_alignment`
+  - couvre les colonnes manquantes frequentes sur:
+    - `billing_campaigns`
+    - `invoices`
+  - inclut aussi indexes/FK pour les champs de cycle strict (`from_reading_id`, `to_reading_id`).
+
+- Tolerance partielle des pages billing aux schemas incomplets:
+  - la page `/admin/billing/campaigns` ne charge plus implicitement toutes les colonnes de `billing_campaigns`.
+  - selection Prisma reduite aux champs reellement affiches pour eviter qu'une colonne non utilisee fasse tomber toute la liste.
+  - meme logique appliquee au service partage `listBillingCampaigns`.
+
+- Robustesse runtime de l'overview:
+  - correction de `formatDate()` pour accepter `Date | string | null`.
+  - evite le crash `value.toISOString is not a function` lorsque les dates reviennent serializees depuis le cache serveur.
+
 
 ## Overview
 
