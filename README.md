@@ -383,6 +383,7 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - Branding applicatif centralise:
   - suppression de l'usage hardcode du nom produit dans les rappels.
   - les messages reminders utilisent maintenant `settings.companyName` (DB settings) comme source unique.
+  - les titres de pages utilisent maintenant `companyName` via le layout global Next.js (`generateMetadata`) au lieu d'un suffixe `MeterFlow` hardcode.
 
 
 ## Overview

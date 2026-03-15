@@ -11,7 +11,7 @@ import { cancelInvoiceAction, issueInvoiceAction } from "@/app/(admin)/admin/bil
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata: Metadata = {
-  title: "Billing Invoices | MeterFlow Dashboard",
+  title: "Billing Invoices",
   description: "Manage billing invoices",
 };
 

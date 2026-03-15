@@ -6,7 +6,7 @@ import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Billing | MeterFlow Dashboard",
+  title: "Billing",
   description: "Billing operations overview",
 };
 

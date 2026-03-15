@@ -13,7 +13,7 @@ import {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata: Metadata = {
-  title: "Invoice Detail | MeterFlow Dashboard",
+  title: "Invoice Detail",
   description: "Invoice details and operations",
 };
 

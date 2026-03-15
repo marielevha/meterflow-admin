@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "History | MeterFlow Dashboard",
+  title: "History",
   description: "History and audit overview",
 };
 

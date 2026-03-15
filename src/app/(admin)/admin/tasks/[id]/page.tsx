@@ -15,7 +15,7 @@ import {
 } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Task Detail | MeterFlow Dashboard",
+  title: "Task Detail",
   description: "Task detail with checklist, comments and attachments",
 };
 

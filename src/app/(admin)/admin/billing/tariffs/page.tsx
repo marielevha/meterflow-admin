@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { createTariffPlanAction, toggleTariffPlanAction } from "@/app/(admin)/admin/billing/actions";
 
 export const metadata: Metadata = {
-  title: "Billing Tariffs | MeterFlow Dashboard",
+  title: "Billing Tariffs",
   description: "Manage tariff plans",
 };
 

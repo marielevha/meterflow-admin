@@ -10,8 +10,8 @@ import ImportUsersModal from "@/components/users/ImportUsersModal";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Users | MeterFlow Dashboard",
-  description: "User management page for MeterFlow dashboard",
+  title: "Users",
+  description: "User management page for dashboard",
 };
 
 const STAFF_ROLES: UserRole[] = [UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN];

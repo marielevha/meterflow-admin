@@ -4,7 +4,7 @@ import AppSettingsForm from "@/components/settings/AppSettingsForm";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 
 export const metadata: Metadata = {
-  title: "Settings | MeterFlow Dashboard",
+  title: "Settings",
   description: "Application settings page",
 };
 

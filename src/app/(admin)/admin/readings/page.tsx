@@ -10,7 +10,7 @@ import { EyeIcon, PencilIcon } from "@/icons";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Readings | MeterFlow Dashboard",
+  title: "Readings",
   description: "Readings supervision",
 };
 

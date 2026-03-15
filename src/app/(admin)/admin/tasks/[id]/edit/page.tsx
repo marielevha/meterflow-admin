@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { updateTaskAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Edit Task | MeterFlow Dashboard",
+  title: "Edit Task",
   description: "Update operational task",
 };
 

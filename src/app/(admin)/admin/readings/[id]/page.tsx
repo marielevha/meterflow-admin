@@ -10,7 +10,7 @@ import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Reading details | MeterFlow Dashboard",
+  title: "Reading details",
   description: "Reading details and audit trail",
 };
 

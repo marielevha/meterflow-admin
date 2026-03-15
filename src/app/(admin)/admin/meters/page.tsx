@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Meters | MeterFlow Dashboard",
+  title: "Meters",
   description: "Meters management view",
 };
 

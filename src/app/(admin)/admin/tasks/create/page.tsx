@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { createTaskAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Create Task | MeterFlow Dashboard",
+  title: "Create Task",
   description: "Create operational task",
 };
 

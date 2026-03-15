@@ -9,7 +9,7 @@ import ConsumptionPerPage from "@/components/consumption/ConsumptionPerPage";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Consumption | MeterFlow Dashboard",
+  title: "Consumption",
   description: "Consumption analytics overview",
 };
 

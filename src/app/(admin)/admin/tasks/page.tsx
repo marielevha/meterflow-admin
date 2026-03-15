@@ -12,7 +12,7 @@ import { listTasks } from "@/lib/backoffice/tasks";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Tasks | MeterFlow Dashboard",
+  title: "Tasks",
   description: "Operational tasks management",
 };
 

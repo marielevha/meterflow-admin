@@ -12,7 +12,7 @@ import OperationsKpisSection from "@/components/overview/OperationsKpisSection";
 import { getOverviewDashboardData } from "@/lib/backoffice/overview";
 
 export const metadata: Metadata = {
-  title: "Overview | MeterFlow Dashboard",
+  title: "Overview",
   description: "Operational activity dashboard",
 };
 

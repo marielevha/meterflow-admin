@@ -12,7 +12,7 @@ import {
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 
 export const metadata: Metadata = {
-  title: "Billing Campaigns | MeterFlow Dashboard",
+  title: "Billing Campaigns",
   description: "Manage billing campaigns",
 };
 
