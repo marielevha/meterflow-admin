@@ -1,24 +1,46 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { MobileSessionProvider } from '@/providers/mobile-session-provider';
+import { MobileDrawerProvider } from '@/providers/mobile-drawer-provider';
+import { MobilePreferencesProvider } from '@/providers/mobile-preferences-provider';
+import { AppThemeProvider, useAppTheme } from '@/providers/app-theme-provider';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <AppThemeProvider>
+      <MobilePreferencesProvider>
+        <MobileSessionProvider>
+          <RootNavigator />
+        </MobileSessionProvider>
+      </MobilePreferencesProvider>
+    </AppThemeProvider>
+  );
+}
+
+function RootNavigator() {
+  const { navigationTheme, resolvedTheme } = useAppTheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
+    <ThemeProvider value={navigationTheme}>
+      <MobileDrawerProvider>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="readings/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="meters" options={{ headerShown: false }} />
+          <Stack.Screen name="meters/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="profile" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="about" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
+      </MobileDrawerProvider>
     </ThemeProvider>
   );
 }

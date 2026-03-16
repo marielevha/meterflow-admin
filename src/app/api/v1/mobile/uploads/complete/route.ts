@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         message: "upload_validated",
         file: {
           key: tokenPayload.key,
-          url: buildObjectUrl(tokenPayload.key),
+          url: buildObjectUrl(tokenPayload.key, request.url),
           sha256: tokenPayload.sha256,
           mimeType: tokenPayload.mimeType,
           sizeBytes: tokenPayload.sizeBytes,

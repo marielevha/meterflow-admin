@@ -118,6 +118,97 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - Mot de passe demo des seeds: `ChangeMe@123`.
 - Script d'integration API:
   - `scripts/mobile_reading_flow.sh`
+
+### 13) Application mobile React Native (Expo)
+
+- Workspace mobile initialise dans `mobileapp/meterflow`.
+- Routing Expo Router structure autour de:
+  - splash
+  - onboarding
+  - auth
+  - tabs client
+  - pages de detail
+- Theming mobile:
+  - mode clair / sombre / systeme
+  - preference persistante cote mobile
+- Splash branding:
+  - ecran type fintech avec logo mobile dedie
+- Onboarding:
+  - parcours en 4 ecrans
+  - memorisation locale pour ne plus le rejouer apres completion
+
+### 14) Auth mobile - UX et session
+
+- Ecrans dedies:
+  - `login`
+  - `register`
+  - `forgot-password`
+  - `reset-password`
+  - `verify-otp`
+- Login mobile connecte au backend:
+  - `POST /api/v1/mobile/auth/login`
+- Session mobile:
+  - access token + refresh token stockes localement
+  - restauration automatique au lancement
+  - refresh automatique via `POST /api/v1/mobile/auth/refresh`
+- Toggle mot de passe visible/masque sur les formulaires sensibles.
+
+### 15) Navigation mobile et preferences locales
+
+- Drawer mobile avec pages:
+  - `Accueil`
+  - `Notifications`
+  - `Mes compteurs`
+  - `Profil`
+  - `Parametres`
+  - `A propos`
+- Topbar fixe unifiee:
+  - mode `menu` sur les ecrans racine
+  - mode `back` sur les ecrans de detail
+- Preferences utilisateur locales:
+  - theme
+  - rester connecte
+  - afficher / masquer l'aide camera
+  - revoir l'onboarding
+
+### 16) App mobile - ecrans client branches au backend
+
+- `Historique` branche sur:
+  - `GET /api/v1/mobile/readings`
+- Detail d'un releve branche sur:
+  - `GET /api/v1/mobile/readings/:readingId`
+- `Mes compteurs` branche sur:
+  - `GET /api/v1/mobile/meters`
+- Detail d'un compteur branche sur:
+  - `GET /api/v1/mobile/meters/:meterId`
+
+### 17) App mobile - parcours de soumission d'un releve
+
+- Ecran `Releves` en mode camera plein ecran.
+- Capture photo en premier, puis:
+  - recuperation GPS (`lat`, `lng`, precision)
+  - preview photo minimaliste
+  - choix du compteur
+  - saisie index principal / secondaire
+  - soumission finale au backend
+- Upload photo mobile branche sur le flow backend:
+  1. `POST /api/v1/mobile/uploads/presign`
+  2. upload direct objet vers MinIO/S3
+  3. `POST /api/v1/mobile/uploads/complete`
+  4. `POST /api/v1/mobile/readings`
+
+### 18) Correctifs stockage S3 / MinIO pour le mobile
+
+- Ajout de la notion d'endpoint public de stockage:
+  - `S3_PUBLIC_ENDPOINT`
+  - `STORAGE_PUBLIC_BASE_URL`
+- Correction de generation des URLs signees pour eviter les URLs `localhost` non utilisables depuis le mobile.
+- Ajustement upload mobile pour compatibilite MinIO:
+  - suppression des headers non signes
+  - upload binaire via `expo-file-system`
+- Endpoint securise pour afficher l'image d'un releve:
+  - `GET /api/v1/mobile/readings/:readingId/image`
+  - utile quand l'objet n'est pas expose publiquement par MinIO.
   - enchaine login -> presign -> upload -> complete -> reading.
 
 ### 13) Dashboard users + RBAC (admin)

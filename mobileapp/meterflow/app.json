@@ -28,6 +28,25 @@
     "plugins": [
       "expo-router",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MeterFlow a besoin d'accéder à votre position pour joindre les coordonnées GPS au relevé."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MeterFlow a besoin d'accéder à la caméra pour capturer votre compteur."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MeterFlow a besoin d'accéder à vos photos pour joindre une image du compteur.",
+          "cameraPermission": "MeterFlow a besoin d'accéder à la caméra pour photographier votre compteur."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
