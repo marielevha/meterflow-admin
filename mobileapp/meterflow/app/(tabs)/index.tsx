@@ -239,7 +239,11 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Dernières consommations</Text>
+            <Text
+              numberOfLines={2}
+              style={[styles.sectionTitle, { color: palette.headline }]}>
+              Dernières consommations
+            </Text>
             <Pressable onPress={() => router.push('/(tabs)/account')}>
               <Text style={[styles.sectionLink, { color: palette.accent }]}>Voir tout</Text>
             </Pressable>
@@ -378,15 +382,20 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
   },
   sectionTitle: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 18,
+    lineHeight: 24,
     fontWeight: '800',
   },
   sectionLink: {
+    flexShrink: 0,
+    marginTop: 2,
     fontSize: 13,
     fontWeight: '800',
   },

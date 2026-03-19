@@ -9,6 +9,7 @@ import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { listClientReadings, type MobileReading } from '@/lib/api/mobile-readings';
+import { getReviewReasonLabel } from '@/lib/readings/review-reasons';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 type HistoryFilter = 'ALL' | 'PENDING' | 'VALIDATED' | 'FLAGGED' | 'REJECTED';
@@ -107,6 +108,11 @@ export default function ReadingsHistoryScreen() {
                     <Text style={[styles.meta, { color: palette.muted }]}>
                       {formatDisplayDate(reading.readingAt)}
                     </Text>
+                    {reading.status === 'FLAGGED' || reading.status === 'REJECTED' ? (
+                      <Text style={[styles.reasonText, { color: palette.muted }]}>
+                        {getReviewReasonLabel(reading.flagReason || reading.rejectionReason) || 'Décision en cours'}
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={[styles.statusPill, statusPillStyle(reading.status, palette)]}>
                     <Text style={[styles.statusText, statusTextStyle(reading.status, palette)]}>
@@ -368,6 +374,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
     lineHeight: 18,
+  },
+  reasonText: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 17,
   },
   indexValue: {
     fontSize: 15,

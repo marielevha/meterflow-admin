@@ -10,6 +10,11 @@ import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { API_BASE_URL } from '@/lib/api/config';
 import { getClientReadingDetail, type MobileReadingDetail } from '@/lib/api/mobile-readings';
+import {
+  getClientReviewDecisionMessage,
+  getClientReviewDecisionTitle,
+  humanizeReadingStatus,
+} from '@/lib/readings/review-reasons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
@@ -75,13 +80,53 @@ export default function ReadingDetailScreen() {
           <StateCard text="Relevé introuvable." color={palette.muted} palette={palette} />
         ) : (
           <>
+            {reading.status === 'VALIDATED' || reading.flagReason || reading.rejectionReason ? (
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor:
+                      reading.status === 'REJECTED'
+                        ? '#fff0ef'
+                        : reading.status === 'FLAGGED'
+                          ? '#fff6e7'
+                          : palette.surface,
+                    borderColor:
+                      reading.status === 'REJECTED'
+                        ? '#efc0bb'
+                        : reading.status === 'FLAGGED'
+                          ? '#f3c98b'
+                          : palette.border,
+                  },
+                ]}>
+                <Text style={[styles.sectionTitle, { color: palette.headline }]}>Décision agent</Text>
+                <Text style={[styles.decisionTitle, { color: palette.headline }]}>
+                  {getClientReviewDecisionTitle(reading.status, reading.flagReason || reading.rejectionReason)}
+                </Text>
+                <Text
+                  style={[
+                    styles.decisionMessage,
+                    {
+                      color:
+                        reading.status === 'REJECTED'
+                          ? '#8f443a'
+                          : reading.status === 'FLAGGED'
+                            ? '#9a6514'
+                            : palette.muted,
+                    },
+                  ]}>
+                  {getClientReviewDecisionMessage(reading.status, reading.flagReason || reading.rejectionReason)}
+                </Text>
+              </View>
+            ) : null}
+
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <Text style={[styles.cardTitle, { color: palette.headline }]}>{reading.meter.serialNumber}</Text>
               <Text style={[styles.cardMeta, { color: palette.muted }]}>
                 {reading.meter.city} / {reading.meter.zone}
               </Text>
               <View style={styles.infoRow}>
-                <InfoItem label="Statut" value={reading.status} palette={palette} />
+                <InfoItem label="Statut" value={humanizeReadingStatus(reading.status)} palette={palette} />
                 <InfoItem label="Index" value={String(reading.primaryIndex ?? '--')} palette={palette} />
               </View>
               <View style={styles.infoRow}>
@@ -354,6 +399,15 @@ const styles = StyleSheet.create({
   gpsMeta: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  decisionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  decisionMessage: {
+    fontSize: 14,
+    lineHeight: 21,
   },
   eventsStack: {
     gap: 10,

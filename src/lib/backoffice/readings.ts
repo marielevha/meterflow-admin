@@ -9,6 +9,13 @@ import {
   UserStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
+import {
+  getClientReadingDecisionMessage,
+  getClientReadingDecisionTitle,
+  normalizeFlagReasonCode,
+  normalizeRejectionReasonCode,
+} from "@/lib/readings/reviewReasons";
 
 type StaffUser = {
   id: string;
@@ -64,6 +71,7 @@ async function getOwnedReadingForReview(readingId: string) {
           id: true,
           type: true,
           customerId: true,
+          serialNumber: true,
         },
       },
     },
@@ -90,6 +98,38 @@ function buildReadingSummary(reading: {
     flagReason: reading.flagReason,
     updatedAt: reading.updatedAt,
   };
+}
+
+async function notifyReadingDecision(params: {
+  userId: string;
+  readingId: string;
+  status: ReadingStatus;
+  reason?: string | null;
+  meterSerialNumber: string;
+}) {
+  const title = getClientReadingDecisionTitle(params.status, params.reason);
+  const body = getClientReadingDecisionMessage(
+    params.status,
+    params.reason,
+    params.meterSerialNumber
+  );
+
+  if (!title || !body) return;
+
+  try {
+    await sendPushNotificationToUser({
+      userId: params.userId,
+      title,
+      body,
+      data: {
+        readingId: params.readingId,
+        status: params.status,
+        meterSerialNumber: params.meterSerialNumber,
+      },
+    });
+  } catch {
+    // best effort only, the review action must not fail on push delivery errors
+  }
 }
 
 export async function listPendingReadings() {
@@ -193,7 +233,18 @@ export async function validateReading(staff: StaffUser, readingId: string) {
         readingId: reading.id,
         userId: staff.id,
         type: ReadingEventType.VALIDATED,
-        payload: { byRole: staff.role },
+        payload: {
+          byRole: staff.role,
+          clientTitle: getClientReadingDecisionTitle(
+            ReadingStatus.VALIDATED,
+            null
+          ),
+          clientMessage: getClientReadingDecisionMessage(
+            ReadingStatus.VALIDATED,
+            null,
+            reading.meter.serialNumber
+          ),
+        },
       },
     });
 
@@ -212,13 +263,25 @@ export async function validateReading(staff: StaffUser, readingId: string) {
     return updated;
   });
 
+  await notifyReadingDecision({
+    userId: reading.meter.customerId,
+    readingId: reading.id,
+    status: ReadingStatus.VALIDATED,
+    reason: null,
+    meterSerialNumber: reading.meter.serialNumber,
+  });
+
   return { status: 200, body: { message: "reading_validated", reading: buildReadingSummary(result) } };
 }
 
 export async function flagReading(staff: StaffUser, readingId: string, payload: FlagOrRejectPayload) {
-  const reason = toNullableTrimmed(payload.reason);
-  if (!reason) {
+  const rawReason = toNullableTrimmed(payload.reason);
+  if (!rawReason) {
     return { status: 400, body: { error: "flag_reason_required" } };
+  }
+  const reason = normalizeFlagReasonCode(rawReason);
+  if (!reason) {
+    return { status: 400, body: { error: "invalid_flag_reason" } };
   }
 
   const reading = await getOwnedReadingForReview(readingId);
@@ -247,11 +310,28 @@ export async function flagReading(staff: StaffUser, readingId: string, payload: 
         readingId: reading.id,
         userId: staff.id,
         type: ReadingEventType.FLAGGED,
-        payload: { reason, byRole: staff.role },
+        payload: {
+          reason,
+          byRole: staff.role,
+          clientTitle: getClientReadingDecisionTitle(ReadingStatus.FLAGGED, reason),
+          clientMessage: getClientReadingDecisionMessage(
+            ReadingStatus.FLAGGED,
+            reason,
+            reading.meter.serialNumber
+          ),
+        },
       },
     });
 
     return readingUpdated;
+  });
+
+  await notifyReadingDecision({
+    userId: reading.meter.customerId,
+    readingId: reading.id,
+    status: ReadingStatus.FLAGGED,
+    reason,
+    meterSerialNumber: reading.meter.serialNumber,
   });
 
   return { status: 200, body: { message: "reading_flagged", reading: buildReadingSummary(updated) } };
@@ -262,9 +342,13 @@ export async function rejectReading(
   readingId: string,
   payload: FlagOrRejectPayload
 ) {
-  const reason = toNullableTrimmed(payload.reason);
-  if (!reason) {
+  const rawReason = toNullableTrimmed(payload.reason);
+  if (!rawReason) {
     return { status: 400, body: { error: "rejection_reason_required" } };
+  }
+  const reason = normalizeRejectionReasonCode(rawReason);
+  if (!reason) {
+    return { status: 400, body: { error: "invalid_rejection_reason" } };
   }
 
   const reading = await getOwnedReadingForReview(readingId);
@@ -293,11 +377,28 @@ export async function rejectReading(
         readingId: reading.id,
         userId: staff.id,
         type: ReadingEventType.REJECTED,
-        payload: { reason, byRole: staff.role },
+        payload: {
+          reason,
+          byRole: staff.role,
+          clientTitle: getClientReadingDecisionTitle(ReadingStatus.REJECTED, reason),
+          clientMessage: getClientReadingDecisionMessage(
+            ReadingStatus.REJECTED,
+            reason,
+            reading.meter.serialNumber
+          ),
+        },
       },
     });
 
     return readingUpdated;
+  });
+
+  await notifyReadingDecision({
+    userId: reading.meter.customerId,
+    readingId: reading.id,
+    status: ReadingStatus.REJECTED,
+    reason,
+    meterSerialNumber: reading.meter.serialNumber,
   });
 
   return { status: 200, body: { message: "reading_rejected", reading: buildReadingSummary(updated) } };

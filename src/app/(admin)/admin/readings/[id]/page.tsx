@@ -8,6 +8,7 @@ import Badge from "@/components/ui/badge/Badge";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
+import { getReviewReasonLabel } from "@/lib/readings/reviewReasons";
 
 export const metadata: Metadata = {
   title: "Reading details",
@@ -274,8 +275,11 @@ export default async function ReadingDetailPage({
 
             {(reading.flagReason || reading.rejectionReason) ? (
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Info label="Flag reason" value={reading.flagReason || "N/A"} />
-                <Info label="Rejection reason" value={reading.rejectionReason || "N/A"} />
+                <Info label="Flag reason" value={getReviewReasonLabel(reading.flagReason) || "N/A"} />
+                <Info
+                  label="Rejection reason"
+                  value={getReviewReasonLabel(reading.rejectionReason) || "N/A"}
+                />
               </div>
             ) : null}
 

@@ -46,6 +46,7 @@
           "cameraPermission": "MeterFlow a besoin d'accéder à la caméra pour photographier votre compteur."
         }
       ],
+      "expo-notifications",
       [
         "expo-splash-screen",
         {

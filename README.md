@@ -568,6 +568,51 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
     - detail releve
     - etapes utiles du parcours de soumission
 
+### 24) Revue admin des releves, notifications client et fondations push
+
+- Revue admin plus rigoureuse des releves:
+  - motifs normalises de signalement/rejet (`flagReason`, `rejectionReason`)
+  - champ motif obligatoire lorsque l'agent choisit `FLAGGED` ou `REJECTED`
+  - catalogues partages de motifs et messages client dans:
+    - `src/lib/readings/reviewReasons.ts`
+    - `mobileapp/meterflow/lib/readings/review-reasons.ts`
+
+- Detail et edition admin des releves:
+  - la page d'edition remplace les champs libres par des listes de motifs controlees
+  - la page detail admin affiche des libelles lisibles plutot que les codes internes
+  - les editions manuelles admin generent aussi des evenements metier de decision, pas seulement un audit technique
+
+- Notifications client in-app:
+  - nouvelle API mobile:
+    - `GET /api/v1/mobile/notifications`
+  - implementation basee sur `reading_events` pour eviter d'ajouter une table de notifications dediee trop tot
+  - la page mobile `Notifications` affiche maintenant:
+    - les validations
+    - les signalements
+    - les rejets
+    - avec titre, message metier, compteur concerne et lien vers le detail releve
+  - le detail releve mobile affiche une carte `Decision agent` avec un message plus clair pour le client
+
+- Fondations des notifications push mobiles:
+  - ajout de `expo-notifications` dans l'app mobile
+  - ajout du modele Prisma `MobilePushDevice`
+  - endpoints mobiles:
+    - `POST /api/v1/mobile/push/register`
+    - `POST /api/v1/mobile/push/unregister`
+  - service backend d'envoi Expo Push:
+    - `src/lib/notifications/expoPush.ts`
+  - envoi push declenche lors des transitions:
+    - validation
+    - signalement
+    - rejet
+  - le flux push est implemente en mode `best effort`:
+    - un echec du service push ne doit jamais casser la decision agent
+
+- Limite actuelle de test:
+  - les push distantes Expo ne sont pas considerees comme valides de bout en bout dans `Expo Go`
+  - il faut un `development build` sur vrai appareil pour verifier correctement les push natives
+  - en attendant, le centre de notifications in-app reste la source fiable cote client
+
 
 ## Overview
 

@@ -4,7 +4,14 @@ import { Prisma, ReadingEventType, ReadingStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
 import { prisma } from "@/lib/prisma";
+import {
+  getClientReadingDecisionMessage,
+  getClientReadingDecisionTitle,
+  normalizeFlagReasonCode,
+  normalizeRejectionReasonCode,
+} from "@/lib/readings/reviewReasons";
 import { isReadingTransitionAllowed } from "@/lib/workflows/stateMachines";
 
 function asString(value: FormDataEntryValue | null) {
@@ -70,6 +77,8 @@ export async function updateReadingAction(readingId: string, formData: FormData)
 
   const flagReason = asString(formData.get("flagReason"));
   const rejectionReason = asString(formData.get("rejectionReason"));
+  const normalizedFlagReason = flagReason ? normalizeFlagReasonCode(flagReason) : null;
+  const normalizedRejectionReason = rejectionReason ? normalizeRejectionReasonCode(rejectionReason) : null;
 
   const gpsLatitudeRaw = asString(formData.get("gpsLatitude"));
   const gpsLongitudeRaw = asString(formData.get("gpsLongitude"));
@@ -103,6 +112,12 @@ export async function updateReadingAction(readingId: string, formData: FormData)
       anomalyScore: true,
       flagReason: true,
       rejectionReason: true,
+      meter: {
+        select: {
+          customerId: true,
+          serialNumber: true,
+        },
+      },
     },
   });
 
@@ -114,6 +129,22 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     redirect(`/admin/readings/${readingId}/edit?error=invalid_status_transition`);
   }
 
+  if (status === ReadingStatus.FLAGGED && !normalizedFlagReason) {
+    redirect(
+      `/admin/readings/${readingId}/edit?error=${
+        flagReason ? "invalid_flag_reason" : "flag_reason_required"
+      }`
+    );
+  }
+
+  if (status === ReadingStatus.REJECTED && !normalizedRejectionReason) {
+    redirect(
+      `/admin/readings/${readingId}/edit?error=${
+        rejectionReason ? "invalid_rejection_reason" : "rejection_reason_required"
+      }`
+    );
+  }
+
   const now = new Date();
   const isReviewed = [ReadingStatus.VALIDATED, ReadingStatus.FLAGGED, ReadingStatus.REJECTED].includes(status);
 
@@ -123,8 +154,8 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     primaryIndex: new Prisma.Decimal(primaryIndex),
     secondaryIndex: secondaryIndex === null ? null : new Prisma.Decimal(secondaryIndex),
     imageUrl,
-    flagReason: status === ReadingStatus.FLAGGED ? (flagReason || null) : null,
-    rejectionReason: status === ReadingStatus.REJECTED ? (rejectionReason || null) : null,
+    flagReason: status === ReadingStatus.FLAGGED ? normalizedFlagReason : null,
+    rejectionReason: status === ReadingStatus.REJECTED ? normalizedRejectionReason : null,
     gpsLatitude: gpsLatitude === null ? null : new Prisma.Decimal(gpsLatitude),
     gpsLongitude: gpsLongitude === null ? null : new Prisma.Decimal(gpsLongitude),
     gpsAccuracyMeters: gpsAccuracy === null ? null : new Prisma.Decimal(gpsAccuracy),
@@ -136,6 +167,16 @@ export async function updateReadingAction(readingId: string, formData: FormData)
   };
 
   try {
+    let pushPayload:
+      | {
+          userId: string;
+          title: string;
+          body: string;
+          status: ReadingStatus;
+          meterSerialNumber: string;
+        }
+      | null = null;
+
     await prisma.$transaction(async (tx) => {
       await tx.reading.update({
         where: { id: readingId },
@@ -175,10 +216,13 @@ export async function updateReadingAction(readingId: string, formData: FormData)
           from: existing.anomalyScore ? existing.anomalyScore.toString() : null,
           to: anomalyScore === null ? null : anomalyScore.toString(),
         },
-        flagReason: { from: existing.flagReason, to: status === ReadingStatus.FLAGGED ? flagReason || null : null },
+        flagReason: {
+          from: existing.flagReason,
+          to: status === ReadingStatus.FLAGGED ? normalizedFlagReason : null,
+        },
         rejectionReason: {
           from: existing.rejectionReason,
-          to: status === ReadingStatus.REJECTED ? rejectionReason || null : null,
+          to: status === ReadingStatus.REJECTED ? normalizedRejectionReason : null,
         },
       };
 
@@ -201,7 +245,81 @@ export async function updateReadingAction(readingId: string, formData: FormData)
           },
         },
       });
+
+      const effectiveReason =
+        status === ReadingStatus.FLAGGED
+          ? normalizedFlagReason
+          : status === ReadingStatus.REJECTED
+            ? normalizedRejectionReason
+            : null;
+      const shouldCreateDecisionEvent =
+        (status === ReadingStatus.VALIDATED && existing.status !== ReadingStatus.VALIDATED) ||
+        (status === ReadingStatus.FLAGGED &&
+          (existing.status !== ReadingStatus.FLAGGED ||
+            existing.flagReason !== normalizedFlagReason)) ||
+        (status === ReadingStatus.REJECTED &&
+          (existing.status !== ReadingStatus.REJECTED ||
+            existing.rejectionReason !== normalizedRejectionReason));
+
+      if (shouldCreateDecisionEvent) {
+        const decisionEventType =
+          status === ReadingStatus.VALIDATED
+            ? ReadingEventType.VALIDATED
+            : status === ReadingStatus.FLAGGED
+              ? ReadingEventType.FLAGGED
+              : ReadingEventType.REJECTED;
+
+        await tx.readingEvent.create({
+          data: {
+            readingId,
+            userId: staff.id,
+            type: decisionEventType,
+            payload: {
+              source: "admin_edit",
+              editedById: staff.id,
+              editedByRole: staff.role,
+              reason: effectiveReason,
+              clientTitle: getClientReadingDecisionTitle(status, effectiveReason),
+              clientMessage: getClientReadingDecisionMessage(
+                status,
+                effectiveReason,
+                existing.meter.serialNumber
+              ),
+            },
+          },
+        });
+
+        const clientTitle = getClientReadingDecisionTitle(status, effectiveReason);
+        const clientMessage = getClientReadingDecisionMessage(
+          status,
+          effectiveReason,
+          existing.meter.serialNumber
+        );
+
+        if (clientTitle && clientMessage) {
+          pushPayload = {
+            userId: existing.meter.customerId,
+            title: clientTitle,
+            body: clientMessage,
+            status,
+            meterSerialNumber: existing.meter.serialNumber,
+          };
+        }
+      }
     });
+
+    if (pushPayload) {
+      await sendPushNotificationToUser({
+        userId: existing.meter.customerId,
+        title: pushPayload.title,
+        body: pushPayload.body,
+        data: {
+          readingId,
+          status: pushPayload.status,
+          meterSerialNumber: pushPayload.meterSerialNumber,
+        },
+      });
+    }
   } catch {
     redirect(`/admin/readings/${readingId}/edit?error=update_failed`);
   }

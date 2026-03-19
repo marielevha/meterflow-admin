@@ -7,6 +7,11 @@ import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { prisma } from "@/lib/prisma";
+import {
+  FLAG_REASON_OPTIONS,
+  REJECTION_REASON_OPTIONS,
+  getReviewReasonLabel,
+} from "@/lib/readings/reviewReasons";
 import { updateReadingAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -37,6 +42,10 @@ function mapError(code: string) {
   if (code === "invalid_primary_index") return "Primary index is invalid.";
   if (code === "invalid_secondary_index") return "Secondary index is invalid.";
   if (code === "image_url_required") return "Image URL is required.";
+  if (code === "flag_reason_required") return "Select a normalized flag reason when status is Flagged.";
+  if (code === "rejection_reason_required") return "Select a normalized rejection reason when status is Rejected.";
+  if (code === "invalid_flag_reason") return "The selected flag reason is invalid.";
+  if (code === "invalid_rejection_reason") return "The selected rejection reason is invalid.";
   if (code === "update_failed") return "Update failed. Please try again.";
   return code.replaceAll("_", " ");
 }
@@ -262,26 +271,49 @@ export default async function EditReadingPage({
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Decision reasons</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            When status is <span className="font-medium text-gray-700 dark:text-gray-200">Flagged</span> or{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-200">Rejected</span>, selecting a normalized
+            reason is mandatory.
+          </p>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="flagReason">Flag reason</Label>
-              <textarea
+              <select
                 id="flagReason"
                 name="flagReason"
-                rows={4}
                 defaultValue={reading.flagReason || ""}
-                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
+                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                <option value="">Select a flag reason</option>
+                {FLAG_REASON_OPTIONS.map((reason) => (
+                  <option key={reason.code} value={reason.code}>
+                    {reason.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Current value: {getReviewReasonLabel(reading.flagReason) || "N/A"}
+              </p>
             </div>
             <div>
               <Label htmlFor="rejectionReason">Rejection reason</Label>
-              <textarea
+              <select
                 id="rejectionReason"
                 name="rejectionReason"
-                rows={4}
                 defaultValue={reading.rejectionReason || ""}
-                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
+                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                <option value="">Select a rejection reason</option>
+                {REJECTION_REASON_OPTIONS.map((reason) => (
+                  <option key={reason.code} value={reason.code}>
+                    {reason.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Current value: {getReviewReasonLabel(reading.rejectionReason) || "N/A"}
+              </p>
             </div>
           </div>
         </section>

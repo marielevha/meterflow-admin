@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
 import { loginWithBackend, type MobileLoginResponse } from '@/lib/auth/mobile-auth-api';
+import { unregisterStoredMobilePushToken } from '@/lib/api/mobile-push';
 import {
   clearCurrentMobileSession,
   hydrateMobileSessionStore,
@@ -52,6 +53,11 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   }
 
   async function logout() {
+    try {
+      await unregisterStoredMobilePushToken();
+    } catch {
+      // best effort cleanup
+    }
     await clearCurrentMobileSession();
   }
 
