@@ -6,6 +6,8 @@ import {
   ReadingStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveGpsThresholdMeters, haversineMeters } from "@/lib/geo/gps";
+import { getAppSettings } from "@/lib/settings/serverSettings";
 
 type CreateReadingPayload = {
   meterId?: string;
@@ -108,6 +110,8 @@ export async function createClientReading(userId: string, payload: CreateReading
       type: true,
       serialNumber: true,
       meterReference: true,
+      latitude: true,
+      longitude: true,
     },
   });
 
@@ -118,6 +122,19 @@ export async function createClientReading(userId: string, payload: CreateReading
   if (meter.type === MeterType.DUAL_INDEX && !secondaryIndex) {
     return { status: 400, body: { error: "secondary_index_required_for_dual_meter" } };
   }
+
+  const appSettings = await getAppSettings();
+  const meterLat = toNumberOrNull(meter.latitude);
+  const meterLng = toNumberOrNull(meter.longitude);
+  const readLat = toNumberOrNull(gpsLatitude);
+  const readLng = toNumberOrNull(gpsLongitude);
+  const gpsThreshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
+  const gpsDistanceMeters =
+    meterLat !== null && meterLng !== null && readLat !== null && readLng !== null
+      ? haversineMeters(meterLat, meterLng, readLat, readLng)
+      : null;
+  const gpsWithinExpectedArea =
+    gpsDistanceMeters === null ? null : gpsDistanceMeters <= gpsThreshold;
 
   const created = await prisma.$transaction(async (tx) => {
     const reading = await tx.reading.create({
@@ -139,6 +156,8 @@ export async function createClientReading(userId: string, payload: CreateReading
         gpsLatitude,
         gpsLongitude,
         gpsAccuracyMeters,
+        gpsDistanceMeters:
+          gpsDistanceMeters !== null ? new Prisma.Decimal(gpsDistanceMeters) : null,
         idempotencyKey,
       },
       include: {
@@ -163,6 +182,26 @@ export async function createClientReading(userId: string, payload: CreateReading
         payload: { source: "mobile" },
       },
     });
+
+    if (gpsDistanceMeters !== null) {
+      await tx.readingEvent.create({
+        data: {
+          readingId: reading.id,
+          userId,
+          type: ReadingEventType.ANOMALY_DETECTED,
+          payload: {
+            check: "gps_distance",
+            passed: gpsWithinExpectedArea,
+            distanceMeters: gpsDistanceMeters,
+            thresholdMeters: gpsThreshold,
+            meterLatitude: meterLat,
+            meterLongitude: meterLng,
+            readingLatitude: readLat,
+            readingLongitude: readLng,
+          },
+        },
+      });
+    }
 
     return reading;
   });
@@ -220,6 +259,10 @@ export async function listClientReadings(
       primaryIndex: true,
       secondaryIndex: true,
       imageUrl: true,
+      gpsLatitude: true,
+      gpsLongitude: true,
+      gpsAccuracyMeters: true,
+      gpsDistanceMeters: true,
       rejectionReason: true,
       flagReason: true,
       reviewedAt: true,
@@ -240,6 +283,12 @@ export async function listClientReadings(
   });
 
   return { status: 200, body: { readings } };
+}
+
+function toNumberOrNull(value: Prisma.Decimal | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
 }
 
 export async function getClientReadingDetail(userId: string, readingId: string) {

@@ -79,6 +79,40 @@ function createObjectKey(userId: string, purpose: string, fileName: string) {
   return `mobile/${purpose}/${userId}/${yyyy}/${mm}/${randomUUID()}.${ext}`;
 }
 
+export async function uploadObjectFile(params: {
+  userId: string;
+  fileName: string;
+  mimeType: string;
+  sha256: string;
+  purpose: string;
+  body: Uint8Array | Buffer;
+  requestUrl?: string;
+}) {
+  const bucket = requiredEnv("S3_BUCKET");
+  const key = createObjectKey(params.userId, params.purpose, params.fileName);
+  const s3 = createS3Client();
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: params.body,
+      ContentType: params.mimeType,
+      Metadata: {
+        sha256: params.sha256,
+        uploaded_by: params.userId,
+        purpose: params.purpose,
+      },
+    })
+  );
+
+  return {
+    bucket,
+    key,
+    fileUrl: buildObjectUrl(key, params.requestUrl),
+  };
+}
+
 export function extractObjectKeyFromUrl(fileUrl: string) {
   try {
     const parsed = new URL(fileUrl);

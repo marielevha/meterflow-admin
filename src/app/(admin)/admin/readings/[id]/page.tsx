@@ -1,5 +1,4 @@
 import { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
@@ -7,6 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -22,6 +22,12 @@ function formatDate(value: Date | null) {
 function decimalToString(value: { toString(): string } | null) {
   if (!value) return "N/A";
   return value.toString();
+}
+
+function decimalToNumber(value: { toString(): string } | null) {
+  if (!value) return null;
+  const num = Number(value.toString());
+  return Number.isFinite(num) ? num : null;
 }
 
 function readingStatusBadge(status: ReadingStatus) {
@@ -216,6 +222,9 @@ export default async function ReadingDetailPage({
   });
 
   if (!reading) notFound();
+  const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
+  const gpsThreshold = gpsThresholdMeters();
+  const gpsWithinThreshold = gpsDistance === null ? null : gpsDistance <= gpsThreshold;
 
   return (
     <div>
@@ -270,6 +279,30 @@ export default async function ReadingDetailPage({
               </div>
             ) : null}
 
+            <div
+              className={`mt-4 rounded-xl border p-4 ${
+                gpsWithinThreshold === false
+                  ? "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"
+                  : "border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-white/[0.02]"
+              }`}
+            >
+              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                GPS proximity check
+              </p>
+              <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">
+                {gpsDistance === null
+                  ? "Distance non calculable"
+                  : `${gpsDistance.toFixed(1)} m par rapport au compteur`}
+              </p>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                {gpsDistance === null
+                  ? "Les coordonnées du compteur ou du relevé sont incomplètes."
+                  : gpsWithinThreshold
+                    ? `Position cohérente avec le seuil configuré (${gpsThreshold} m).`
+                    : `Distance supérieure au seuil configuré (${gpsThreshold} m). Contrôle recommandé.`}
+              </p>
+            </div>
+
             {reading.ocrText ? (
               <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">OCR text</p>
@@ -281,12 +314,9 @@ export default async function ReadingDetailPage({
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Evidence</h3>
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-              <Image
-                src={reading.imageUrl}
+              <img
+                src={`/api/v1/readings/${reading.id}/image`}
                 alt={`Reading ${reading.id}`}
-                width={1280}
-                height={960}
-                unoptimized
                 className="h-auto w-full object-cover"
               />
             </div>

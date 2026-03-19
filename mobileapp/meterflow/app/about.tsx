@@ -15,7 +15,7 @@ export default function AboutScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="A propos" subtitle="Drawer menu">
+      <AppPage title="A propos" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)">
         <View style={styles.container}>
           <View style={[styles.heroCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <View style={[styles.logoBox, { backgroundColor: palette.accentSoft }]}>

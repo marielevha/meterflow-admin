@@ -9,6 +9,10 @@ export type MobileReading = {
   primaryIndex: string | number | null;
   secondaryIndex: string | number | null;
   imageUrl: string | null;
+  gpsLatitude: string | number | null;
+  gpsLongitude: string | number | null;
+  gpsAccuracyMeters: string | number | null;
+  gpsDistanceMeters: string | number | null;
   rejectionReason: string | null;
   flagReason: string | null;
   reviewedAt: string | null;

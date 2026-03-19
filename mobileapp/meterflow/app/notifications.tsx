@@ -12,7 +12,7 @@ export default function NotificationsScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Notifications" subtitle="Drawer menu" scrollable={false}>
+      <AppPage title="Notifications" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)" scrollable={false}>
         <View style={styles.container}>
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <View style={[styles.iconWrap, { backgroundColor: palette.accentSoft }]}>

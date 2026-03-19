@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AppPage } from '@/components/app/app-page';
+import { CircularLoading } from '@/components/app/circular-loading';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
@@ -58,11 +59,10 @@ export default function MetersScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Mes compteurs" subtitle="Drawer menu">
+      <AppPage title="Mes compteurs" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)">
         {loading ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <ActivityIndicator size="small" color={palette.accent} />
-            <Text style={[styles.stateText, { color: palette.muted }]}>Chargement des compteurs...</Text>
+          <View style={styles.loadingWrap}>
+            <CircularLoading palette={palette} />
           </View>
         ) : error ? (
           <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
@@ -136,6 +136,11 @@ function formatDisplayDate(value: string) {
 
 const styles = StyleSheet.create({
   stack: { gap: 12 },
+  loadingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
   stateCard: {
     borderWidth: 1,
     borderRadius: 24,

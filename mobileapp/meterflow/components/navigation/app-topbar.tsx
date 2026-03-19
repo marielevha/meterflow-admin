@@ -10,10 +10,25 @@ type AppTopBarProps = {
   title: string;
   subtitle?: string;
   mode?: 'drawer' | 'back';
-  backHref?: '/(tabs)/account' | '/(tabs)' | '/meters' | '/profile' | '/settings' | '/about';
+  backHref?:
+    | '/consumption/[meterId]'
+    | '/readings-history'
+    | '/(tabs)/account'
+    | '/(tabs)'
+    | '/meters'
+    | '/profile'
+    | '/settings'
+    | '/about';
+  onBackPress?: () => void;
 };
 
-export function AppTopBar({ title, subtitle, mode = 'drawer', backHref }: AppTopBarProps) {
+export function AppTopBar({
+  title,
+  subtitle,
+  mode = 'drawer',
+  backHref,
+  onBackPress,
+}: AppTopBarProps) {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
   const { openDrawer } = useMobileDrawer();
@@ -21,6 +36,11 @@ export function AppTopBar({ title, subtitle, mode = 'drawer', backHref }: AppTop
 
   function handleLeadingAction() {
     if (mode === 'back') {
+      if (onBackPress) {
+        onBackPress();
+        return;
+      }
+
       if (router.canGoBack()) {
         router.back();
         return;
@@ -34,6 +54,10 @@ export function AppTopBar({ title, subtitle, mode = 'drawer', backHref }: AppTop
     }
 
     openDrawer();
+  }
+
+  function handleTrailingAction() {
+    router.push('/notifications');
   }
 
   return (
@@ -53,7 +77,11 @@ export function AppTopBar({ title, subtitle, mode = 'drawer', backHref }: AppTop
         <Text style={[styles.title, { color: palette.headline }]}>{title}</Text>
       </View>
 
-      <View style={[styles.menuButton, styles.placeholder]} />
+      <Pressable
+        onPress={handleTrailingAction}
+        style={[styles.menuButton, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+        <Ionicons name="notifications-outline" size={20} color={palette.headline} />
+      </Pressable>
     </View>
   );
 }
@@ -72,9 +100,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  placeholder: {
-    opacity: 0,
   },
   titleBlock: {
     flex: 1,

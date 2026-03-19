@@ -1,184 +1,338 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
 import { AppPage } from '@/components/app/app-page';
+import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
+import { listClientConsumption, type MobileConsumptionEntry } from '@/lib/api/mobile-consumption';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
-const METERS = [
-  {
-    id: 'MF-SN-DKR-0006',
-    label: 'Compteur principal',
-    address: 'Dakar / Almadies',
-    lastIndex: '501 kWh',
-    lastReadingDate: '07 fev. 2026',
-    status: 'Actif',
-  },
-  {
-    id: 'MF-CG-BZV-0001',
-    label: 'Compteur secondaire',
-    address: 'Brazzaville / Makelele',
-    lastIndex: '1328 kWh',
-    lastReadingDate: '01 fev. 2026',
-    status: 'Actif',
-  },
-];
-
-const LAST_READING = {
-  status: 'En cours de validation',
-  meter: 'MF-SN-DKR-0006',
-  index: '501 kWh',
-  submittedAt: '07 fev. 2026 a 10:10',
+type DashboardData = {
+  meters: MobileMeter[];
+  consumptions: MobileConsumptionEntry[];
 };
-
-const QUICK_INFO = [
-  {
-    title: 'Fenetre de releve',
-    value: '20 -> 05',
-    helper: 'Prochaine campagne ouverte',
-    icon: 'calendar-outline' as const,
-  },
-  {
-    title: 'Derniere facture',
-    value: '12 500 FCFA',
-    helper: 'Echeance le 28 fev.',
-    icon: 'receipt-outline' as const,
-  },
-];
 
 export default function HomeScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
-  const { session } = useMobileSession();
+  const { width: screenWidth } = useWindowDimensions();
+  const { session, logout } = useMobileSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    meters: [],
+    consumptions: [],
+  });
+  const [activeMeterIndex, setActiveMeterIndex] = useState(0);
 
-  const customerName =
-    [session?.user.firstName, session?.user.lastName].filter(Boolean).join(' ') || 'Client MeterFlow';
+  useEffect(() => {
+    let active = true;
+
+    async function loadDashboard() {
+      if (!session?.accessToken) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [metersResult, consumptionsResult] = await Promise.all([
+          listClientMeters(session.accessToken),
+          listClientConsumption({ limit: 12 }),
+        ]);
+
+        if (!active) return;
+        setDashboardData({
+          meters: metersResult.meters,
+          consumptions: consumptionsResult.consumptions,
+        });
+      } catch (loadError) {
+        if (!active) return;
+        const message =
+          loadError instanceof Error ? loadError.message : 'Impossible de charger votre tableau de bord.';
+        setError(message);
+        if (message.includes('Session invalide')) {
+          await logout();
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+
+    return () => {
+      active = false;
+    };
+  }, [logout, session?.accessToken]);
+
+  useEffect(() => {
+    if (dashboardData.meters.length === 0) {
+      setActiveMeterIndex(0);
+      return;
+    }
+
+    setActiveMeterIndex((current) => Math.min(current, dashboardData.meters.length - 1));
+  }, [dashboardData.meters.length]);
+
+  const activeMeter = dashboardData.meters[activeMeterIndex] ?? null;
+
+  const latestConsumptions = useMemo(() => {
+    const meterScopedConsumptions = activeMeter
+      ? dashboardData.consumptions.filter((consumption) => consumption.meterId === activeMeter.id)
+      : dashboardData.consumptions;
+
+    return meterScopedConsumptions.slice(0, 5);
+  }, [activeMeter, dashboardData.consumptions]);
+  const meterCardWidth = Math.min(screenWidth - 56, 320);
+  const meterSnapInterval = meterCardWidth + 12;
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Accueil" subtitle="Tableau client">
-        <View style={styles.header}>
-          <View>
+      <AppPage title="Accueil" subtitle="Vue d’ensemble">
+        {/* <View style={styles.header}>
+          <View style={styles.headerTextBlock}>
             <Text style={[styles.eyebrow, { color: palette.accent }]}>Bonjour</Text>
             <Text style={[styles.title, { color: palette.headline }]}>{customerName}</Text>
             <Text style={[styles.subtitle, { color: palette.muted }]}>
-              Votre espace client pour les releves, compteurs et notifications.
+              Suivez vos derniers relevés et lancez une nouvelle soumission rapidement.
             </Text>
           </View>
 
           <View style={[styles.avatar, { backgroundColor: palette.accentSoft }]}>
             <Text style={[styles.avatarText, { color: palette.primary }]}>
-              {session?.user.firstName?.[0] || 'C'}
+              {session?.user.firstName?.[0] || session?.user.username?.[0] || 'C'}
             </Text>
           </View>
-        </View>
-
-        <Pressable
-          onPress={() => router.push('/(tabs)/readings')}
-          style={[styles.heroCard, { backgroundColor: palette.primary }]}>
-          <View style={styles.heroTop}>
-            <View>
-              <Text style={styles.heroEyebrow}>Action principale</Text>
-              <Text style={styles.heroTitle}>Faire un releve</Text>
-            </View>
-            <View style={styles.heroIcon}>
-              <Ionicons name="camera-outline" size={24} color="#ffffff" />
-            </View>
-          </View>
-
-          <Text style={styles.heroText}>
-            Photographiez le compteur, saisissez l&apos;index et envoyez votre releve en quelques secondes.
-          </Text>
-
-          <View style={styles.heroFooter}>
-            <Text style={styles.heroLink}>Commencer maintenant</Text>
-            <Ionicons name="arrow-forward" size={18} color="#ffffff" />
-          </View>
-        </Pressable>
+        </View> */}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: palette.headline }]}>Mes compteurs</Text>
-          <View style={styles.sectionStack}>
-            {METERS.map((meter) => (
-              <View
-                key={meter.id}
-                style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-                <View style={styles.rowBetween}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardLabel, { color: palette.muted }]}>{meter.label}</Text>
-                    <Text style={[styles.cardTitle, { color: palette.headline }]}>{meter.id}</Text>
-                  </View>
-                  <View style={[styles.statusPill, { backgroundColor: palette.accentSoft }]}>
-                    <Text style={[styles.statusText, { color: palette.primary }]}>{meter.status}</Text>
-                  </View>
-                </View>
+          {loading ? (
+            <View style={styles.readingsLoadingWrap}>
+              <CircularLoading palette={palette} />
+            </View>
+          ) : error ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
+              <Ionicons name="alert-circle-outline" size={20} color={palette.danger} />
+              <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
+            </View>
+          ) : dashboardData.meters.length === 0 ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
+              <Ionicons name="flash-outline" size={20} color={palette.icon} />
+              <Text style={[styles.stateText, { color: palette.muted }]}>
+                Aucun compteur associé à ce compte.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <ScrollView
+                horizontal
+                pagingEnabled={false}
+                decelerationRate="fast"
+                snapToInterval={meterSnapInterval}
+                snapToAlignment="start"
+                disableIntervalMomentum
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.meterDeckContent}
+                onMomentumScrollEnd={(event) => {
+                  const offsetX = event.nativeEvent.contentOffset.x;
+                  const nextIndex = Math.round(offsetX / meterSnapInterval);
+                  setActiveMeterIndex(Math.max(0, Math.min(nextIndex, dashboardData.meters.length - 1)));
+                }}>
+                {dashboardData.meters.map((meter) => {
+                  const latestState = meter.states[0];
+                  return (
+                    <Pressable
+                      key={meter.id}
+                      onPress={() => router.push(`/meters/${meter.id}`)}
+                      style={[
+                        styles.financeCard,
+                        {
+                          width: meterCardWidth,
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}>
+                      <View style={styles.financeCardTop}>
+                        <View style={styles.financeCardTitleBlock}>
+                          <Text style={[styles.financeCardLabel, { color: palette.muted }]}>Compteur</Text>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.financeCardTitle, { color: palette.headline }]}>
+                            {meter.serialNumber}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.financeStatusPill,
+                            { backgroundColor: `${palette.accent}1f` },
+                          ]}>
+                          <Text style={[styles.financeStatusText, { color: palette.accent }]}>
+                            {humanizeMeterStatus(meter.status)}
+                          </Text>
+                        </View>
+                      </View>
 
-                <Text style={[styles.cardMeta, { color: palette.muted }]}>{meter.address}</Text>
+                      <View style={styles.financeBottomRow}>
+                        <View style={styles.financeMetric}>
+                          <Text style={[styles.financeMetricLabel, { color: palette.muted }]}>
+                            Index principal
+                          </Text>
+                          <Text style={[styles.financeMetricValue, { color: palette.headline }]}>
+                            {latestState?.currentPrimary?.toString() || '--'}
+                          </Text>
+                        </View>
+                        {meter.type === 'DUAL_INDEX' ? (
+                          <View style={styles.financeMetric}>
+                            <Text style={[styles.financeMetricLabel, { color: palette.muted }]}>
+                              Index secondaire
+                            </Text>
+                            <Text style={[styles.financeMetricValue, { color: palette.headline }]}>
+                              {latestState?.currentSecondary?.toString() || '--'}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-                <View style={styles.metricsRow}>
-                  <View style={styles.metricBlock}>
-                    <Text style={[styles.metricLabel, { color: palette.muted }]}>Dernier index</Text>
-                    <Text style={[styles.metricValue, { color: palette.headline }]}>{meter.lastIndex}</Text>
-                  </View>
-                  <View style={styles.metricBlock}>
-                    <Text style={[styles.metricLabel, { color: palette.muted }]}>Date</Text>
-                    <Text style={[styles.metricValue, { color: palette.headline }]}>{meter.lastReadingDate}</Text>
-                  </View>
+              {dashboardData.meters.length > 1 ? (
+                <View style={styles.carouselDots}>
+                  {dashboardData.meters.map((meter, index) => {
+                    const active = index === activeMeterIndex;
+                    return (
+                      <View
+                        key={meter.id}
+                        style={[
+                          styles.carouselDot,
+                          {
+                            backgroundColor: active ? palette.accent : palette.border,
+                            width: active ? 20 : 8,
+                          },
+                        ]}
+                      />
+                    );
+                  })}
                 </View>
-              </View>
-            ))}
-          </View>
+              ) : null}
+            </>
+          )}
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: palette.headline }]}>Dernier releve</Text>
-          <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <View style={styles.rowBetween}>
-              <View>
-                <Text style={[styles.cardLabel, { color: palette.muted }]}>Statut</Text>
-                <Text style={[styles.cardTitle, { color: palette.headline }]}>{LAST_READING.status}</Text>
-              </View>
-              <Ionicons name="time-outline" size={22} color={palette.accent} />
-            </View>
-
-            <Text style={[styles.cardMeta, { color: palette.muted }]}>{LAST_READING.meter}</Text>
-
-            <View style={styles.metricsRow}>
-              <View style={styles.metricBlock}>
-                <Text style={[styles.metricLabel, { color: palette.muted }]}>Index</Text>
-                <Text style={[styles.metricValue, { color: palette.headline }]}>{LAST_READING.index}</Text>
-              </View>
-              <View style={styles.metricBlock}>
-                <Text style={[styles.metricLabel, { color: palette.muted }]}>Soumis le</Text>
-                <Text style={[styles.metricValue, { color: palette.headline }]}>{LAST_READING.submittedAt}</Text>
-              </View>
-            </View>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Dernières consommations</Text>
+            <Pressable onPress={() => router.push('/(tabs)/account')}>
+              <Text style={[styles.sectionLink, { color: palette.accent }]}>Voir tout</Text>
+            </Pressable>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: palette.headline }]}>A retenir</Text>
-          <View style={styles.infoGrid}>
-            {QUICK_INFO.map((item) => (
-              <View
-                key={item.title}
-                style={[styles.infoCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-                <View style={[styles.infoIcon, { backgroundColor: palette.surface }]}>
-                  <Ionicons name={item.icon} size={18} color={palette.accent} />
-                </View>
-                <Text style={[styles.infoTitle, { color: palette.muted }]}>{item.title}</Text>
-                <Text style={[styles.infoValue, { color: palette.headline }]}>{item.value}</Text>
-                <Text style={[styles.infoHelper, { color: palette.muted }]}>{item.helper}</Text>
-              </View>
-            ))}
-          </View>
+          {loading ? (
+            <View style={styles.readingsLoadingWrap}>
+              <CircularLoading palette={palette} />
+            </View>
+          ) : error ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
+              <Ionicons name="alert-circle-outline" size={20} color={palette.danger} />
+              <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
+            </View>
+          ) : latestConsumptions.length === 0 ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
+              <Ionicons name="stats-chart-outline" size={20} color={palette.icon} />
+              <Text style={[styles.stateText, { color: palette.muted }]}>
+                Aucune consommation calculée pour le moment.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.readingsList}>
+              {latestConsumptions.map((consumption) => (
+                <Pressable
+                  key={`${consumption.meterId}-${consumption.periodKey}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/consumption/[meterId]',
+                      params: { meterId: consumption.meterId, periodKey: consumption.periodKey },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.readingWalletRow,
+                    {
+                      backgroundColor: palette.surface,
+                      borderColor: palette.border,
+                      opacity: pressed ? 0.88 : 1,
+                    },
+                  ]}>
+                  <View
+                    style={[
+                      styles.readingIconWrap,
+                      { backgroundColor: palette.surfaceMuted, borderColor: `${palette.border}80` },
+                    ]}>
+                    <Ionicons name="stats-chart-outline" size={18} color={palette.accent} />
+                  </View>
+
+                  <View style={styles.readingTransactionBody}>
+                    <View style={styles.readingTextBlock}>
+                      <Text numberOfLines={1} style={[styles.readingTitle, { color: palette.headline }]}>
+                        {consumption.periodLabel}
+                      </Text>
+                      <Text style={[styles.readingMeta, { color: palette.muted }]} numberOfLines={1}>
+                        {consumption.meterSerialNumber}
+                      </Text>
+                    </View>
+
+                    <View style={styles.readingAmountBlock}>
+                      <Text style={[styles.readingAmountValue, { color: palette.headline }]}>
+                        {formatConsumption(consumption.totalConsumption)}
+                      </Text>
+                      <Text style={[styles.readingAmountMeta, { color: palette.muted }]}>consommation</Text>
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
       </AppPage>
     </RequireMobileAuth>
   );
+}
+
+function formatConsumption(value: number | null) {
+  if (value === null || Number.isNaN(value)) return '--';
+  return `${value.toFixed(0)} kWh`;
+}
+
+function humanizeMeterStatus(status: string) {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Actif';
+    case 'INACTIVE':
+      return 'Inactif';
+    case 'MAINTENANCE':
+      return 'Maintenance';
+    case 'REPLACED':
+      return 'Remplacé';
+    default:
+      return status;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -188,10 +342,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 16,
   },
+  headerTextBlock: {
+    flex: 1,
+  },
   eyebrow: {
     fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
@@ -204,7 +361,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     lineHeight: 21,
-    maxWidth: 280,
   },
   avatar: {
     width: 48,
@@ -217,146 +373,168 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
   },
-  heroCard: {
-    borderRadius: 28,
-    padding: 22,
-    gap: 18,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  heroEyebrow: {
-    color: '#c7d4ff',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  heroTitle: {
-    color: '#ffffff',
-    fontSize: 26,
-    lineHeight: 30,
-    fontWeight: '900',
-  },
-  heroIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroText: {
-    color: '#eaf0ff',
-    fontSize: 14,
-    lineHeight: 22,
-    maxWidth: 290,
-  },
-  heroFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  heroLink: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
   section: {
+    gap: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
   },
-  sectionStack: {
-    gap: 12,
+  sectionLink: {
+    fontSize: 13,
+    fontWeight: '800',
   },
-  card: {
+  stateCard: {
     borderWidth: 1,
-    borderRadius: 24,
-    padding: 18,
-    gap: 12,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rowBetween: {
+  stateText: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  meterDeckContent: {
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+  financeCard: {
+    borderWidth: 1,
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    gap: 20,
+  },
+  financeCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  cardLabel: {
-    fontSize: 12,
+  financeCardTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  financeCardLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+    marginBottom: 6,
+  },
+  financeCardTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  financeStatusPill: {
+    flexShrink: 0,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  financeStatusText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  financeBottomRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  financeMetric: {
+    flex: 1,
+    gap: 4,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.18)',
+  },
+  financeMetricLabel: {
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  cardTitle: {
+  financeMetricValue: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '800',
+  },
+  carouselDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: 4,
-    fontSize: 17,
-    fontWeight: '800',
   },
-  cardMeta: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  statusPill: {
+  carouselDot: {
+    height: 8,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  metricsRow: {
-    flexDirection: 'row',
+  readingsList: {
     gap: 10,
   },
-  metricBlock: {
-    flex: 1,
-    gap: 4,
+  readingsLoadingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
   },
-  metricLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  metricValue: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
-  },
-  infoGrid: {
+  readingWalletRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
-  },
-  infoCard: {
-    flex: 1,
     borderWidth: 1,
-    borderRadius: 22,
-    padding: 16,
-    gap: 10,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  infoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  readingIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  infoTitle: {
-    fontSize: 12,
-    fontWeight: '700',
+  readingTransactionBody: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  infoValue: {
-    fontSize: 18,
+  readingTextBlock: {
+    flex: 1,
+    gap: 2,
+  },
+  readingTitle: {
+    fontSize: 15,
     fontWeight: '800',
   },
-  infoHelper: {
+  readingMeta: {
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
+  },
+  readingAmountBlock: {
+    alignItems: 'flex-end',
+    gap: 2,
+    minWidth: 88,
+  },
+  readingAmountValue: {
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  readingAmountMeta: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

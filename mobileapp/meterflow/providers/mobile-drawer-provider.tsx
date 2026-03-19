@@ -16,6 +16,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useCallback,
   type PropsWithChildren,
@@ -37,6 +38,7 @@ const MobileDrawerContext = createContext<DrawerContextValue | null>(null);
 
 const MENU_ITEMS = [
   { label: 'Accueil', route: '/(tabs)', icon: 'home-outline' as const, matches: ['/', '/(tabs)', '/(tabs)/index'] },
+  { label: 'Relevés', route: '/readings-history', icon: 'time-outline' as const, matches: ['/readings-history'] },
   { label: 'Notifications', route: '/notifications', icon: 'notifications-outline' as const, matches: ['/notifications'] },
   { label: 'Mes compteurs', route: '/meters', icon: 'speedometer-outline' as const, matches: ['/meters'] },
   { label: 'Profil', route: '/profile', icon: 'person-outline' as const, matches: ['/profile'] },
@@ -56,10 +58,20 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
   const [overlayOpacity] = useState(() => new Animated.Value(0));
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const previousPathnameRef = useRef(pathname);
 
   useEffect(() => {
     translateX.setValue(-drawerWidth);
   }, [drawerWidth, translateX]);
+
+  const resetDrawer = useCallback(() => {
+    translateX.stopAnimation();
+    overlayOpacity.stopAnimation();
+    setIsOpen(false);
+    setIsMounted(false);
+    translateX.setValue(-drawerWidth);
+    overlayOpacity.setValue(0);
+  }, [drawerWidth, overlayOpacity, translateX]);
 
   const closeDrawer = useCallback(() => {
     setIsOpen(false);
@@ -75,6 +87,34 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
     setIsMounted(true);
     setIsOpen(true);
   }, [drawerWidth, isAuthenticated, overlayOpacity, translateX]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const frame = requestAnimationFrame(() => {
+        resetDrawer();
+      });
+
+      return () => {
+        cancelAnimationFrame(frame);
+      };
+    }
+  }, [isAuthenticated, resetDrawer]);
+
+  useEffect(() => {
+    if (previousPathnameRef.current !== pathname) {
+      if (isMounted || isOpen) {
+        const frame = requestAnimationFrame(() => {
+          resetDrawer();
+        });
+        previousPathnameRef.current = pathname;
+
+        return () => {
+          cancelAnimationFrame(frame);
+        };
+      }
+      previousPathnameRef.current = pathname;
+    }
+  }, [pathname, isMounted, isOpen, resetDrawer]);
 
   useEffect(() => {
     if (!isMounted) {
@@ -108,8 +148,8 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
   }, [drawerWidth, isMounted, isOpen, overlayOpacity, translateX]);
 
   async function handleLogout() {
-    closeDrawer();
-    logout();
+    resetDrawer();
+    await logout();
     router.replace('/(auth)/login');
   }
 

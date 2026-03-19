@@ -202,6 +202,13 @@ export default async function EditReadingPage({
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Evidence & location</h3>
+          <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+            <img
+              src={`/api/v1/readings/${reading.id}/image`}
+              alt={`Reading ${reading.id}`}
+              className="h-auto max-h-[380px] w-full object-cover"
+            />
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="md:col-span-2 xl:col-span-3">
               <Label htmlFor="imageUrl">Image URL</Label>

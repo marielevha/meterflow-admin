@@ -31,6 +31,8 @@ function RootNavigator() {
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="readings-history" options={{ headerShown: false }} />
+          <Stack.Screen name="consumption/[meterId]" options={{ headerShown: false }} />
           <Stack.Screen name="readings/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="meters" options={{ headerShown: false }} />
           <Stack.Screen name="meters/[id]" options={{ headerShown: false }} />

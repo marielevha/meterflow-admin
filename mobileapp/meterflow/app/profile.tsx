@@ -13,7 +13,7 @@ export default function ProfileScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Profil" subtitle="Drawer menu" scrollable={false}>
+      <AppPage title="Profil" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)" scrollable={false}>
         <View style={styles.container}>
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={[styles.name, { color: palette.headline }]}>

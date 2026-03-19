@@ -9,19 +9,20 @@ import {
   Alert,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppShell } from '@/components/app/app-shell';
+import { AppPage } from '@/components/app/app-page';
+import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AuthInput } from '@/components/auth/auth-input';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
+import { getMobileAppConfig } from '@/lib/api/mobile-app-config';
 import { createClientReading } from '@/lib/api/mobile-readings';
 import { uploadReadingPhoto } from '@/lib/api/mobile-uploads';
 import { useMobileDrawer } from '@/providers/mobile-drawer-provider';
@@ -57,8 +58,20 @@ export default function ReadingsScreen() {
   const [selectedMeterId, setSelectedMeterId] = useState<string | null>(null);
   const [primaryIndex, setPrimaryIndex] = useState('');
   const [secondaryIndex, setSecondaryIndex] = useState('');
+  const [gpsThresholdMeters, setGpsThresholdMeters] = useState(200);
 
   const selectedMeter = meters.find((meter) => meter.id === selectedMeterId) ?? null;
+  const mobileGpsDistanceMeters =
+    selectedMeter && capturedPhoto
+      ? calculateGpsDistanceMeters(
+          toNumberOrNull(selectedMeter.latitude),
+          toNumberOrNull(selectedMeter.longitude),
+          capturedPhoto.gpsLatitude,
+          capturedPhoto.gpsLongitude
+        )
+      : null;
+  const gpsDistanceWarning =
+    mobileGpsDistanceMeters !== null && mobileGpsDistanceMeters > gpsThresholdMeters;
 
   useEffect(() => {
     let active = true;
@@ -97,6 +110,28 @@ export default function ReadingsScreen() {
       active = false;
     };
   }, [logout, session?.accessToken]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAppConfig() {
+      try {
+        const result = await getMobileAppConfig();
+        if (!active) return;
+        if (typeof result.config.maxGpsDistanceMeters === 'number' && result.config.maxGpsDistanceMeters > 0) {
+          setGpsThresholdMeters(result.config.maxGpsDistanceMeters);
+        }
+      } catch {
+        if (!active) return;
+      }
+    }
+
+    void loadAppConfig();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleCapture() {
     if (!cameraRef.current || isCapturing) {
@@ -166,6 +201,16 @@ export default function ReadingsScreen() {
       return;
     }
 
+    if (gpsDistanceWarning) {
+      const shouldContinue = await confirmGpsDistanceWarning(
+        mobileGpsDistanceMeters ?? 0,
+        gpsThresholdMeters
+      );
+      if (!shouldContinue) {
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -196,7 +241,7 @@ export default function ReadingsScreen() {
             text: 'Voir historique',
             onPress: () => {
               resetFlow();
-              router.push('/(tabs)/account');
+              router.push('/readings-history');
             },
           },
           {
@@ -266,154 +311,199 @@ export default function ReadingsScreen() {
   if (step === 'details' && capturedPhoto) {
     return (
       <RequireMobileAuth>
-        <AppShell>
-          <ScrollView contentContainerStyle={styles.detailsContainer} showsVerticalScrollIndicator={false}>
-            <StepHeader
-              title="Finaliser le relevé"
-              subtitle="Compteur et index"
-              onBack={() => setStep('preview')}
-              palette={palette}
-            />
+        <AppPage
+          title="Finaliser le relevé"
+          subtitle="Compteur et index"
+          topBarMode="back"
+          onBackPress={() => setStep('capture')}
+          contentStyle={styles.detailsContainer}>
+          <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={styles.compactHero}>
+              <Image source={{ uri: capturedPhoto.uri }} style={styles.thumbnail} contentFit="cover" alt="" />
 
-            <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <View style={styles.compactHero}>
-                <Image source={{ uri: capturedPhoto.uri }} style={styles.thumbnail} contentFit="cover" alt="" />
+              <View style={styles.compactHeroBody}>
+                <Text style={[styles.compactHeroTitle, { color: palette.headline }]}>Photo validée</Text>
+                <Text style={[styles.compactHeroText, { color: palette.muted }]}>
+                  Choisis maintenant le compteur concerné et renseigne ses index.
+                </Text>
 
-                <View style={styles.compactHeroBody}>
-                  <Text style={[styles.compactHeroTitle, { color: palette.headline }]}>Photo validée</Text>
-                  <Text style={[styles.compactHeroText, { color: palette.muted }]}>
-                    Choisis maintenant le compteur concerné et renseigne ses index.
-                  </Text>
-
-                  {selectedMeter ? (
-                    <View style={[styles.selectedMeterBadge, { backgroundColor: palette.accentSoft }]}>
-                      <Ionicons name="flash-outline" size={14} color={palette.accent} />
-                      <Text style={[styles.selectedMeterBadgeText, { color: palette.primary }]}>
-                        {selectedMeter.serialNumber}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </View>
-
-            <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Compteur</Text>
-
-              {loadingMeters ? (
-                <View style={styles.inlineState}>
-                  <ActivityIndicator size="small" color={palette.accent} />
-                  <Text style={[styles.inlineStateText, { color: palette.muted }]}>Chargement des compteurs...</Text>
-                </View>
-              ) : metersError ? (
-                <Text style={[styles.inlineErrorText, { color: palette.danger }]}>{metersError}</Text>
-              ) : (
-                <View style={styles.metersStack}>
-                  {meters.map((meter) => {
-                    const selected = selectedMeterId === meter.id;
-
-                    return (
-                      <Pressable
-                        key={meter.id}
-                        onPress={() => setSelectedMeterId(meter.id)}
-                        style={[
-                          styles.meterChoice,
-                          {
-                            backgroundColor: selected ? palette.accentSoft : palette.surfaceMuted,
-                            borderColor: selected ? palette.accent : palette.border,
-                          },
-                        ]}>
-                        <View
-                          style={[
-                            styles.meterChoiceIcon,
-                            { backgroundColor: selected ? '#ffffff' : palette.surface },
-                          ]}>
-                          <Ionicons
-                            name={meter.type === 'DUAL_INDEX' ? 'layers-outline' : 'flash-outline'}
-                            size={18}
-                            color={selected ? palette.accent : palette.icon}
-                          />
-                        </View>
-
-                        <View style={styles.meterChoiceBody}>
-                          <Text
-                            style={[
-                              styles.meterChoiceTitle,
-                              { color: selected ? palette.headline : palette.headline },
-                            ]}>
-                            {meter.serialNumber}
-                          </Text>
-                          <Text style={[styles.meterChoiceMeta, { color: palette.muted }]}>
-                            {[meter.city, meter.zone].filter(Boolean).join(' / ') || 'Localisation non renseignée'}
-                          </Text>
-                        </View>
-
-                        <View style={styles.meterChoiceAside}>
-                          <Text style={[styles.meterChoiceType, { color: selected ? palette.primary : palette.muted }]}>
-                            {meter.type === 'DUAL_INDEX' ? 'Double' : 'Simple'}
-                          </Text>
-                          {selected ? <Ionicons name="checkmark-circle" size={20} color={palette.accent} /> : null}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-
-            <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <View style={styles.indexHeader}>
-                <Text style={[styles.sectionTitle, { color: palette.headline }]}>Index</Text>
                 {selectedMeter ? (
-                  <Text style={[styles.indexHeaderHint, { color: palette.muted }]}>
-                    {selectedMeter.type === 'DUAL_INDEX' ? '2 champs requis' : '1 champ requis'}
-                  </Text>
+                  <View style={[styles.selectedMeterBadge, { backgroundColor: palette.accentSoft }]}>
+                    <Ionicons name="flash-outline" size={14} color={palette.accent} />
+                    <Text style={[styles.selectedMeterBadgeText, { color: palette.primary }]}>
+                      {selectedMeter.serialNumber}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
-
-              <View style={styles.indexStack}>
-                <AuthInput
-                  label="Index principal"
-                  icon="flash-outline"
-                  keyboardType="numeric"
-                  value={primaryIndex}
-                  onChangeText={setPrimaryIndex}
-                  placeholder="Ex: 1254"
-                />
-
-                {selectedMeter?.type === 'DUAL_INDEX' ? (
-                  <AuthInput
-                    label="Index secondaire"
-                    icon="layers-outline"
-                    keyboardType="numeric"
-                    value={secondaryIndex}
-                    onChangeText={setSecondaryIndex}
-                    placeholder="Ex: 874"
-                  />
-                ) : null}
-              </View>
-
-              <Pressable
-                onPress={() => void handleSubmitReading()}
-                disabled={isSubmitting}
-                style={[
-                  styles.submitButton,
-                  {
-                    backgroundColor: isSubmitting ? `${palette.primary}99` : palette.primary,
-                  },
-                ]}>
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <>
-                    <Ionicons name="cloud-upload-outline" size={18} color="#ffffff" />
-                    <Text style={styles.submitButtonText}>Envoyer le relevé</Text>
-                  </>
-                )}
-              </Pressable>
             </View>
-          </ScrollView>
-        </AppShell>
+          </View>
+
+          <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Compteur</Text>
+
+            {loadingMeters ? (
+              <View style={styles.inlineState}>
+                <CircularLoading palette={palette} size={52} />
+              </View>
+            ) : metersError ? (
+              <Text style={[styles.inlineErrorText, { color: palette.danger }]}>{metersError}</Text>
+            ) : (
+              <View style={styles.metersStack}>
+                {meters.map((meter) => {
+                  const selected = selectedMeterId === meter.id;
+
+                  return (
+                    <Pressable
+                      key={meter.id}
+                      onPress={() => setSelectedMeterId(meter.id)}
+                      style={[
+                        styles.meterChoice,
+                        {
+                          backgroundColor: selected ? palette.accentSoft : palette.surfaceMuted,
+                          borderColor: selected ? palette.accent : palette.border,
+                        },
+                      ]}>
+                      <View
+                        style={[
+                          styles.meterChoiceIcon,
+                          { backgroundColor: selected ? '#ffffff' : palette.surface },
+                        ]}>
+                        <Ionicons
+                          name={meter.type === 'DUAL_INDEX' ? 'layers-outline' : 'flash-outline'}
+                          size={18}
+                          color={selected ? palette.accent : palette.icon}
+                        />
+                      </View>
+
+                      <View style={styles.meterChoiceBody}>
+                        <Text style={[styles.meterChoiceTitle, { color: palette.headline }]}>
+                          {meter.serialNumber}
+                        </Text>
+                        <Text style={[styles.meterChoiceMeta, { color: palette.muted }]}>
+                          {[meter.city, meter.zone].filter(Boolean).join(' / ') || 'Localisation non renseignée'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.meterChoiceAside}>
+                        <Text style={[styles.meterChoiceType, { color: selected ? palette.primary : palette.muted }]}>
+                          {meter.type === 'DUAL_INDEX' ? 'Double' : 'Simple'}
+                        </Text>
+                        {selected ? <Ionicons name="checkmark-circle" size={20} color={palette.accent} /> : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          {selectedMeter ? (
+            <View
+              style={[
+                styles.gpsCard,
+                {
+                  backgroundColor: gpsDistanceWarning ? '#fff4e8' : palette.surface,
+                  borderColor: gpsDistanceWarning ? '#f3c98b' : palette.border,
+                },
+              ]}>
+              <View style={styles.gpsCardHeader}>
+                <View
+                  style={[
+                    styles.gpsCardIcon,
+                    {
+                      backgroundColor: gpsDistanceWarning ? 'rgba(255,255,255,0.72)' : palette.accentSoft,
+                    },
+                  ]}>
+                  <Ionicons
+                    name={gpsDistanceWarning ? 'warning-outline' : 'locate-outline'}
+                    size={18}
+                    color={gpsDistanceWarning ? '#c77c11' : palette.accent}
+                  />
+                </View>
+
+                <View style={styles.gpsCardBody}>
+                  <Text style={[styles.gpsCardTitle, { color: palette.headline }]}>
+                    Vérification GPS
+                  </Text>
+                  <Text
+                    style={[
+                      styles.gpsCardMeta,
+                      { color: gpsDistanceWarning ? '#9a6514' : palette.muted },
+                    ]}>
+                    {mobileGpsDistanceMeters !== null
+                      ? `${formatMeters(mobileGpsDistanceMeters)} du compteur enregistré`
+                      : 'Coordonnées du compteur indisponibles. Le contrôle se fera côté serveur.'}
+                  </Text>
+                </View>
+              </View>
+
+              {mobileGpsDistanceMeters !== null ? (
+                <Text
+                  style={[
+                    styles.gpsCardHint,
+                    { color: gpsDistanceWarning ? '#9a6514' : palette.muted },
+                  ]}>
+                  {gpsDistanceWarning
+                    ? `Vous êtes au-delà du seuil recommandé (${gpsThresholdMeters} m). Le relevé peut être envoyé, mais il sera signalé pour contrôle.`
+                    : `Position cohérente avec le compteur enregistré (seuil ${gpsThresholdMeters} m).`}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={styles.indexHeader}>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Index</Text>
+              {selectedMeter ? (
+                <Text style={[styles.indexHeaderHint, { color: palette.muted }]}>
+                  {selectedMeter.type === 'DUAL_INDEX' ? '2 champs requis' : '1 champ requis'}
+                </Text>
+              ) : null}
+            </View>
+
+            <View style={styles.indexStack}>
+              <AuthInput
+                label="Index principal"
+                icon="flash-outline"
+                keyboardType="numeric"
+                value={primaryIndex}
+                onChangeText={setPrimaryIndex}
+                placeholder="Ex: 1254"
+              />
+
+              {selectedMeter?.type === 'DUAL_INDEX' ? (
+                <AuthInput
+                  label="Index secondaire"
+                  icon="layers-outline"
+                  keyboardType="numeric"
+                  value={secondaryIndex}
+                  onChangeText={setSecondaryIndex}
+                  placeholder="Ex: 874"
+                />
+              ) : null}
+            </View>
+
+            <Pressable
+              onPress={() => void handleSubmitReading()}
+              disabled={isSubmitting}
+              style={[
+                styles.submitButton,
+                {
+                  backgroundColor: isSubmitting ? `${palette.primary}99` : palette.primary,
+                },
+              ]}>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={18} color="#ffffff" />
+                  <Text style={styles.submitButtonText}>Envoyer le relevé</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </AppPage>
       </RequireMobileAuth>
     );
   }
@@ -438,13 +528,12 @@ export default function ReadingsScreen() {
                 <View style={styles.previewActions}>
                   <Pressable
                     onPress={resetFlow}
-                    style={[styles.secondaryButton, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
-                    <Text style={styles.secondaryButtonLabel}>Reprendre</Text>
+                    style={[styles.previewActionIconButton, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+                    <Ionicons name="refresh-outline" size={24} color="#ffffff" />
                   </Pressable>
 
-                  <Pressable onPress={() => setStep('details')} style={styles.validateButton}>
-                    <Ionicons name="arrow-forward-circle" size={20} color="#08101f" />
-                    <Text style={styles.validateButtonLabel}>Continuer</Text>
+                  <Pressable onPress={() => setStep('details')} style={styles.previewActionIconButtonPrimary}>
+                    <Ionicons name="arrow-forward" size={24} color="#08101f" />
                   </Pressable>
                 </View>
               </View>
@@ -536,35 +625,6 @@ export default function ReadingsScreen() {
         )}
       </SafeAreaView>
     </RequireMobileAuth>
-  );
-}
-
-function StepHeader({
-  title,
-  subtitle,
-  onBack,
-  palette,
-}: {
-  title: string;
-  subtitle: string;
-  onBack: () => void;
-  palette: (typeof Colors)['light'];
-}) {
-  return (
-    <View style={styles.stepHeader}>
-      <Pressable
-        onPress={onBack}
-        style={[styles.stepBackButton, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-        <Ionicons name="arrow-back" size={20} color={palette.headline} />
-      </Pressable>
-
-      <View style={styles.stepHeaderTextBlock}>
-        <Text style={[styles.stepSubtitle, { color: palette.accent }]}>{subtitle}</Text>
-        <Text style={[styles.stepTitle, { color: palette.headline }]}>{title}</Text>
-      </View>
-
-      <View style={styles.stepBackPlaceholder} />
-    </View>
   );
 }
 
@@ -769,46 +829,31 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   previewFooter: {
-    backgroundColor: 'rgba(7, 17, 31, 0.62)',
+    backgroundColor: 'transparent',
     borderRadius: 28,
     paddingHorizontal: 20,
-    paddingVertical: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    paddingVertical: 10,
   },
   previewActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 16,
   },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 54,
+  previewActionIconButton: {
+    width: 58,
+    height: 58,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
   },
-  secondaryButtonLabel: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  validateButton: {
-    flex: 1.25,
-    minHeight: 54,
+  previewActionIconButtonPrimary: {
+    width: 58,
+    height: 58,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 18,
     backgroundColor: '#d9e6ff',
-  },
-  validateButtonLabel: {
-    color: '#08101f',
-    fontSize: 15,
-    fontWeight: '800',
   },
   helpBackdrop: {
     flex: 1,
@@ -856,48 +901,48 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   detailsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 34,
+    paddingBottom: 12,
     gap: 18,
-  },
-  stepHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 14,
-  },
-  stepBackButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBackPlaceholder: {
-    width: 44,
-  },
-  stepHeaderTextBlock: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  stepSubtitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.9,
-    textTransform: 'uppercase',
-  },
-  stepTitle: {
-    fontSize: 18,
-    fontWeight: '800',
   },
   detailsCard: {
     borderWidth: 1,
     borderRadius: 24,
     padding: 18,
     gap: 16,
+  },
+  gpsCard: {
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+    gap: 10,
+  },
+  gpsCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  gpsCardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gpsCardBody: {
+    flex: 1,
+    gap: 4,
+  },
+  gpsCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  gpsCardMeta: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  gpsCardHint: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   compactHero: {
     flexDirection: 'row',
@@ -1017,3 +1062,51 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+
+function toNumberOrNull(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function calculateGpsDistanceMeters(
+  meterLat: number | null,
+  meterLng: number | null,
+  readLat: number,
+  readLng: number
+) {
+  if (meterLat === null || meterLng === null) return null;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const dLat = toRad(readLat - meterLat);
+  const dLon = toRad(readLng - meterLng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(meterLat)) * Math.cos(toRad(readLat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusMeters * c;
+}
+
+function formatMeters(value: number) {
+  return `${Math.round(value)} m`;
+}
+
+function confirmGpsDistanceWarning(distanceMeters: number, thresholdMeters: number) {
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(
+      'Emplacement à vérifier',
+      `La photo semble avoir été prise à environ ${formatMeters(distanceMeters)} du compteur enregistré, au-delà du seuil recommandé (${thresholdMeters} m). Voulez-vous continuer ?`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        {
+          text: 'Continuer',
+          onPress: () => resolve(true),
+        },
+      ]
+    );
+  });
+}

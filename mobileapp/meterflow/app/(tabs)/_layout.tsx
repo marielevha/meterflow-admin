@@ -51,8 +51,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Historique',
-          tabBarIcon: ({ color }) => <Ionicons size={24} name="time-outline" color={color} />,
+          title: 'Consommation',
+          tabBarIcon: ({ color }) => <Ionicons size={24} name="stats-chart-outline" color={color} />,
         }}
       />
     </Tabs>

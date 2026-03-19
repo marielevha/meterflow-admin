@@ -506,6 +506,68 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - correction de `formatDate()` pour accepter `Date | string | null`.
   - evite le crash `value.toISOString is not a function` lorsque les dates reviennent serializees depuis le cache serveur.
 
+### 23) Mobile - consommation, upload simplifie et navigation unifiee
+
+- Simplification du stockage photo cote mobile:
+  - nouveau endpoint direct `POST /api/v1/mobile/uploads`
+  - le mobile envoie maintenant l'image au backend en `multipart/form-data`
+  - le serveur se charge du stockage MinIO/S3 et renvoie les metadonnees du fichier
+  - les anciens endpoints `presign/complete` restent disponibles, mais le flux mobile privilegie maintenant l'upload backend direct
+
+- Affichage securise des images de releve:
+  - mobile:
+    - `GET /api/v1/mobile/readings/:readingId/image`
+  - admin:
+    - `GET /api/v1/readings/:id/image`
+  - les vues mobile/admin n'ont plus besoin d'un objet MinIO publiquement lisible pour afficher la photo
+
+- GPS et anti-fraude harmonises:
+  - calcul de distance GPS cote mobile pour l'alerte UX lors de la soumission
+  - calcul officiel de `gpsDistanceMeters` cote backend a la creation du releve
+  - seuil GPS centralise dans les settings applicatifs (`maxGpsDistanceMeters`)
+  - exposition mobile en lecture via `GET /api/v1/mobile/app-config`
+  - affichage de l'ecart GPS dans:
+    - le detail releve mobile
+    - le detail releve admin
+    - la page mobile `Parametres` (info utilisateur)
+
+- Navigation mobile consolidee:
+  - stabilisation du drawer mobile (reset propre apres changement de route / logout / login)
+  - topbar fixe homogene sur les ecrans applicatifs, bouton retour sur les ecrans detail
+  - ajout des pages drawer:
+    - `Notifications`
+    - `A propos`
+    - `Profil`
+    - `Parametres`
+    - `Releves` (historique de soumission)
+  - reorganisation des tabs:
+    - `Accueil`
+    - `Releves` (camera / soumission)
+    - `Consommation`
+
+- API mobile consommation:
+  - `GET /api/v1/mobile/consumption`
+    - historique mensuel agrege par compteur a partir des `meter_states`
+  - `GET /api/v1/mobile/consumption/:meterId?periodKey=YYYY-MM`
+    - detail d'une periode avec les etats utilises pour le calcul
+
+- UX mobile consommation:
+  - nouvelle page tab `Consommation`
+  - nouvelle page de detail de consommation par compteur/periode
+  - l'ancienne page `Historique` devient `Releves` via `readings-history`
+  - l'accueil affiche maintenant les dernieres consommations du compteur courant du carousel, plutot que les derniers releves
+  - pour les compteurs double index, l'accueil affiche directement la consommation totale en kWh
+
+- Composant de chargement partage:
+  - ajout de `mobileapp/meterflow/components/app/circular-loading.tsx`
+  - reutilise sur:
+    - accueil
+    - historique des releves
+    - consommation
+    - liste/detail compteurs
+    - detail releve
+    - etapes utiles du parcours de soumission
+
 
 ## Overview
 

@@ -1,9 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppPage } from '@/components/app/app-page';
+import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -174,7 +175,7 @@ function StateCard({
 }) {
   return (
     <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-      {loading ? <ActivityIndicator size="small" color={palette.accent} /> : null}
+      {loading ? <CircularLoading palette={palette} size={56} /> : null}
       <Text style={[styles.stateText, { color }]}>{text}</Text>
     </View>
   );

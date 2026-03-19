@@ -10,7 +10,16 @@ type AppPageProps = PropsWithChildren<{
   title: string;
   subtitle?: string;
   topBarMode?: 'drawer' | 'back';
-  backHref?: '/(tabs)/account' | '/(tabs)' | '/meters' | '/profile' | '/settings' | '/about';
+  backHref?:
+    | '/consumption/[meterId]'
+    | '/readings-history'
+    | '/(tabs)/account'
+    | '/(tabs)'
+    | '/meters'
+    | '/profile'
+    | '/settings'
+    | '/about';
+  onBackPress?: () => void;
   scrollable?: boolean;
   contentStyle?: ViewStyle;
 }>;
@@ -20,6 +29,7 @@ export function AppPage({
   subtitle,
   topBarMode = 'drawer',
   backHref,
+  onBackPress,
   scrollable = true,
   contentStyle,
   children,
@@ -38,7 +48,13 @@ export function AppPage({
               borderBottomColor: palette.border,
             },
           ]}>
-          <AppTopBar title={title} subtitle={subtitle} mode={topBarMode} backHref={backHref} />
+          <AppTopBar
+            title={title}
+            subtitle={subtitle}
+            mode={topBarMode}
+            backHref={backHref}
+            onBackPress={onBackPress}
+          />
         </View>
 
         {scrollable ? (

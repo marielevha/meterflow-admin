@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AppPage } from '@/components/app/app-page';
+import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { API_BASE_URL } from '@/lib/api/config';
@@ -65,7 +66,7 @@ export default function ReadingDetailScreen() {
         title="Détail relevé"
         subtitle="Historique client"
         topBarMode="back"
-        backHref="/(tabs)/account">
+        backHref="/readings-history">
         {loading ? (
           <StateCard text="Chargement du relevé..." color={palette.muted} loading palette={palette} />
         ) : error ? (
@@ -90,6 +91,48 @@ export default function ReadingDetailScreen() {
                   value={reading.reviewedAt ? formatDisplayDateTime(reading.reviewedAt) : '--'}
                   palette={palette}
                 />
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: gpsDistanceWarning(reading.gpsDistanceMeters)
+                    ? '#fff4e8'
+                    : palette.surface,
+                  borderColor: gpsDistanceWarning(reading.gpsDistanceMeters) ? '#f3c98b' : palette.border,
+                },
+              ]}>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Contrôle GPS</Text>
+              <View style={styles.gpsRow}>
+                <View
+                  style={[
+                    styles.gpsIconWrap,
+                    {
+                      backgroundColor: gpsDistanceWarning(reading.gpsDistanceMeters)
+                        ? '#ffffffb8'
+                        : palette.accentSoft,
+                    },
+                  ]}>
+                  <Ionicons
+                    name={gpsDistanceWarning(reading.gpsDistanceMeters) ? 'warning-outline' : 'locate-outline'}
+                    size={18}
+                    color={gpsDistanceWarning(reading.gpsDistanceMeters) ? '#c77c11' : palette.accent}
+                  />
+                </View>
+                <View style={styles.gpsBody}>
+                  <Text style={[styles.gpsTitle, { color: palette.headline }]}>
+                    {formatGpsDistance(reading.gpsDistanceMeters)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.gpsMeta,
+                      { color: gpsDistanceWarning(reading.gpsDistanceMeters) ? '#9a6514' : palette.muted },
+                    ]}>
+                    {gpsDistanceMessage(reading.gpsDistanceMeters)}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -156,7 +199,7 @@ function StateCard({
 }) {
   return (
     <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-      {loading ? <ActivityIndicator size="small" color={palette.accent} /> : null}
+      {loading ? <CircularLoading palette={palette} size={56} /> : null}
       <Text style={[styles.stateText, { color }]}>{text}</Text>
     </View>
   );
@@ -189,6 +232,36 @@ function formatDisplayDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function gpsDistanceWarning(value: string | number | null) {
+  const distance = toNullableNumber(value);
+  return distance !== null && distance > 200;
+}
+
+function formatGpsDistance(value: string | number | null) {
+  const distance = toNullableNumber(value);
+  if (distance === null) return 'Distance non calculable';
+  return `${Math.round(distance)} m du compteur`;
+}
+
+function gpsDistanceMessage(value: string | number | null) {
+  const distance = toNullableNumber(value);
+  if (distance === null) {
+    return 'Les coordonnées nécessaires sont incomplètes.';
+  }
+
+  if (distance > 200) {
+    return 'La prise de photo semble éloignée du compteur enregistré. Un contrôle est recommandé.';
+  }
+
+  return 'La position paraît cohérente avec le compteur enregistré.';
+}
+
+function toNullableNumber(value: string | number | null) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
 }
 
 const styles = StyleSheet.create({
@@ -257,6 +330,30 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
+  },
+  gpsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  gpsIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gpsBody: {
+    flex: 1,
+    gap: 4,
+  },
+  gpsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  gpsMeta: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   eventsStack: {
     gap: 10,

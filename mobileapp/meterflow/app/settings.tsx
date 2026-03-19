@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -6,6 +7,7 @@ import { AppPage } from '@/components/app/app-page';
 import { ThemeModeSwitcher } from '@/components/app/theme-mode-switcher';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getMobileAppConfig, type MobileAppConfig } from '@/lib/api/mobile-app-config';
 import { resetOnboardingCompleted } from '@/lib/storage/onboarding';
 import { useMobilePreferences } from '@/providers/mobile-preferences-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
@@ -15,6 +17,28 @@ export default function SettingsScreen() {
   const palette = Colors[scheme];
   const { logout } = useMobileSession();
   const { preferences, updatePreferences } = useMobilePreferences();
+  const [appConfig, setAppConfig] = useState<MobileAppConfig | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadConfig() {
+      try {
+        const result = await getMobileAppConfig();
+        if (!active) return;
+        setAppConfig(result.config);
+      } catch {
+        if (!active) return;
+        setAppConfig(null);
+      }
+    }
+
+    void loadConfig();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleReplayOnboarding() {
     await resetOnboardingCompleted();
@@ -23,7 +47,7 @@ export default function SettingsScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Parametres" subtitle="Drawer menu">
+      <AppPage title="Parametres" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)">
         <View style={styles.container}>
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={[styles.cardTitle, { color: palette.headline }]}>Apparence</Text>
@@ -47,6 +71,26 @@ export default function SettingsScreen() {
               description="Afficher le bouton d'information sur l'écran de prise de photo."
               value={preferences.showCameraHelp}
               onValueChange={(value) => void updatePreferences({ showCameraHelp: value })}
+              palette={palette}
+              last
+            />
+          </View>
+
+          <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>Règles de relevé</Text>
+            <InfoRow
+              label="GPS requis"
+              value={appConfig ? (appConfig.requireGpsForReading ? 'Oui' : 'Non') : '--'}
+              palette={palette}
+            />
+            <InfoRow
+              label="Seuil GPS"
+              value={appConfig ? `${appConfig.maxGpsDistanceMeters} m` : '--'}
+              palette={palette}
+            />
+            <InfoRow
+              label="Taille max photo"
+              value={appConfig ? `${appConfig.maxImageSizeMb} MB` : '--'}
               palette={palette}
               last
             />
@@ -110,6 +154,25 @@ function SettingToggleRow({
   );
 }
 
+function InfoRow({
+  label,
+  value,
+  palette,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  palette: (typeof Colors)['light'];
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.infoRow, !last && { borderBottomColor: palette.border, borderBottomWidth: 1 }]}>
+      <Text style={[styles.infoLabel, { color: palette.muted }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: palette.headline }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { gap: 22 },
   card: { borderWidth: 1, borderRadius: 24, padding: 22, gap: 14 },
@@ -133,6 +196,21 @@ const styles = StyleSheet.create({
   toggleDescription: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    paddingBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   actionButton: {
     minHeight: 52,
