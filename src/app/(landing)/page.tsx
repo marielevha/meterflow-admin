@@ -46,7 +46,7 @@ const stats = [
 ];
 
 export const metadata: Metadata = {
-  title: "MeterFlow | Landing",
+  title: "Landing",
   description: "Plateforme metier pour capture compteur, controle qualite et orchestration des equipes terrain.",
 };
 

@@ -10,7 +10,7 @@ import PermissionsFilters from "@/components/rbac/PermissionsFilters";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "Rules & Permissions | MeterFlow Dashboard",
+  title: "Rules & Permissions",
   description: "RBAC management overview for roles and permissions",
 };
 

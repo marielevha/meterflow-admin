@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { createReadingTask } from "@/lib/backoffice/readings";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function POST(
+async function postCreateReadingTask(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:create"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -24,3 +25,5 @@ export async function POST(
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 }
+
+export const POST = withRouteInstrumentation("api.v1.readings.create_task", postCreateReadingTask);

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { issueCampaignInvoices } from "@/lib/backoffice/billing";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function POST(
+async function postIssueCampaignInvoices(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -15,3 +16,8 @@ export async function POST(
   const result = await issueCampaignInvoices({ id: auth.user.id, role: auth.user.role }, id);
   return NextResponse.json(result.body, { status: result.status });
 }
+
+export const POST = withRouteInstrumentation(
+  "api.v1.billing.campaigns.issue",
+  postIssueCampaignInvoices,
+);

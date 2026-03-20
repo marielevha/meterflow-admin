@@ -7,7 +7,7 @@ import Badge from "@/components/ui/badge/Badge";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "User Details | MeterFlow Dashboard",
+  title: "User Details",
   description: "User details page",
 };
 

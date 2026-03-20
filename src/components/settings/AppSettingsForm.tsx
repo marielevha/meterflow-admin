@@ -116,6 +116,9 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
                 setSettings((prev) => ({ ...prev, maxGpsDistanceMeters: Number(e.target.value || "0") }))
               }
             />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Utilise pour l&apos;alerte mobile et pour le controle officiel backend/admin.
+            </p>
           </Field>
           <Field label="Review SLA (hours)">
             <Input

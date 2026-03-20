@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
+import { ReadingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentMobileClient } from "@/lib/auth/mobileSession";
+
+const mobileProfileSelect = {
+  id: true,
+  phone: true,
+  username: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  region: true,
+  city: true,
+  zone: true,
+  role: true,
+  status: true,
+  activatedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export async function GET(request: Request) {
   const auth = await getCurrentMobileClient(request);
@@ -9,7 +27,39 @@ export async function GET(request: Request) {
   }
 
   const { passwordHash: _passwordHash, ...safeUser } = auth.user;
-  return NextResponse.json({ user: safeUser }, { status: 200 });
+  const [meterCount, readingCount, pendingReadingCount] = await Promise.all([
+    prisma.meter.count({
+      where: {
+        customerId: auth.user.id,
+        deletedAt: null,
+      },
+    }),
+    prisma.reading.count({
+      where: {
+        submittedById: auth.user.id,
+        deletedAt: null,
+      },
+    }),
+    prisma.reading.count({
+      where: {
+        submittedById: auth.user.id,
+        status: ReadingStatus.PENDING,
+        deletedAt: null,
+      },
+    }),
+  ]);
+
+  return NextResponse.json(
+    {
+      user: safeUser,
+      summary: {
+        meterCount,
+        readingCount,
+        pendingReadingCount,
+      },
+    },
+    { status: 200 }
+  );
 }
 
 export async function PATCH(request: Request) {
@@ -24,12 +74,15 @@ export async function PATCH(request: Request) {
       typeof payload?.firstName === "string" ? payload.firstName.trim() || null : undefined;
     const lastName =
       typeof payload?.lastName === "string" ? payload.lastName.trim() || null : undefined;
+    const region =
+      typeof payload?.region === "string" ? payload.region.trim() || null : undefined;
     const city = typeof payload?.city === "string" ? payload.city.trim() || null : undefined;
     const zone = typeof payload?.zone === "string" ? payload.zone.trim() || null : undefined;
 
     if (
       firstName === undefined &&
       lastName === undefined &&
+      region === undefined &&
       city === undefined &&
       zone === undefined
     ) {
@@ -41,25 +94,11 @@ export async function PATCH(request: Request) {
       data: {
         ...(firstName !== undefined ? { firstName } : {}),
         ...(lastName !== undefined ? { lastName } : {}),
+        ...(region !== undefined ? { region } : {}),
         ...(city !== undefined ? { city } : {}),
         ...(zone !== undefined ? { zone } : {}),
       },
-      select: {
-        id: true,
-        phone: true,
-        username: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        region: true,
-        city: true,
-        zone: true,
-        role: true,
-        status: true,
-        activatedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: mobileProfileSelect,
     });
 
     return NextResponse.json({ message: "profile_updated", user: updated }, { status: 200 });

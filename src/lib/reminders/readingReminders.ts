@@ -67,7 +67,13 @@ function formatWindowDate(date: Date, timeZone: string) {
   return formatter.format(date);
 }
 
-function buildReminderMessage(client: EligibleClient, windowStart: Date, windowEnd: Date, timeZone: string) {
+function buildReminderMessage(
+  client: EligibleClient,
+  windowStart: Date,
+  windowEnd: Date,
+  timeZone: string,
+  companyName: string,
+) {
   const customerName = [client.firstName, client.lastName].filter(Boolean).join(" ") || "Client";
   const start = formatWindowDate(windowStart, timeZone);
   const end = formatWindowDate(windowEnd, timeZone);
@@ -76,7 +82,7 @@ function buildReminderMessage(client: EligibleClient, windowStart: Date, windowE
     `Bonjour ${customerName},`,
     `il vous reste ${client.pendingMeters} compteur(s) a relever sur ${client.totalMeters}.`,
     `Fenetre de releve: ${start} au ${end}.`,
-    "Merci de soumettre votre auto-releve dans l'application MeterFlow.",
+    `Merci de soumettre votre auto-releve dans l'application ${companyName}.`,
   ].join(" ");
 
   return {
@@ -218,7 +224,13 @@ async function sendEmailViaResend(to: string, subject: string, text: string, htm
   }
 }
 
-async function sendEmailViaMailtrap(to: string, subject: string, text: string, html: string) {
+async function sendEmailViaMailtrap(
+  to: string,
+  subject: string,
+  text: string,
+  html: string,
+  companyName: string,
+) {
   const apiKey = process.env.MAILTRAP_API_KEY?.trim();
   const from = process.env.REMINDER_EMAIL_FROM?.trim();
   const fromEmail = from ? extractEmailAddress(from) : "";
@@ -241,7 +253,7 @@ async function sendEmailViaMailtrap(to: string, subject: string, text: string, h
       body: JSON.stringify({
         from: {
           email: fromEmail,
-          name: "MeterFlow",
+          name: companyName,
         },
         to: [{ email: to }],
         subject,
@@ -283,9 +295,10 @@ async function sendEmail(
   subject: string,
   text: string,
   html: string,
+  companyName: string,
 ) {
   if (provider === "MAILTRAP") {
-    return sendEmailViaMailtrap(to, subject, text, html);
+    return sendEmailViaMailtrap(to, subject, text, html, companyName);
   }
   return sendEmailViaResend(to, subject, text, html);
 }
@@ -524,6 +537,7 @@ export async function executeReadingRemindersJob(
       windowStart,
       windowEnd,
       settings.readingReminderTimezone || "UTC",
+      settings.companyName || "MeterFlow",
     );
 
     for (const channel of channels) {
@@ -589,6 +603,7 @@ export async function executeReadingRemindersJob(
             message.emailSubject,
             message.emailText,
             message.emailHtml,
+            settings.companyName || "MeterFlow",
           );
         }
       } else {

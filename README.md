@@ -118,6 +118,97 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - Mot de passe demo des seeds: `ChangeMe@123`.
 - Script d'integration API:
   - `scripts/mobile_reading_flow.sh`
+
+### 13) Application mobile React Native (Expo)
+
+- Workspace mobile initialise dans `mobileapp/meterflow`.
+- Routing Expo Router structure autour de:
+  - splash
+  - onboarding
+  - auth
+  - tabs client
+  - pages de detail
+- Theming mobile:
+  - mode clair / sombre / systeme
+  - preference persistante cote mobile
+- Splash branding:
+  - ecran type fintech avec logo mobile dedie
+- Onboarding:
+  - parcours en 4 ecrans
+  - memorisation locale pour ne plus le rejouer apres completion
+
+### 14) Auth mobile - UX et session
+
+- Ecrans dedies:
+  - `login`
+  - `register`
+  - `forgot-password`
+  - `reset-password`
+  - `verify-otp`
+- Login mobile connecte au backend:
+  - `POST /api/v1/mobile/auth/login`
+- Session mobile:
+  - access token + refresh token stockes localement
+  - restauration automatique au lancement
+  - refresh automatique via `POST /api/v1/mobile/auth/refresh`
+- Toggle mot de passe visible/masque sur les formulaires sensibles.
+
+### 15) Navigation mobile et preferences locales
+
+- Drawer mobile avec pages:
+  - `Accueil`
+  - `Notifications`
+  - `Mes compteurs`
+  - `Profil`
+  - `Parametres`
+  - `A propos`
+- Topbar fixe unifiee:
+  - mode `menu` sur les ecrans racine
+  - mode `back` sur les ecrans de detail
+- Preferences utilisateur locales:
+  - theme
+  - rester connecte
+  - afficher / masquer l'aide camera
+  - revoir l'onboarding
+
+### 16) App mobile - ecrans client branches au backend
+
+- `Historique` branche sur:
+  - `GET /api/v1/mobile/readings`
+- Detail d'un releve branche sur:
+  - `GET /api/v1/mobile/readings/:readingId`
+- `Mes compteurs` branche sur:
+  - `GET /api/v1/mobile/meters`
+- Detail d'un compteur branche sur:
+  - `GET /api/v1/mobile/meters/:meterId`
+
+### 17) App mobile - parcours de soumission d'un releve
+
+- Ecran `Releves` en mode camera plein ecran.
+- Capture photo en premier, puis:
+  - recuperation GPS (`lat`, `lng`, precision)
+  - preview photo minimaliste
+  - choix du compteur
+  - saisie index principal / secondaire
+  - soumission finale au backend
+- Upload photo mobile branche sur le flow backend:
+  1. `POST /api/v1/mobile/uploads/presign`
+  2. upload direct objet vers MinIO/S3
+  3. `POST /api/v1/mobile/uploads/complete`
+  4. `POST /api/v1/mobile/readings`
+
+### 18) Correctifs stockage S3 / MinIO pour le mobile
+
+- Ajout de la notion d'endpoint public de stockage:
+  - `S3_PUBLIC_ENDPOINT`
+  - `STORAGE_PUBLIC_BASE_URL`
+- Correction de generation des URLs signees pour eviter les URLs `localhost` non utilisables depuis le mobile.
+- Ajustement upload mobile pour compatibilite MinIO:
+  - suppression des headers non signes
+  - upload binaire via `expo-file-system`
+- Endpoint securise pour afficher l'image d'un releve:
+  - `GET /api/v1/mobile/readings/:readingId/image`
+  - utile quand l'objet n'est pas expose publiquement par MinIO.
   - enchaine login -> presign -> upload -> complete -> reading.
 
 ### 13) Dashboard users + RBAC (admin)
@@ -299,6 +390,293 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - Envoi Email/Push:
   - email via Resend ou Mailtrap (`RESEND_API_KEY` ou `MAILTRAP_API_KEY`, plus `REMINDER_EMAIL_FROM`)
   - push via webhook (`REMINDER_PUSH_WEBHOOK_URL`)
+
+### 20) Module Tasks management + refonte Readings (admin)
+
+- Tasks management (backoffice):
+  - bloc menu dedie `Tasks management` (avec icone metier) dans la sidebar
+  - pages:
+    - `/admin/tasks` (liste, KPIs, filtres auto, pagination)
+    - `/admin/tasks/create` (creation)
+    - `/admin/tasks/:id` (detail complet: statut rapide, checklist, commentaires, pieces jointes, timeline)
+    - `/admin/tasks/:id/edit` (edition orientee workflow)
+  - APIs completees:
+    - `GET/POST /api/v1/tasks`
+    - `GET/PATCH /api/v1/tasks/:id`
+    - `GET /api/v1/tasks/stats`
+    - `POST /api/v1/tasks/:id/comments`
+    - `POST /api/v1/tasks/:id/attachments`
+    - `POST /api/v1/tasks/:id/items`
+    - `PATCH /api/v1/tasks/:id/items/:itemId`
+  - audit: ecriture d'evenements `reading_events` quand une tache liee a un releve est modifiee.
+
+- Readings admin UX:
+  - `/admin/readings` refait avec:
+    - recherche + filtres (status/date) auto-appliques (sans bouton Apply)
+    - pagination + per-page
+    - colonne `Actions` en icones `voir` / `editer`
+  - nouvelles pages:
+    - `/admin/readings/:id` (detail complet du releve: preuve image, acteurs, compteur, taches liees, audit trail)
+    - `/admin/readings/:id/edit` (edition releve + journalisation d'audit)
+  - audit trail du detail releve:
+    - remplacement du JSON brut par une presentation lisible (cle/valeur formatee pour utilisateur final).
+
+### 21) P0/P1/P2 robustesse, observabilite et exploitation
+
+- Stabilite navigation/sidebar:
+  - correction d'un risque de boucle de rendu dans `AppSidebar` (gestion d'ouverture des sous-menus, etat actif par chemin le plus specifique).
+  - activation du sous-menu coherent sur les pages detail/edit (users/meters/readings/tasks).
+
+- Renforcement workflows metier:
+  - machine d'etats centralisee pour transitions (`src/lib/workflows/stateMachines.ts`).
+  - garde-fous sur transitions Tasks/Readings pour limiter les regressions de statut.
+  - audit harmonise sur modifications manuelles.
+
+- Observabilite API:
+  - wrapper d'instrumentation `withRouteInstrumentation`:
+    - generation/propagation `x-request-id`
+    - mesure de latence
+    - logs de succes/erreur standardises.
+  - integration sur endpoints critiques auth/readings/tasks/dashboard/billing.
+
+- Logging serveur avec rotation type rolling files:
+  - logger JSON structure (`src/lib/observability/logger.ts`)
+  - ecriture disque:
+    - `logs/application.log`
+    - `logs/error.log`
+  - rotation par taille + retention fichiers archives (`.1`, `.2`, ...).
+  - variables de config:
+    - `LOG_DIR`
+    - `LOG_MAX_FILE_SIZE_MB`
+    - `LOG_MAX_FILES`
+    - `LOG_LEVEL`
+    - `LOG_TO_CONSOLE`
+
+- Exploitation / readiness:
+  - endpoint health:
+    - `GET /api/health` (etat app + connectivite DB, `ok`/`degraded`).
+  - smoke checks P2:
+    - script `scripts/p2_smoke_checks.sh`
+    - commande `npm run smoke:p2`
+    - verification rapide: health -> login -> endpoint protege + presence `x-request-id`.
+
+- Scalabilite requetes admin:
+  - extraction de la logique Overview vers un service dedie `src/lib/backoffice/overview.ts`.
+  - cache serveur (`unstable_cache`, revalidate 60s) pour reduire la charge SQL.
+  - indexes Prisma/SQL ajoutes:
+    - `meter_states(deleted_at, effective_at)`
+    - `readings(deleted_at, created_at)`
+    - `readings(deleted_at, status, created_at)`
+    - `reading_events(deleted_at, created_at)`
+    - `tasks(deleted_at, created_at)`
+  - migration: `prisma/migrations/20260224164000_add_perf_indexes`.
+
+- Branding applicatif centralise:
+  - suppression de l'usage hardcode du nom produit dans les rappels.
+  - les messages reminders utilisent maintenant `settings.companyName` (DB settings) comme source unique.
+  - les titres de pages utilisent maintenant `companyName` via le layout global Next.js (`generateMetadata`) au lieu d'un suffixe `MeterFlow` hardcode.
+
+### 22) Correctifs billing et resilience overview
+
+- Diagnostic billing plus precis:
+  - remplacement du message generique "module non initialise" par une analyse d'erreur Prisma plus utile.
+  - distinction entre:
+    - tables manquantes
+    - colonnes manquantes / schema mismatch
+    - probleme de connexion Prisma
+    - erreur inattendue
+  - fichiers:
+    - `src/lib/backoffice/billingPageErrors.ts`
+    - `src/components/billing/BillingSchemaNotice.tsx`
+
+- Reparation de drift du schema billing:
+  - ajout d'une migration corrective idempotente:
+    - `prisma/migrations/20260315120000_repair_billing_schema_alignment`
+  - couvre les colonnes manquantes frequentes sur:
+    - `billing_campaigns`
+    - `invoices`
+  - inclut aussi indexes/FK pour les champs de cycle strict (`from_reading_id`, `to_reading_id`).
+
+- Tolerance partielle des pages billing aux schemas incomplets:
+  - la page `/admin/billing/campaigns` ne charge plus implicitement toutes les colonnes de `billing_campaigns`.
+  - selection Prisma reduite aux champs reellement affiches pour eviter qu'une colonne non utilisee fasse tomber toute la liste.
+  - meme logique appliquee au service partage `listBillingCampaigns`.
+
+- Robustesse runtime de l'overview:
+  - correction de `formatDate()` pour accepter `Date | string | null`.
+  - evite le crash `value.toISOString is not a function` lorsque les dates reviennent serializees depuis le cache serveur.
+
+### 23) Mobile - consommation, upload simplifie et navigation unifiee
+
+- Simplification du stockage photo cote mobile:
+  - nouveau endpoint direct `POST /api/v1/mobile/uploads`
+  - le mobile envoie maintenant l'image au backend en `multipart/form-data`
+  - le serveur se charge du stockage MinIO/S3 et renvoie les metadonnees du fichier
+  - les anciens endpoints `presign/complete` restent disponibles, mais le flux mobile privilegie maintenant l'upload backend direct
+
+- Affichage securise des images de releve:
+  - mobile:
+    - `GET /api/v1/mobile/readings/:readingId/image`
+  - admin:
+    - `GET /api/v1/readings/:id/image`
+  - les vues mobile/admin n'ont plus besoin d'un objet MinIO publiquement lisible pour afficher la photo
+
+- GPS et anti-fraude harmonises:
+  - calcul de distance GPS cote mobile pour l'alerte UX lors de la soumission
+  - calcul officiel de `gpsDistanceMeters` cote backend a la creation du releve
+  - seuil GPS centralise dans les settings applicatifs (`maxGpsDistanceMeters`)
+  - exposition mobile en lecture via `GET /api/v1/mobile/app-config`
+  - affichage de l'ecart GPS dans:
+    - le detail releve mobile
+    - le detail releve admin
+    - la page mobile `Parametres` (info utilisateur)
+
+- Navigation mobile consolidee:
+  - stabilisation du drawer mobile (reset propre apres changement de route / logout / login)
+  - topbar fixe homogene sur les ecrans applicatifs, bouton retour sur les ecrans detail
+  - ajout des pages drawer:
+    - `Notifications`
+    - `A propos`
+    - `Profil`
+    - `Parametres`
+    - `Releves` (historique de soumission)
+  - reorganisation des tabs:
+    - `Accueil`
+    - `Releves` (camera / soumission)
+    - `Consommation`
+
+- API mobile consommation:
+  - `GET /api/v1/mobile/consumption`
+    - historique mensuel agrege par compteur a partir des `meter_states`
+  - `GET /api/v1/mobile/consumption/:meterId?periodKey=YYYY-MM`
+    - detail d'une periode avec les etats utilises pour le calcul
+
+- UX mobile consommation:
+  - nouvelle page tab `Consommation`
+  - nouvelle page de detail de consommation par compteur/periode
+  - l'ancienne page `Historique` devient `Releves` via `readings-history`
+  - l'accueil affiche maintenant les dernieres consommations du compteur courant du carousel, plutot que les derniers releves
+  - pour les compteurs double index, l'accueil affiche directement la consommation totale en kWh
+
+- Composant de chargement partage:
+  - ajout de `mobileapp/meterflow/components/app/circular-loading.tsx`
+  - reutilise sur:
+    - accueil
+    - historique des releves
+    - consommation
+    - liste/detail compteurs
+    - detail releve
+    - etapes utiles du parcours de soumission
+
+### 24) Revue admin des releves, notifications client et fondations push
+
+- Revue admin plus rigoureuse des releves:
+  - motifs normalises de signalement/rejet (`flagReason`, `rejectionReason`)
+  - champ motif obligatoire lorsque l'agent choisit `FLAGGED` ou `REJECTED`
+  - catalogues partages de motifs et messages client dans:
+    - `src/lib/readings/reviewReasons.ts`
+    - `mobileapp/meterflow/lib/readings/review-reasons.ts`
+
+- Detail et edition admin des releves:
+  - la page d'edition remplace les champs libres par des listes de motifs controlees
+  - la page detail admin affiche des libelles lisibles plutot que les codes internes
+  - les editions manuelles admin generent aussi des evenements metier de decision, pas seulement un audit technique
+
+- Notifications client in-app:
+  - nouvelle API mobile:
+    - `GET /api/v1/mobile/notifications`
+  - implementation basee sur `reading_events` pour eviter d'ajouter une table de notifications dediee trop tot
+  - la page mobile `Notifications` affiche maintenant:
+    - les validations
+    - les signalements
+    - les rejets
+    - avec titre, message metier, compteur concerne et lien vers le detail releve
+  - le detail releve mobile affiche une carte `Decision agent` avec un message plus clair pour le client
+
+- Fondations des notifications push mobiles:
+  - ajout de `expo-notifications` dans l'app mobile
+  - ajout du modele Prisma `MobilePushDevice`
+  - endpoints mobiles:
+    - `POST /api/v1/mobile/push/register`
+    - `POST /api/v1/mobile/push/unregister`
+  - service backend d'envoi Expo Push:
+    - `src/lib/notifications/expoPush.ts`
+  - envoi push declenche lors des transitions:
+    - validation
+    - signalement
+    - rejet
+  - le flux push est implemente en mode `best effort`:
+    - un echec du service push ne doit jamais casser la decision agent
+
+- Limite actuelle de test:
+  - les push distantes Expo ne sont pas considerees comme valides de bout en bout dans `Expo Go`
+  - il faut un `development build` sur vrai appareil pour verifier correctement les push natives
+  - en attendant, le centre de notifications in-app reste la source fiable cote client
+
+### 25) Stabilisation MVP mobile, profil complet et internationalisation
+
+- Stabilisation du workflow mobile de releve:
+  - anti double action sur les soumissions critiques
+  - messages d'erreur/succes homogenises cote mobile
+  - meilleure robustesse camera / GPS avant envoi
+  - resoumission plus fluide apres rejet avec navigation et etats mieux geres
+  - actualisation plus intelligente des ecrans apres action metier:
+    - accueil
+    - releves
+    - consommation
+    - notifications
+
+- Notifications in-app consolidees:
+  - badge non lu dans la topbar et le drawer
+  - marquage fin comme lu a l'ouverture du detail du releve
+  - bouton `Tout marquer comme lu`
+  - pagination par curseur sur `GET /api/v1/mobile/notifications`
+  - composant d'etat partage pour les cas vides / erreurs:
+    - `mobileapp/meterflow/components/app/app-state-card.tsx`
+
+- Page `Profil` transformee en vrai ecran compte client:
+  - chargement des vraies donnees via `GET /api/v1/mobile/me`
+  - edition des informations personnelles (`firstName`, `lastName`, `region`, `city`, `zone`)
+  - resume compte simplifie (`Compteurs`, `Releves`)
+  - section securite avec changement de mot de passe
+  - support backend:
+    - `PATCH /api/v1/mobile/me`
+    - `PATCH /api/v1/mobile/me/password`
+  - deconnexion forcee apres changement de mot de passe, conformement a l'invalidation des sessions cote serveur
+
+- Navigation mobile plus propre:
+  - prevention de l'empilement des pages identiques (`safePush`)
+  - topbar partage simplifie:
+    - un seul titre visible
+    - bouton menu ou retour selon le contexte
+  - drawer stabilise sur login/logout et changements de route
+
+- Internationalisation mobile:
+  - infrastructure i18n legere ajoutee:
+    - `mobileapp/meterflow/lib/i18n/translations.ts`
+    - `mobileapp/meterflow/hooks/use-i18n.ts`
+  - preference de langue persistante dans `app-preferences`
+  - choix de langue dans la page `Parametres`
+  - langues actuellement supportees:
+    - francais (`fr`)
+    - anglais (`en`)
+    - lingala (`ln`)
+  - couverture i18n deja branchee sur les principaux ecrans clients:
+    - accueil
+    - notifications
+    - profil
+    - compteurs
+    - consommation
+    - a propos
+    - drawer / tabs / parametres
+
+- Cloisonnement des roles cote mobile:
+  - l'app mobile client est maintenant reservee aux profils `CLIENT`
+  - verrou applique sur:
+    - `POST /api/v1/mobile/auth/login`
+    - `POST /api/v1/mobile/auth/refresh`
+  - les profils `AGENT`, `SUPERVISOR` et `ADMIN` ne peuvent plus ouvrir de session dans cette app
+  - cette separation prepare la future app mobile dediee aux agents sans dupliquer tout le backend
 
 
 ## Overview

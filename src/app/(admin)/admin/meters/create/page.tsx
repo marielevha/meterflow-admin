@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { createMeterAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Add Meter | MeterFlow Dashboard",
+  title: "Add Meter",
   description: "Create meter page",
 };
 

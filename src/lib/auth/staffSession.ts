@@ -8,6 +8,10 @@ const STAFF_ROLES = new Set<UserRole>([
   UserRole.ADMIN,
 ]);
 
+type StaffAuthOptions = {
+  anyOfPermissions?: string[];
+};
+
 function extractAccessToken(request: Request): string | null {
   const authorization = request.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) {
@@ -19,7 +23,34 @@ function extractAccessToken(request: Request): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export async function getCurrentStaffUser(request: Request) {
+async function hasAnyPermission(userId: string, permissionCodes: string[]) {
+  if (permissionCodes.length === 0) return true;
+
+  const assignment = await prisma.userRoleAssignment.findFirst({
+    where: {
+      userId,
+      deletedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      role: {
+        deletedAt: null,
+        permissions: {
+          some: {
+            deletedAt: null,
+            permission: {
+              deletedAt: null,
+              code: { in: permissionCodes },
+            },
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(assignment);
+}
+
+export async function getCurrentStaffUser(request: Request, options?: StaffAuthOptions) {
   const token = extractAccessToken(request);
   if (!token) {
     return { ok: false as const, status: 401, body: { error: "unauthorized" } };
@@ -69,6 +100,18 @@ export async function getCurrentStaffUser(request: Request) {
 
   if (user.status !== UserStatus.ACTIVE) {
     return { ok: false as const, status: 403, body: { error: "user_not_active" } };
+  }
+
+  const requiredPermissions = (options?.anyOfPermissions || []).filter(Boolean);
+  if (requiredPermissions.length > 0 && user.role !== UserRole.ADMIN) {
+    const allowed = await hasAnyPermission(user.id, requiredPermissions);
+    if (!allowed) {
+      return {
+        ok: false as const,
+        status: 403,
+        body: { error: "missing_permission", requiredAnyOf: requiredPermissions },
+      };
+    }
   }
 
   return { ok: true as const, user, tokenPayload: payload };

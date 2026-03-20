@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { updateRolePermissionsAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Role Permissions | MeterFlow Dashboard",
+  title: "Role Permissions",
   description: "Manage permissions assigned to a role",
 };
 

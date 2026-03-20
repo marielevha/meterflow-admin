@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { loginUser } from "@/lib/auth/login";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function POST(request: Request) {
+async function postLogin(request: Request) {
   try {
     const payload = await request.json();
     const result = await loginUser(
@@ -33,3 +34,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 }
+
+export const POST = withRouteInstrumentation("api.v1.auth.login", postLogin);

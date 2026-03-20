@@ -207,6 +207,8 @@ model User {
   receivedPayments       Payment[]            @relation("PaymentReceivedBy")
   deliveryLogs           InvoiceDelivery[]    @relation("InvoiceDeliveryTriggeredBy")
   readingReminderLogs    ReadingReminderLog[]
+  mobilePushDevices      MobilePushDevice[]
+  mobileNotificationReads MobileNotificationRead[]
 
   @@index([role, status])
   @@index([deletedAt])
@@ -335,6 +337,7 @@ model MeterState {
   sourceReading     Reading?  @relation(fields: [sourceReadingId], references: [id])
 
   @@index([meterId, effectiveAt])
+  @@index([deletedAt, effectiveAt])
   @@index([sourceReadingId])
   @@index([deletedAt])
   @@map("meter_states")
@@ -382,6 +385,8 @@ model Reading {
   @@index([meterId, status, readingAt])
   @@index([submittedById, status])
   @@index([reviewedById])
+  @@index([deletedAt, createdAt])
+  @@index([deletedAt, status, createdAt])
   @@index([deletedAt])
   @@map("readings")
 }
@@ -397,8 +402,10 @@ model ReadingEvent {
   deletedAt DateTime?        @map("deleted_at")
   reading   Reading          @relation(fields: [readingId], references: [id])
   user      User?            @relation(fields: [userId], references: [id])
+  notificationReads MobileNotificationRead[]
 
   @@index([readingId, type, createdAt])
+  @@index([deletedAt, createdAt])
   @@index([userId])
   @@index([deletedAt])
   @@map("reading_events")
@@ -431,6 +438,7 @@ model Task {
   attachments  TaskAttachment[]
 
   @@index([status, priority, dueAt])
+  @@index([deletedAt, createdAt])
   @@index([assignedToId])
   @@index([meterId, readingId])
   @@index([deletedAt])
@@ -810,4 +818,37 @@ model ReadingReminderLog {
   @@index([reminderWindowKey, channel, status])
   @@index([deletedAt])
   @@map("reading_reminder_logs")
+}
+
+model MobilePushDevice {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  expoPushToken String   @unique @map("expo_push_token")
+  platform      String
+  appVersion    String?  @map("app_version")
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, deletedAt])
+  @@index([deletedAt, lastSeenAt])
+  @@map("mobile_push_devices")
+}
+
+model MobileNotificationRead {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  readingEventId String       @map("reading_event_id") @db.Uuid
+  readAt         DateTime     @default(now()) @map("read_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  user           User         @relation(fields: [userId], references: [id])
+  readingEvent   ReadingEvent @relation(fields: [readingEventId], references: [id])
+
+  @@unique([userId, readingEventId])
+  @@index([userId, readAt])
+  @@index([readingEventId])
+  @@map("mobile_notification_reads")
 }

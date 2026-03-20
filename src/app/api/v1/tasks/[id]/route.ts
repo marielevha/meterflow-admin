@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { getTaskDetail, updateTask } from "@/lib/backoffice/tasks";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function GET(
+async function getTask(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -16,15 +17,15 @@ export async function GET(
     return NextResponse.json({ error: "task_id_required" }, { status: 400 });
   }
 
-  const result = await getTaskDetail(id);
+  const result = await getTaskDetail({ id: auth.user.id, role: auth.user.role }, id);
   return NextResponse.json(result.body, { status: result.status });
 }
 
-export async function PATCH(
+async function patchTask(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -42,3 +43,6 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
 }
+
+export const GET = withRouteInstrumentation("api.v1.tasks.detail", getTask);
+export const PATCH = withRouteInstrumentation("api.v1.tasks.update", patchTask);

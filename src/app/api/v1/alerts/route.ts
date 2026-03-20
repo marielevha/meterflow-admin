@@ -3,7 +3,7 @@ import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { listAlerts } from "@/lib/backoffice/audit";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["audit:view"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

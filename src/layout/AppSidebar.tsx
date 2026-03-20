@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState,useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ import {
   PageIcon,
   PieChartIcon,
   PlugInIcon,
+  TaskIcon,
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
@@ -25,6 +26,7 @@ type NavItem = {
   path?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
+const SHOW_DEMO_MENU = process.env.NEXT_PUBLIC_SHOW_DEMO_MENU === "1";
 
 const navItems: NavItem[] = [
   {
@@ -55,6 +57,14 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <TaskIcon />,
+    name: "Tasks management",
+    subItems: [
+      { name: "Tasks", path: "/admin/tasks", pro: false },
+      { name: "Add task", path: "/admin/tasks/create", pro: false },
+    ],
+  },
+  {
     icon: <PieChartIcon />,
     name: "Billing",
     subItems: [
@@ -80,6 +90,9 @@ const navItems: NavItem[] = [
     path: "/admin/settings",
   },
 
+];
+
+const demoMainItems: NavItem[] = [
   {
     name: "Forms",
     icon: <ListIcon />,
@@ -100,7 +113,7 @@ const navItems: NavItem[] = [
   },
 ];
 
-const othersItems: NavItem[] = [
+const demoOtherItems: NavItem[] = [
   {
     icon: <PieChartIcon />,
     name: "Charts",
@@ -134,13 +147,15 @@ const othersItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const effectiveMainItems = SHOW_DEMO_MENU ? [...navItems, ...demoMainItems] : navItems;
+  const effectiveOtherItems = SHOW_DEMO_MENU ? demoOtherItems : [];
 
   const renderMenuItems = (
-    navItems: NavItem[],
+    menuItems: NavItem[],
     menuType: "main" | "others"
   ) => (
     <ul className="flex flex-col gap-4">
-      {navItems.map((nav, index) => (
+      {menuItems.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
@@ -203,14 +218,11 @@ const AppSidebar: React.FC = () => {
           )}
           {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
             <div
-              ref={(el) => {
-                subMenuRefs.current[`${menuType}-${index}`] = el;
-              }}
               className="overflow-hidden transition-all duration-300"
               style={{
                 height:
                   openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? `${subMenuHeight[`${menuType}-${index}`]}px`
+                    ? "auto"
                     : "0px",
               }}
             >
@@ -265,14 +277,11 @@ const AppSidebar: React.FC = () => {
     </ul>
   );
 
-  const [openSubmenu, setOpenSubmenu] = useState<{
+  const [manualOpenSubmenu, setManualOpenSubmenu] = useState<{
     type: "main" | "others";
     index: number;
   } | null>(null);
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
-    {}
-  );
-  const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [collapsedActiveSubmenuKey, setCollapsedActiveSubmenuKey] = useState<string | null>(null);
 
   const isActive = useCallback(
     (path: string) => pathname === path || pathname.startsWith(`${path}/`),
@@ -291,56 +300,61 @@ const AppSidebar: React.FC = () => {
     [pathname]
   );
 
-  useEffect(() => {
-    // Check if the current path matches any submenu item
-    let submenuMatched = false;
-    ["main", "others"].forEach((menuType) => {
-      const items = menuType === "main" ? navItems : othersItems;
-      items.forEach((nav, index) => {
-        if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
-            if (isActive(subItem.path)) {
-              setOpenSubmenu({
-                type: menuType as "main" | "others",
-                index,
-              });
-              submenuMatched = true;
-            }
-          });
+  const activeSubmenu: {
+    key: string;
+    submenu: { type: "main" | "others"; index: number };
+    score: number;
+  } | null = (() => {
+    let best:
+      | {
+          key: string;
+          submenu: { type: "main" | "others"; index: number };
+          score: number;
         }
+      | null = null;
+
+    const inspect = (items: NavItem[], type: "main" | "others") => {
+      items.forEach((nav, index) => {
+        if (!nav.subItems) return;
+        nav.subItems.forEach((subItem) => {
+          if (!isActive(subItem.path)) return;
+          const score = subItem.path.length;
+          if (!best || score > best.score) {
+            best = {
+              key: `${type}-${index}`,
+              submenu: { type, index },
+              score,
+            };
+          }
+        });
       });
-    });
+    };
 
-    // If no submenu item matches, close the open submenu
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
-    }
-  }, [pathname,isActive]);
+    inspect(effectiveMainItems, "main");
+    inspect(effectiveOtherItems, "others");
+    return best;
+  })();
 
-  useEffect(() => {
-    // Set the height of the submenu items when the submenu is opened
-    if (openSubmenu !== null) {
-      const key = `${openSubmenu.type}-${openSubmenu.index}`;
-      if (subMenuRefs.current[key]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
-          [key]: subMenuRefs.current[key]?.scrollHeight || 0,
-        }));
-      }
-    }
-  }, [openSubmenu]);
+  const openSubmenu =
+    manualOpenSubmenu ||
+    (activeSubmenu && activeSubmenu.key !== collapsedActiveSubmenuKey
+      ? activeSubmenu.submenu
+      : null);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
-    setOpenSubmenu((prevOpenSubmenu) => {
-      if (
-        prevOpenSubmenu &&
-        prevOpenSubmenu.type === menuType &&
-        prevOpenSubmenu.index === index
-      ) {
-        return null;
+    const clickedKey = `${menuType}-${index}`;
+    const currentKey = openSubmenu ? `${openSubmenu.type}-${openSubmenu.index}` : null;
+
+    if (currentKey === clickedKey) {
+      setManualOpenSubmenu(null);
+      if (activeSubmenu?.key === clickedKey) {
+        setCollapsedActiveSubmenuKey(clickedKey);
       }
-      return { type: menuType, index };
-    });
+      return;
+    }
+
+    setCollapsedActiveSubmenuKey(null);
+    setManualOpenSubmenu({ type: menuType, index });
   };
 
   return (
@@ -408,25 +422,27 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(effectiveMainItems, "main")}
             </div>
 
-            <div className="">
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(othersItems, "others")}
-            </div>
+            {effectiveOtherItems.length > 0 ? (
+              <div className="">
+                <h2
+                  className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    "Others"
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(effectiveOtherItems, "others")}
+              </div>
+            ) : null}
           </div>
         </nav>
         {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}

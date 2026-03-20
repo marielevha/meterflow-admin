@@ -2,9 +2,10 @@ import { UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { getDashboardKpis } from "@/lib/backoffice/dashboard";
+import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
-export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+async function getKpis(request: Request) {
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["dashboard:view"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -20,3 +21,5 @@ export async function GET(request: Request) {
   const result = await getDashboardKpis({ from, to });
   return NextResponse.json(result.body, { status: result.status });
 }
+
+export const GET = withRouteInstrumentation("api.v1.dashboard.kpis", getKpis);

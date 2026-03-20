@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       sha256,
       expiresInSeconds,
       purpose,
+      requestUrl: request.url,
     });
 
     const uploadToken = createUploadToken(

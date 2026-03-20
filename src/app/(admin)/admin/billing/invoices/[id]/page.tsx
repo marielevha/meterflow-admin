@@ -4,6 +4,7 @@ import { DeliveryChannel, PaymentMethod } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
+import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { getInvoiceDetail } from "@/lib/backoffice/billing";
 import {
   registerInvoicePaymentAction,
@@ -13,7 +14,7 @@ import {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata: Metadata = {
-  title: "Invoice Detail | MeterFlow Dashboard",
+  title: "Invoice Detail",
   description: "Invoice details and operations",
 };
 
@@ -37,11 +38,12 @@ export default async function BillingInvoiceDetailPage({
   let result: Awaited<ReturnType<typeof getInvoiceDetail>>;
   try {
     result = await getInvoiceDetail(id);
-  } catch {
+  } catch (error) {
+    const errorState = getBillingPageErrorState(error, "billing.invoice_detail");
     return (
       <div>
         <PageBreadcrumb pageTitle="Invoice detail" />
-        <BillingSchemaNotice />
+        <BillingSchemaNotice {...errorState} />
       </div>
     );
   }

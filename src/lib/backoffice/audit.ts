@@ -1,5 +1,7 @@
 import { Prisma, ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { gpsThresholdMeters, resolveGpsThresholdMeters, haversineMeters } from "@/lib/geo/gps";
+import { getAppSettings } from "@/lib/settings/serverSettings";
 
 type StaffUser = {
   id: string;
@@ -11,25 +13,8 @@ function toNumberOrNull(value: Prisma.Decimal | null | undefined): number | null
   return Number(value);
 }
 
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const earthRadiusMeters = 6371000;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusMeters * c;
-}
-
-function gpsThresholdMeters() {
-  const raw = Number(process.env.GPS_MAX_DISTANCE_METERS ?? "200");
-  if (!Number.isFinite(raw) || raw <= 0) return 200;
-  return raw;
-}
-
 export async function runReadingChecks(staff: StaffUser, readingId: string) {
+  const appSettings = await getAppSettings();
   const reading = await prisma.reading.findFirst({
     where: { id: readingId, deletedAt: null },
     include: {
@@ -105,7 +90,7 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
   const readLng = toNumberOrNull(reading.gpsLongitude);
 
   let distanceMeters: number | null = null;
-  const threshold = gpsThresholdMeters();
+  const threshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
   let gpsPassed = true;
 
   if (
@@ -231,6 +216,8 @@ export async function getReadingEvents(readingId: string) {
 }
 
 export async function listAlerts(params: { from?: string; to?: string }) {
+  const appSettings = await getAppSettings();
+  const threshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
   const where: Prisma.ReadingWhereInput = {
     deletedAt: null,
     OR: [
@@ -238,7 +225,7 @@ export async function listAlerts(params: { from?: string; to?: string }) {
       { status: ReadingStatus.REJECTED },
       { flagReason: { not: null } },
       { anomalyScore: { not: null } },
-      { gpsDistanceMeters: { gt: new Prisma.Decimal(gpsThresholdMeters()) } },
+      { gpsDistanceMeters: { gt: new Prisma.Decimal(threshold) } },
     ],
   };
 
