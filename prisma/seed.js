@@ -1,5 +1,19 @@
 const { randomBytes, scryptSync } = require("node:crypto");
-const { PrismaClient, MeterStatus, MeterType, UserRole, UserStatus } = require("@prisma/client");
+const {
+  PrismaClient,
+  MeterStatus,
+  MeterType,
+  ReadingSource,
+  ReadingStatus,
+  TaskEventType,
+  TaskItemStatus,
+  TaskPriority,
+  TaskResolutionCode,
+  TaskStatus,
+  TaskType,
+  UserRole,
+  UserStatus,
+} = require("@prisma/client");
 
 const prisma = new PrismaClient();
 const DEMO_PASSWORD = "ChangeMe@123";
@@ -176,6 +190,182 @@ const meterStates = [
   { serialNumber: "MF-SN-DKR-0006", effectiveAt: "2026-02-07T10:10:00.000Z", previousPrimary: 455, currentPrimary: 501 },
 ];
 
+const demoReadings = [
+  {
+    key: "client001-flagged-dual",
+    meterSerialNumber: "MF-CG-BZV-0002",
+    submittedByUsername: "client001",
+    source: ReadingSource.CLIENT,
+    status: ReadingStatus.FLAGGED,
+    readingAt: "2026-03-18T08:20:00.000Z",
+    primaryIndex: 648,
+    secondaryIndex: 307,
+    imageUrl: "https://demo.meterflow.local/readings/client001-flagged-dual.jpg",
+    imageMimeType: "image/jpeg",
+    imageSizeBytes: 228114,
+    gpsLatitude: -4.2822,
+    gpsLongitude: 15.2671,
+    gpsAccuracyMeters: 12.5,
+    flagReason: "gps_distance_exceeded",
+  },
+  {
+    key: "client001-rejected-single",
+    meterSerialNumber: "MF-CG-BZV-0001",
+    submittedByUsername: "client001",
+    source: ReadingSource.CLIENT,
+    status: ReadingStatus.REJECTED,
+    readingAt: "2026-03-19T09:05:00.000Z",
+    primaryIndex: 1347,
+    imageUrl: "https://demo.meterflow.local/readings/client001-rejected-single.jpg",
+    imageMimeType: "image/jpeg",
+    imageSizeBytes: 201442,
+    gpsLatitude: -4.2718,
+    gpsLongitude: 15.281,
+    gpsAccuracyMeters: 9.2,
+    rejectionReason: "blurry_image",
+  },
+  {
+    key: "agent001-confirmed-single",
+    meterSerialNumber: "MF-CG-BZV-0001",
+    submittedByUsername: "agent001",
+    reviewedByUsername: "agent001",
+    source: ReadingSource.AGENT,
+    status: ReadingStatus.VALIDATED,
+    readingAt: "2026-03-18T10:45:00.000Z",
+    primaryIndex: 1359,
+    imageUrl: "https://demo.meterflow.local/readings/agent001-confirmed-single.jpg",
+    imageMimeType: "image/jpeg",
+    imageSizeBytes: 244910,
+    gpsLatitude: -4.2721,
+    gpsLongitude: 15.2808,
+    gpsAccuracyMeters: 6.8,
+    reviewedAt: "2026-03-18T10:52:00.000Z",
+  },
+];
+
+const demoTasks = [
+  {
+    key: "agent001-overdue-recheck",
+    title: "DEMO: Controle terrain urgent MF-CG-BZV-0002",
+    description: "[seed-demo] Reprendre le releve client et verifier la coherence GPS sur site.",
+    meterSerialNumber: "MF-CG-BZV-0002",
+    readingKey: "client001-flagged-dual",
+    assignedToUsername: "agent001",
+    createdByUsername: "supervisor001",
+    type: TaskType.FIELD_RECHECK,
+    status: TaskStatus.OPEN,
+    priority: TaskPriority.CRITICAL,
+    dueAt: "2026-03-19T09:00:00.000Z",
+  },
+  {
+    key: "agent001-in-progress-verification",
+    title: "DEMO: Verification compteur MF-CG-BZV-0001",
+    description: "[seed-demo] Confirmer l etat du compteur et preparer un nouveau releve terrain.",
+    meterSerialNumber: "MF-CG-BZV-0001",
+    readingKey: "client001-rejected-single",
+    assignedToUsername: "agent001",
+    createdByUsername: "supervisor001",
+    startedByUsername: "agent001",
+    type: TaskType.METER_VERIFICATION,
+    status: TaskStatus.IN_PROGRESS,
+    priority: TaskPriority.HIGH,
+    dueAt: "2026-03-20T14:00:00.000Z",
+    startedAt: "2026-03-20T08:00:00.000Z",
+  },
+  {
+    key: "agent001-open-today",
+    title: "DEMO: Passage client MF-CG-BZV-0001",
+    description: "[seed-demo] Mission terrain simple a planifier avec le client.",
+    meterSerialNumber: "MF-CG-BZV-0001",
+    assignedToUsername: "agent001",
+    createdByUsername: "supervisor001",
+    type: TaskType.GENERAL,
+    status: TaskStatus.OPEN,
+    priority: TaskPriority.MEDIUM,
+    dueAt: "2026-03-20T16:30:00.000Z",
+  },
+  {
+    key: "agent001-done-confirmed",
+    title: "DEMO: Mission terminee MF-CG-BZV-0001",
+    description: "[seed-demo] Mission cloturee avec releve terrain confirme.",
+    meterSerialNumber: "MF-CG-BZV-0001",
+    readingKey: "client001-rejected-single",
+    reportedReadingKey: "agent001-confirmed-single",
+    assignedToUsername: "agent001",
+    createdByUsername: "supervisor001",
+    startedByUsername: "agent001",
+    closedByUsername: "agent001",
+    type: TaskType.FIELD_RECHECK,
+    status: TaskStatus.DONE,
+    priority: TaskPriority.HIGH,
+    dueAt: "2026-03-18T11:00:00.000Z",
+    startedAt: "2026-03-18T10:20:00.000Z",
+    fieldSubmittedAt: "2026-03-18T10:50:00.000Z",
+    closedAt: "2026-03-18T10:55:00.000Z",
+    resolutionCode: TaskResolutionCode.READING_CONFIRMED,
+    resolutionComment: "Releve terrain confirme apres passage chez le client.",
+    fieldPrimaryIndex: 1359,
+    fieldImageUrl: "https://demo.meterflow.local/tasks/agent001-done-proof.jpg",
+    fieldImageHash: "seed-demo-agent001-done-proof",
+    fieldImageMimeType: "image/jpeg",
+    fieldImageSizeBytes: 244910,
+    fieldGpsLatitude: -4.2721,
+    fieldGpsLongitude: 15.2808,
+    fieldGpsAccuracyMeters: 6.8,
+  },
+  {
+    key: "agent001-blocked-fraud",
+    title: "DEMO: Fraude suspectee MF-CG-BZV-0002",
+    description: "[seed-demo] Le terrain a remonte un besoin d escalade immediate.",
+    meterSerialNumber: "MF-CG-BZV-0002",
+    readingKey: "client001-flagged-dual",
+    assignedToUsername: "agent001",
+    createdByUsername: "supervisor001",
+    startedByUsername: "agent001",
+    type: TaskType.FRAUD_INVESTIGATION,
+    status: TaskStatus.BLOCKED,
+    priority: TaskPriority.CRITICAL,
+    dueAt: "2026-03-20T11:30:00.000Z",
+    startedAt: "2026-03-20T09:10:00.000Z",
+    fieldSubmittedAt: "2026-03-20T09:45:00.000Z",
+    resolutionCode: TaskResolutionCode.ESCALATION_REQUIRED,
+    resolutionComment: "Compteur ouvert et incoherence visible. Escalade demandee.",
+    fieldPrimaryIndex: 651,
+    fieldSecondaryIndex: 309,
+    fieldImageUrl: "https://demo.meterflow.local/tasks/agent001-blocked-proof.jpg",
+    fieldImageHash: "seed-demo-agent001-blocked-proof",
+    fieldImageMimeType: "image/jpeg",
+    fieldImageSizeBytes: 251004,
+    fieldGpsLatitude: -4.2823,
+    fieldGpsLongitude: 15.2672,
+    fieldGpsAccuracyMeters: 7.4,
+  },
+  {
+    key: "agent002-open-check",
+    title: "DEMO: Verification terrain MF-CG-PNR-0005",
+    description: "[seed-demo] Mission de verification pour agent secondaire.",
+    meterSerialNumber: "MF-CG-PNR-0005",
+    assignedToUsername: "agent002",
+    createdByUsername: "supervisor001",
+    type: TaskType.METER_VERIFICATION,
+    status: TaskStatus.OPEN,
+    priority: TaskPriority.MEDIUM,
+    dueAt: "2026-03-21T10:00:00.000Z",
+  },
+  {
+    key: "agent003-open-check",
+    title: "DEMO: Verification terrain MF-SN-DKR-0003",
+    description: "[seed-demo] Mission de verification pour l equipe Dakar.",
+    meterSerialNumber: "MF-SN-DKR-0003",
+    assignedToUsername: "agent003",
+    createdByUsername: "supervisor002",
+    type: TaskType.METER_VERIFICATION,
+    status: TaskStatus.OPEN,
+    priority: TaskPriority.MEDIUM,
+    dueAt: "2026-03-21T15:00:00.000Z",
+  },
+];
+
 async function main() {
   for (const role of roles) {
     await prisma.role.upsert({
@@ -340,7 +530,444 @@ async function main() {
     }
   }
 
-  console.log("Seed complete: roles, permissions, users, meters and meter states inserted.");
+  const readingByKey = {};
+  for (const reading of demoReadings) {
+    const meter = meterBySerial[reading.meterSerialNumber];
+    const submittedBy = userByUsername[reading.submittedByUsername];
+    const reviewedBy = reading.reviewedByUsername ? userByUsername[reading.reviewedByUsername] : null;
+
+    if (!meter) {
+      throw new Error(`Missing meter for demo reading ${reading.key}: ${reading.meterSerialNumber}`);
+    }
+
+    if (!submittedBy) {
+      throw new Error(`Missing submittedBy user for demo reading ${reading.key}: ${reading.submittedByUsername}`);
+    }
+
+    const readingAt = new Date(reading.readingAt);
+    const existingReading = await prisma.reading.findFirst({
+      where: {
+        meterId: meter.id,
+        submittedById: submittedBy.id,
+        source: reading.source,
+        readingAt,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    const data = {
+      meterId: meter.id,
+      submittedById: submittedBy.id,
+      reviewedById: reviewedBy?.id ?? null,
+      source: reading.source,
+      status: reading.status,
+      readingAt,
+      primaryIndex: reading.primaryIndex,
+      secondaryIndex: reading.secondaryIndex ?? null,
+      imageUrl: reading.imageUrl,
+      imageMimeType: reading.imageMimeType,
+      imageSizeBytes: reading.imageSizeBytes,
+      gpsLatitude: reading.gpsLatitude,
+      gpsLongitude: reading.gpsLongitude,
+      gpsAccuracyMeters: reading.gpsAccuracyMeters,
+      reviewedAt: reading.reviewedAt ? new Date(reading.reviewedAt) : null,
+      flagReason: reading.flagReason ?? null,
+      rejectionReason: reading.rejectionReason ?? null,
+      deletedAt: null,
+    };
+
+    const savedReading = existingReading
+      ? await prisma.reading.update({
+          where: { id: existingReading.id },
+          data,
+        })
+      : await prisma.reading.create({
+          data,
+        });
+
+    readingByKey[reading.key] = savedReading;
+  }
+
+  const demoTaskTitles = demoTasks.map((task) => task.title);
+  const existingDemoTasks = await prisma.task.findMany({
+    where: {
+      title: { in: demoTaskTitles },
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      title: true,
+    },
+  });
+
+  const existingDemoTaskIds = existingDemoTasks.map((task) => task.id);
+  if (existingDemoTaskIds.length > 0) {
+    const existingEventIds = (
+      await prisma.taskEvent.findMany({
+        where: { taskId: { in: existingDemoTaskIds } },
+        select: { id: true },
+      })
+    ).map((event) => event.id);
+
+    if (existingEventIds.length > 0) {
+      await prisma.agentNotificationRead.deleteMany({
+        where: {
+          taskEventId: { in: existingEventIds },
+        },
+      });
+    }
+
+    await prisma.taskEvent.deleteMany({
+      where: { taskId: { in: existingDemoTaskIds } },
+    });
+    await prisma.taskAttachment.deleteMany({
+      where: { taskId: { in: existingDemoTaskIds } },
+    });
+    await prisma.taskComment.deleteMany({
+      where: { taskId: { in: existingDemoTaskIds } },
+    });
+    await prisma.taskItem.deleteMany({
+      where: { taskId: { in: existingDemoTaskIds } },
+    });
+  }
+
+  const taskByKey = {};
+  for (const task of demoTasks) {
+    const meter = meterBySerial[task.meterSerialNumber];
+    const assignedTo = userByUsername[task.assignedToUsername];
+    const createdBy = userByUsername[task.createdByUsername];
+    const startedBy = task.startedByUsername ? userByUsername[task.startedByUsername] : null;
+    const closedBy = task.closedByUsername ? userByUsername[task.closedByUsername] : null;
+    const reading = task.readingKey ? readingByKey[task.readingKey] : null;
+    const reportedReading = task.reportedReadingKey ? readingByKey[task.reportedReadingKey] : null;
+
+    if (!meter) {
+      throw new Error(`Missing meter for demo task ${task.key}: ${task.meterSerialNumber}`);
+    }
+
+    if (!assignedTo || !createdBy) {
+      throw new Error(`Missing users for demo task ${task.key}`);
+    }
+
+    const existingTask = await prisma.task.findFirst({
+      where: {
+        title: task.title,
+        assignedToId: assignedTo.id,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    const data = {
+      meterId: meter.id,
+      readingId: reading?.id ?? null,
+      reportedReadingId: reportedReading?.id ?? null,
+      assignedToId: assignedTo.id,
+      createdById: createdBy.id,
+      closedById: closedBy?.id ?? null,
+      startedById: startedBy?.id ?? null,
+      type: task.type,
+      status: task.status,
+      priority: task.priority,
+      resolutionCode: task.resolutionCode ?? null,
+      title: task.title,
+      description: task.description,
+      resolutionComment: task.resolutionComment ?? null,
+      dueAt: task.dueAt ? new Date(task.dueAt) : null,
+      startedAt: task.startedAt ? new Date(task.startedAt) : null,
+      fieldSubmittedAt: task.fieldSubmittedAt ? new Date(task.fieldSubmittedAt) : null,
+      closedAt: task.closedAt ? new Date(task.closedAt) : null,
+      fieldPrimaryIndex: task.fieldPrimaryIndex ?? null,
+      fieldSecondaryIndex: task.fieldSecondaryIndex ?? null,
+      fieldImageUrl: task.fieldImageUrl ?? null,
+      fieldImageHash: task.fieldImageHash ?? null,
+      fieldImageMimeType: task.fieldImageMimeType ?? null,
+      fieldImageSizeBytes: task.fieldImageSizeBytes ?? null,
+      fieldGpsLatitude: task.fieldGpsLatitude ?? null,
+      fieldGpsLongitude: task.fieldGpsLongitude ?? null,
+      fieldGpsAccuracyMeters: task.fieldGpsAccuracyMeters ?? null,
+      deletedAt: null,
+    };
+
+    const savedTask = existingTask
+      ? await prisma.task.update({
+          where: { id: existingTask.id },
+          data,
+        })
+      : await prisma.task.create({
+          data,
+        });
+
+    taskByKey[task.key] = savedTask;
+  }
+
+  await prisma.taskItem.createMany({
+    data: [
+      {
+        taskId: taskByKey["agent001-overdue-recheck"].id,
+        meterId: meterBySerial["MF-CG-BZV-0002"].id,
+        title: "Verifier la photo du client",
+        details: "Comparer la photo soumise et l etat reel du compteur.",
+        status: TaskItemStatus.TODO,
+        sortOrder: 1,
+      },
+      {
+        taskId: taskByKey["agent001-overdue-recheck"].id,
+        meterId: meterBySerial["MF-CG-BZV-0002"].id,
+        title: "Confirmer la position GPS sur site",
+        details: "Verifier la correspondance entre le compteur et les coordonnees.",
+        status: TaskItemStatus.TODO,
+        sortOrder: 2,
+      },
+      {
+        taskId: taskByKey["agent001-in-progress-verification"].id,
+        meterId: meterBySerial["MF-CG-BZV-0001"].id,
+        completedById: userByUsername.agent001.id,
+        title: "Prendre contact avec le client",
+        details: "Contact etabli pour le passage terrain.",
+        status: TaskItemStatus.DONE,
+        sortOrder: 1,
+        completedAt: new Date("2026-03-20T08:05:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-in-progress-verification"].id,
+        meterId: meterBySerial["MF-CG-BZV-0001"].id,
+        title: "Confirmer l index sur site",
+        details: "Comparer le releve saisi et la valeur observee.",
+        status: TaskItemStatus.TODO,
+        sortOrder: 2,
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        meterId: meterBySerial["MF-CG-BZV-0001"].id,
+        completedById: userByUsername.agent001.id,
+        title: "Reprendre une photo nette",
+        details: "Photo terrain capturee et archivee.",
+        status: TaskItemStatus.DONE,
+        sortOrder: 1,
+        completedAt: new Date("2026-03-18T10:32:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        meterId: meterBySerial["MF-CG-BZV-0001"].id,
+        completedById: userByUsername.agent001.id,
+        title: "Confirmer le nouvel index",
+        details: "Releve agent valide et transmis.",
+        status: TaskItemStatus.DONE,
+        sortOrder: 2,
+        completedAt: new Date("2026-03-18T10:50:00.000Z"),
+      },
+    ],
+  });
+
+  await prisma.taskComment.createMany({
+    data: [
+      {
+        taskId: taskByKey["agent001-overdue-recheck"].id,
+        userId: userByUsername.supervisor001.id,
+        comment: "Priorite haute. Le client a deja soumis un relevé incoherent.",
+        isInternal: true,
+        createdAt: new Date("2026-03-19T08:45:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-in-progress-verification"].id,
+        userId: userByUsername.agent001.id,
+        comment: "Passage planifie ce matin. Verification compteur en cours.",
+        isInternal: true,
+        createdAt: new Date("2026-03-20T08:10:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        userId: userByUsername.agent001.id,
+        comment: "Le compteur etait accessible. Nouvel index confirme sur site.",
+        isInternal: true,
+        createdAt: new Date("2026-03-18T10:54:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-blocked-fraud"].id,
+        userId: userByUsername.agent001.id,
+        comment: "Compteur ouvert. Besoin d une reprise superviseur.",
+        isInternal: true,
+        createdAt: new Date("2026-03-20T09:46:00.000Z"),
+      },
+    ],
+  });
+
+  await prisma.taskAttachment.createMany({
+    data: [
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        uploadedById: userByUsername.agent001.id,
+        fileUrl: "https://demo.meterflow.local/tasks/agent001-done-proof.jpg",
+        fileName: "agent001-done-proof.jpg",
+        mimeType: "image/jpeg",
+        fileHash: "seed-demo-agent001-done-proof",
+        fileSizeBytes: 244910,
+        createdAt: new Date("2026-03-18T10:50:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-blocked-fraud"].id,
+        uploadedById: userByUsername.agent001.id,
+        fileUrl: "https://demo.meterflow.local/tasks/agent001-blocked-proof.jpg",
+        fileName: "agent001-blocked-proof.jpg",
+        mimeType: "image/jpeg",
+        fileHash: "seed-demo-agent001-blocked-proof",
+        fileSizeBytes: 251004,
+        createdAt: new Date("2026-03-20T09:45:00.000Z"),
+      },
+    ],
+  });
+
+  const createdTaskEvents = [];
+  for (const event of [
+      {
+        taskId: taskByKey["agent001-overdue-recheck"].id,
+        actorUserId: userByUsername.supervisor001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-19T08:46:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-in-progress-verification"].id,
+        actorUserId: userByUsername.supervisor001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-19T17:20:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-in-progress-verification"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.STARTED,
+        payload: { source: "seed", previousStatus: TaskStatus.OPEN, nextStatus: TaskStatus.IN_PROGRESS },
+        createdAt: new Date("2026-03-20T08:00:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-open-today"].id,
+        actorUserId: userByUsername.supervisor001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-20T07:15:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        actorUserId: userByUsername.supervisor001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-18T09:10:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.STARTED,
+        payload: { source: "seed", previousStatus: TaskStatus.OPEN, nextStatus: TaskStatus.IN_PROGRESS },
+        createdAt: new Date("2026-03-18T10:20:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.FIELD_RESULT_SUBMITTED,
+        payload: { source: "seed", previousStatus: TaskStatus.IN_PROGRESS, nextStatus: TaskStatus.DONE, resolutionCode: TaskResolutionCode.READING_CONFIRMED },
+        createdAt: new Date("2026-03-18T10:50:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-done-confirmed"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.COMPLETED,
+        payload: { source: "seed", previousStatus: TaskStatus.IN_PROGRESS, nextStatus: TaskStatus.DONE },
+        createdAt: new Date("2026-03-18T10:55:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-blocked-fraud"].id,
+        actorUserId: userByUsername.supervisor001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-20T08:30:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-blocked-fraud"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.STARTED,
+        payload: { source: "seed", previousStatus: TaskStatus.OPEN, nextStatus: TaskStatus.IN_PROGRESS },
+        createdAt: new Date("2026-03-20T09:10:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-blocked-fraud"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.FIELD_RESULT_SUBMITTED,
+        payload: { source: "seed", previousStatus: TaskStatus.IN_PROGRESS, nextStatus: TaskStatus.BLOCKED, resolutionCode: TaskResolutionCode.ESCALATION_REQUIRED },
+        createdAt: new Date("2026-03-20T09:45:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent001-blocked-fraud"].id,
+        actorUserId: userByUsername.agent001.id,
+        recipientUserId: userByUsername.agent001.id,
+        type: TaskEventType.BLOCKED,
+        payload: { source: "seed", previousStatus: TaskStatus.IN_PROGRESS, nextStatus: TaskStatus.BLOCKED, resolutionCode: TaskResolutionCode.ESCALATION_REQUIRED },
+        createdAt: new Date("2026-03-20T09:47:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent002-open-check"].id,
+        actorUserId: userByUsername.supervisor001.id,
+        recipientUserId: userByUsername.agent002.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-20T11:15:00.000Z"),
+      },
+      {
+        taskId: taskByKey["agent003-open-check"].id,
+        actorUserId: userByUsername.supervisor002.id,
+        recipientUserId: userByUsername.agent003.id,
+        type: TaskEventType.ASSIGNED,
+        payload: { source: "seed", nextStatus: TaskStatus.OPEN },
+        createdAt: new Date("2026-03-20T11:40:00.000Z"),
+      },
+    ]) {
+    const createdEvent = await prisma.taskEvent.create({ data: event });
+    createdTaskEvents.push(createdEvent);
+  }
+
+  const eventIdByTaskAndType = Object.fromEntries(
+    createdTaskEvents.map((event) => [`${event.taskId}:${event.type}:${event.createdAt.toISOString()}`, event.id])
+  );
+
+  await prisma.agentNotificationRead.createMany({
+    data: [
+      {
+        userId: userByUsername.agent001.id,
+        taskEventId: eventIdByTaskAndType[`${taskByKey["agent001-done-confirmed"].id}:${TaskEventType.ASSIGNED}:2026-03-18T09:10:00.000Z`],
+        readAt: new Date("2026-03-18T09:20:00.000Z"),
+      },
+      {
+        userId: userByUsername.agent001.id,
+        taskEventId: eventIdByTaskAndType[`${taskByKey["agent001-done-confirmed"].id}:${TaskEventType.STARTED}:2026-03-18T10:20:00.000Z`],
+        readAt: new Date("2026-03-18T10:25:00.000Z"),
+      },
+      {
+        userId: userByUsername.agent001.id,
+        taskEventId: eventIdByTaskAndType[`${taskByKey["agent001-done-confirmed"].id}:${TaskEventType.FIELD_RESULT_SUBMITTED}:2026-03-18T10:50:00.000Z`],
+        readAt: new Date("2026-03-18T10:56:00.000Z"),
+      },
+      {
+        userId: userByUsername.agent001.id,
+        taskEventId: eventIdByTaskAndType[`${taskByKey["agent001-done-confirmed"].id}:${TaskEventType.COMPLETED}:2026-03-18T10:55:00.000Z`],
+        readAt: new Date("2026-03-18T10:57:00.000Z"),
+      },
+    ].filter((entry) => entry.taskEventId)
+  });
+
+  console.log("Seed complete: roles, permissions, users, meters, meter states, demo readings and demo tasks inserted.");
   console.log(`Demo password for all seeded users: ${DEMO_PASSWORD}`);
 }
 

@@ -9,7 +9,7 @@ import {
   generateTokenHash,
 } from "@/lib/auth/token";
 
-type LoginPlatform = "web" | "mobile";
+type LoginPlatform = "web" | "mobile" | "agent-mobile";
 type LoginIdentifierType = "phone" | "email" | "username";
 
 type LoginPayload = {
@@ -31,6 +31,11 @@ const WEB_ALLOWED_ROLES = new Set<UserRole>([
   UserRole.ADMIN,
 ]);
 const MOBILE_ALLOWED_ROLES = new Set<UserRole>([UserRole.CLIENT]);
+const AGENT_MOBILE_ALLOWED_ROLES = new Set<UserRole>([
+  UserRole.AGENT,
+  UserRole.SUPERVISOR,
+  UserRole.ADMIN,
+]);
 
 function normalizeIdentifier(identifier: string) {
   return identifier.trim();
@@ -85,6 +90,10 @@ export async function loginUser(payload: LoginPayload, options?: LoginOptions) {
 
   if (platform === "mobile" && !MOBILE_ALLOWED_ROLES.has(user.role)) {
     return { status: 403, body: { error: "role_not_allowed_for_mobile" } };
+  }
+
+  if (platform === "agent-mobile" && !AGENT_MOBILE_ALLOWED_ROLES.has(user.role)) {
+    return { status: 403, body: { error: "role_not_allowed_for_agent_mobile" } };
   }
 
   if (user.status !== "ACTIVE") {

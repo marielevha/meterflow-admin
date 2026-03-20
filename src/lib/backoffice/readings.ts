@@ -2,12 +2,14 @@ import {
   Prisma,
   ReadingEventType,
   ReadingStatus,
+  TaskEventType,
   TaskPriority,
   TaskStatus,
   TaskType,
   UserRole,
   UserStatus,
 } from "@prisma/client";
+import { createAgentTaskEvent } from "@/lib/agentMobile/notifications";
 import { prisma } from "@/lib/prisma";
 import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
 import {
@@ -497,6 +499,17 @@ export async function createReadingTask(
         userId: staff.id,
         type: ReadingEventType.TASK_CREATED,
         payload: { taskId: task.id, type, priority, assignedToId: assignedToId ?? null },
+      },
+    });
+
+    await createAgentTaskEvent(tx, {
+      taskId: task.id,
+      type: TaskEventType.ASSIGNED,
+      actorUserId: staff.id,
+      recipientUserId: assignedToId ?? null,
+      payload: {
+        source: "reading-review",
+        nextStatus: task.status,
       },
     });
 

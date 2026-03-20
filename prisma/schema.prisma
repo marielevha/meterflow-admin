@@ -84,6 +84,24 @@ enum TaskPriority {
   CRITICAL
 }
 
+enum TaskResolutionCode {
+  READING_CONFIRMED
+  READING_IMPOSSIBLE
+  METER_INACCESSIBLE
+  METER_DAMAGED_OR_MISSING
+  SUSPECTED_FRAUD
+  CUSTOMER_ABSENT
+  ESCALATION_REQUIRED
+}
+
+enum TaskEventType {
+  ASSIGNED
+  STARTED
+  BLOCKED
+  COMPLETED
+  FIELD_RESULT_SUBMITTED
+}
+
 enum TaskItemStatus {
   TODO
   DONE
@@ -191,6 +209,9 @@ model User {
   assignedTasks          Task[]               @relation("TaskAssignedTo")
   createdTasks           Task[]               @relation("TaskCreatedBy")
   closedTasks            Task[]               @relation("TaskClosedBy")
+  startedTasks           Task[]               @relation("TaskStartedBy")
+  taskEventsAsActor      TaskEvent[]          @relation("TaskEventActor")
+  taskEventsAsRecipient  TaskEvent[]          @relation("TaskEventRecipient")
   completedTaskItems     TaskItem[]           @relation("TaskItemCompletedBy")
   taskComments           TaskComment[]
   taskAttachments        TaskAttachment[]
@@ -209,6 +230,7 @@ model User {
   readingReminderLogs    ReadingReminderLog[]
   mobilePushDevices      MobilePushDevice[]
   mobileNotificationReads MobileNotificationRead[]
+  agentNotificationReads AgentNotificationRead[]
 
   @@index([role, status])
   @@index([deletedAt])
@@ -376,7 +398,8 @@ model Reading {
   reviewedBy        User?          @relation("ReadingReviewedBy", fields: [reviewedById], references: [id])
   events            ReadingEvent[]
   meterStates       MeterState[]
-  tasks             Task[]
+  tasks             Task[]           @relation("TaskSourceReading")
+  reportedTasks     Task[]           @relation("TaskReportedReading")
   taskItems         TaskItem[]
   invoices          Invoice[]      @relation("InvoiceSourceReading")
   fromInvoices      Invoice[]      @relation("InvoiceFromReading")
@@ -412,37 +435,80 @@ model ReadingEvent {
 }
 
 model Task {
-  id           String           @id @default(uuid()) @db.Uuid
-  meterId      String?          @map("meter_id") @db.Uuid
-  readingId    String?          @map("reading_id") @db.Uuid
-  assignedToId String?          @map("assigned_to_id") @db.Uuid
-  createdById  String?          @map("created_by_id") @db.Uuid
-  closedById   String?          @map("closed_by_id") @db.Uuid
-  type         TaskType         @default(GENERAL)
-  status       TaskStatus       @default(OPEN)
-  priority     TaskPriority     @default(MEDIUM)
-  title        String
-  description  String?
-  dueAt        DateTime?        @map("due_at")
-  closedAt     DateTime?        @map("closed_at")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-  deletedAt    DateTime?        @map("deleted_at")
-  meter        Meter?           @relation(fields: [meterId], references: [id])
-  reading      Reading?         @relation(fields: [readingId], references: [id])
-  assignedTo   User?            @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
-  createdBy    User?            @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  closedBy     User?            @relation("TaskClosedBy", fields: [closedById], references: [id])
-  items        TaskItem[]
-  comments     TaskComment[]
-  attachments  TaskAttachment[]
+  id                   String             @id @default(uuid()) @db.Uuid
+  meterId              String?            @map("meter_id") @db.Uuid
+  readingId            String?            @map("reading_id") @db.Uuid
+  reportedReadingId    String?            @map("reported_reading_id") @db.Uuid
+  assignedToId         String?            @map("assigned_to_id") @db.Uuid
+  createdById          String?            @map("created_by_id") @db.Uuid
+  closedById           String?            @map("closed_by_id") @db.Uuid
+  startedById          String?            @map("started_by_id") @db.Uuid
+  type                 TaskType           @default(GENERAL)
+  status               TaskStatus         @default(OPEN)
+  priority             TaskPriority       @default(MEDIUM)
+  resolutionCode       TaskResolutionCode? @map("resolution_code")
+  title                String
+  description          String?
+  resolutionComment    String?            @map("resolution_comment")
+  dueAt                DateTime?          @map("due_at")
+  startedAt            DateTime?          @map("started_at")
+  fieldSubmittedAt     DateTime?          @map("field_submitted_at")
+  closedAt             DateTime?          @map("closed_at")
+  fieldPrimaryIndex    Decimal?           @map("field_primary_index") @db.Decimal(14, 3)
+  fieldSecondaryIndex  Decimal?           @map("field_secondary_index") @db.Decimal(14, 3)
+  fieldImageUrl        String?            @map("field_image_url")
+  fieldImageHash       String?            @map("field_image_hash")
+  fieldImageMimeType   String?            @map("field_image_mime_type")
+  fieldImageSizeBytes  Int?               @map("field_image_size_bytes")
+  fieldGpsLatitude     Decimal?           @map("field_gps_latitude") @db.Decimal(10, 7)
+  fieldGpsLongitude    Decimal?           @map("field_gps_longitude") @db.Decimal(10, 7)
+  fieldGpsAccuracyMeters Decimal?         @map("field_gps_accuracy_meters") @db.Decimal(10, 2)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  deletedAt            DateTime?          @map("deleted_at")
+  meter                Meter?             @relation(fields: [meterId], references: [id])
+  reading              Reading?           @relation("TaskSourceReading", fields: [readingId], references: [id])
+  reportedReading      Reading?           @relation("TaskReportedReading", fields: [reportedReadingId], references: [id])
+  assignedTo           User?              @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdBy            User?              @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  closedBy             User?              @relation("TaskClosedBy", fields: [closedById], references: [id])
+  startedBy            User?              @relation("TaskStartedBy", fields: [startedById], references: [id])
+  items                TaskItem[]
+  comments             TaskComment[]
+  attachments          TaskAttachment[]
+  events               TaskEvent[]
 
   @@index([status, priority, dueAt])
   @@index([deletedAt, createdAt])
   @@index([assignedToId])
+  @@index([startedById])
   @@index([meterId, readingId])
+  @@index([reportedReadingId])
+  @@index([resolutionCode])
   @@index([deletedAt])
   @@map("tasks")
+}
+
+model TaskEvent {
+  id              String         @id @default(uuid()) @db.Uuid
+  taskId          String         @map("task_id") @db.Uuid
+  actorUserId     String?        @map("actor_user_id") @db.Uuid
+  recipientUserId String         @map("recipient_user_id") @db.Uuid
+  type            TaskEventType
+  payload         Json?          @default("{}")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
+  task            Task           @relation(fields: [taskId], references: [id])
+  actorUser       User?          @relation("TaskEventActor", fields: [actorUserId], references: [id])
+  recipientUser   User           @relation("TaskEventRecipient", fields: [recipientUserId], references: [id])
+  notificationReads AgentNotificationRead[]
+
+  @@index([taskId, createdAt])
+  @@index([recipientUserId, createdAt])
+  @@index([actorUserId])
+  @@index([deletedAt])
+  @@map("task_events")
 }
 
 model TaskItem {
@@ -851,4 +917,20 @@ model MobileNotificationRead {
   @@index([userId, readAt])
   @@index([readingEventId])
   @@map("mobile_notification_reads")
+}
+
+model AgentNotificationRead {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  taskEventId String    @map("task_event_id") @db.Uuid
+  readAt      DateTime  @default(now()) @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  user        User      @relation(fields: [userId], references: [id])
+  taskEvent    TaskEvent @relation(fields: [taskEventId], references: [id])
+
+  @@unique([userId, taskEventId])
+  @@index([userId, readAt])
+  @@index([taskEventId])
+  @@map("agent_notification_reads")
 }

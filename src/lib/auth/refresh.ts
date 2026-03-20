@@ -10,8 +10,11 @@ import {
 
 type RefreshPayload = {
   refreshToken: string;
-  platform?: "mobile" | "web";
+  platform?: "mobile" | "web" | "agent-mobile";
 };
+
+const WEB_ALLOWED_ROLES = [UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN] as const;
+const AGENT_MOBILE_ALLOWED_ROLES = [UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN] as const;
 
 export async function refreshSession(payload: RefreshPayload) {
   const refreshToken = payload.refreshToken?.trim();
@@ -84,7 +87,9 @@ export async function refreshSession(payload: RefreshPayload) {
   if (
     (platform === "mobile" && user.role !== UserRole.CLIENT) ||
     (platform === "web" &&
-      ![UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN].includes(user.role))
+      !WEB_ALLOWED_ROLES.includes(user.role)) ||
+    (platform === "agent-mobile" &&
+      !AGENT_MOBILE_ALLOWED_ROLES.includes(user.role))
   ) {
     return {
       status: 403,
@@ -92,7 +97,9 @@ export async function refreshSession(payload: RefreshPayload) {
         error:
           platform === "mobile"
             ? "role_not_allowed_for_mobile"
-            : "role_not_allowed_for_web",
+            : platform === "agent-mobile"
+              ? "role_not_allowed_for_agent_mobile"
+              : "role_not_allowed_for_web",
       },
     };
   }

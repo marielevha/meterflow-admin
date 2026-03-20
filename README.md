@@ -678,6 +678,135 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - les profils `AGENT`, `SUPERVISOR` et `ADMIN` ne peuvent plus ouvrir de session dans cette app
   - cette separation prepare la future app mobile dediee aux agents sans dupliquer tout le backend
 
+### 26) App mobile agent, missions terrain et notifications dediees
+
+- Nouvelle application mobile agent:
+  - ajout de `mobileapp/agent-app`
+  - reprise des briques communes de l'app client:
+    - splash
+    - onboarding
+    - profil
+    - parametres
+    - notifications
+    - topbar / drawer / theme / i18n
+  - variable d'environnement unifiee:
+    - `EXPO_PUBLIC_API_BASE_URL`
+
+- Authentification mobile agent branchee au backend:
+  - nouvelles routes:
+    - `POST /api/v1/agent-mobile/auth/login`
+    - `POST /api/v1/agent-mobile/auth/refresh`
+    - `POST /api/v1/agent-mobile/auth/signup`
+    - `POST /api/v1/agent-mobile/auth/activate`
+    - `POST /api/v1/agent-mobile/auth/resend-otp`
+    - `POST /api/v1/agent-mobile/auth/forgot-password/request`
+    - `POST /api/v1/agent-mobile/auth/forgot-password/confirm`
+  - profil agent:
+    - `GET /api/v1/agent-mobile/me`
+    - `PATCH /api/v1/agent-mobile/me`
+    - `PATCH /api/v1/agent-mobile/me/password`
+  - l'app agent accepte les profils staff (`AGENT`, `SUPERVISOR`, `ADMIN`)
+  - l'app client reste reservee aux `CLIENT`
+
+- Ecrans de base disponibles dans l'app agent:
+  - login, inscription, activation OTP, reset password
+  - home agent
+  - missions
+  - detail mission
+  - rapport terrain
+  - notifications
+  - profil
+  - parametres
+  - a propos
+
+- Missions assignees cote agent:
+  - liste backend:
+    - `GET /api/v1/agent-mobile/tasks`
+  - detail backend:
+    - `GET /api/v1/agent-mobile/tasks/:id`
+  - vues metier disponibles:
+    - missions du jour
+    - missions en retard
+    - missions en cours
+    - missions terminees
+  - filtre par statut/vue dans l'app mobile
+  - la home agent repose maintenant sur ce dashboard missions
+
+- Actions terrain sur mission:
+  - demarrage mission:
+    - `POST /api/v1/agent-mobile/tasks/:id/start`
+  - transition rapide:
+    - `POST /api/v1/agent-mobile/tasks/:id/transition`
+    - actions mobiles:
+      - `Demarrer`
+      - `Bloquer`
+      - `Terminer`
+  - rapport terrain complet:
+    - photo
+    - GPS
+    - index principal / secondaire si necessaire
+    - commentaire
+    - issue terrain
+    - `POST /api/v1/agent-mobile/tasks/:id/result`
+  - upload agent simplifie via backend:
+    - `POST /api/v1/agent-mobile/uploads`
+
+- Resultats terrain pris en charge:
+  - releve confirme
+  - releve impossible
+  - compteur inaccessible
+  - compteur absent ou endommage
+  - fraude suspectee
+  - client absent
+  - besoin d'escalade
+  - si l'issue est `READING_CONFIRMED`, un releve agent valide est cree cote backend
+
+- Nouvelles donnees metier pour les missions:
+  - migration `20260320110000_add_task_field_reports`
+  - ajout des champs:
+    - `startedAt`
+    - `startedById`
+    - `resolutionCode`
+    - `resolutionComment`
+    - donnees GPS / photo / index du rapport
+    - `reportedReadingId`
+
+- Notifications agent reelles:
+  - nouvelles routes:
+    - `GET /api/v1/agent-mobile/notifications`
+    - `PATCH /api/v1/agent-mobile/notifications`
+  - pagination, non lu, `Tout marquer comme lu`
+  - badge non lu dans la topbar et le drawer
+  - les actions terrain alimentent maintenant les notifications agent
+  - creation d'evenements mission pour:
+    - assignation
+    - demarrage
+    - blocage
+    - cloture
+    - envoi du rapport terrain
+
+- Evolution du schema pour les notifications agent:
+  - migration `20260320124500_add_agent_task_notifications`
+  - ajout de:
+    - `TaskEvent`
+    - `TaskEventType`
+    - `AgentNotificationRead`
+
+- Seeds de demo enrichis:
+  - donnees de test pour `agent001`
+  - missions variees
+  - timeline / commentaires / pieces jointes
+  - evenements de mission
+  - notifications lues / non lues
+  - utile pour tester sans reconstruire tout le workflow a la main
+
+- Finition UX agent:
+  - page `A propos` ajoutee a l'app agent
+  - simplification des ecrans de permissions camera / localisation
+  - correction des affichages GPS quand les coordonnees sont nulles ou mal formees
+  - mode sombre ajuste sur les boutons et elements principaux
+  - champ de login simplifie sur l'app agent: `Username`
+
 
 ## Overview
 

@@ -1,6 +1,7 @@
 import {
   Prisma,
   ReadingEventType,
+  TaskEventType,
   TaskItemStatus,
   TaskPriority,
   TaskStatus,
@@ -8,6 +9,7 @@ import {
   UserRole,
   UserStatus,
 } from "@prisma/client";
+import { createAgentTaskEvent } from "@/lib/agentMobile/notifications";
 import { prisma } from "@/lib/prisma";
 import { isTaskTransitionAllowed } from "@/lib/workflows/stateMachines";
 
@@ -400,6 +402,19 @@ export async function createTask(staff: StaffUser, payload: CreateTaskPayload) {
     },
   );
 
+  if (assignee?.id) {
+    await createAgentTaskEvent(prisma, {
+      taskId: created.id,
+      type: TaskEventType.ASSIGNED,
+      actorUserId: staff.id,
+      recipientUserId: assignee.id,
+      payload: {
+        source: "backoffice",
+        nextStatus: created.status,
+      },
+    });
+  }
+
   return { status: 201, body: { message: "task_created", task: created } };
 }
 
@@ -475,23 +490,41 @@ export async function getTaskDetail(staff: StaffUser, taskId: string) {
       id: true,
       meterId: true,
       readingId: true,
+      reportedReadingId: true,
       assignedToId: true,
       createdById: true,
       closedById: true,
+      startedById: true,
       type: true,
       status: true,
       priority: true,
+      resolutionCode: true,
       title: true,
       description: true,
+      resolutionComment: true,
       dueAt: true,
+      startedAt: true,
+      fieldSubmittedAt: true,
       closedAt: true,
+      fieldPrimaryIndex: true,
+      fieldSecondaryIndex: true,
+      fieldImageUrl: true,
+      fieldImageHash: true,
+      fieldImageMimeType: true,
+      fieldImageSizeBytes: true,
+      fieldGpsLatitude: true,
+      fieldGpsLongitude: true,
+      fieldGpsAccuracyMeters: true,
       createdAt: true,
       updatedAt: true,
       meter: {
         select: {
           id: true,
+          type: true,
           serialNumber: true,
           meterReference: true,
+          addressLine1: true,
+          addressLine2: true,
           city: true,
           zone: true,
           customer: {
@@ -508,7 +541,26 @@ export async function getTaskDetail(staff: StaffUser, taskId: string) {
           secondaryIndex: true,
         },
       },
+      reportedReading: {
+        select: {
+          id: true,
+          status: true,
+          readingAt: true,
+          primaryIndex: true,
+          secondaryIndex: true,
+        },
+      },
       assignedTo: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          username: true,
+          role: true,
+          phone: true,
+        },
+      },
+      startedBy: {
         select: {
           id: true,
           firstName: true,
@@ -738,6 +790,45 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
       dueAt: updated.dueAt?.toISOString() || null,
     },
   );
+
+  if (updated.assignedToId && updated.assignedToId !== existing.assignedToId) {
+    await createAgentTaskEvent(prisma, {
+      taskId: updated.id,
+      type: TaskEventType.ASSIGNED,
+      actorUserId: staff.id,
+      recipientUserId: updated.assignedToId,
+      payload: {
+        source: "backoffice",
+        previousStatus: existing.status,
+        nextStatus: updated.status,
+      },
+    });
+  }
+
+  if (payload.status && updated.assignedToId) {
+    const eventType =
+      updated.status === TaskStatus.BLOCKED
+        ? TaskEventType.BLOCKED
+        : updated.status === TaskStatus.DONE
+          ? TaskEventType.COMPLETED
+          : updated.status === TaskStatus.IN_PROGRESS
+            ? TaskEventType.STARTED
+            : null;
+
+    if (eventType) {
+      await createAgentTaskEvent(prisma, {
+        taskId: updated.id,
+        type: eventType,
+        actorUserId: staff.id,
+        recipientUserId: updated.assignedToId,
+        payload: {
+          source: "backoffice",
+          previousStatus: existing.status,
+          nextStatus: updated.status,
+        },
+      });
+    }
+  }
 
   return { status: 200, body: { message: "task_updated", task: updated } };
 }
