@@ -2,30 +2,32 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { API_BASE_URL } from '@/lib/api/config';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { getClientReadingDetail, type MobileReadingDetail } from '@/lib/api/mobile-readings';
-import {
-  getClientReviewDecisionMessage,
-  getClientReviewDecisionTitle,
-  humanizeReadingStatus,
-} from '@/lib/readings/review-reasons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSafePush } from '@/hooks/use-safe-push';
+import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function ReadingDetailScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; notificationId?: string }>();
   const { session, logout } = useMobileSession();
+  const { markNotificationsRead } = useMobileNotifications();
+  const { safePush } = useSafePush();
   const [reading, setReading] = useState<MobileReadingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const notificationId =
+    typeof params.notificationId === 'string' ? params.notificationId : null;
 
   useEffect(() => {
     let active = true;
@@ -46,9 +48,9 @@ export default function ReadingDetailScreen() {
         setReading(result.reading);
       } catch (loadError) {
         if (!active) return;
-        const message = loadError instanceof Error ? loadError.message : 'Impossible de charger le détail.';
+        const message = toMobileErrorMessage(loadError, 'Impossible de charger le détail.');
         setError(message);
-        if (message.includes('Session invalide')) {
+        if (isMobileAuthError(loadError)) {
           await logout();
         }
       } finally {
@@ -65,6 +67,14 @@ export default function ReadingDetailScreen() {
     };
   }, [logout, params.id]);
 
+  useEffect(() => {
+    if (!notificationId) {
+      return;
+    }
+
+    void markNotificationsRead([notificationId]);
+  }, [markNotificationsRead, notificationId]);
+
   return (
     <RequireMobileAuth>
       <AppPage
@@ -80,7 +90,7 @@ export default function ReadingDetailScreen() {
           <StateCard text="Relevé introuvable." color={palette.muted} palette={palette} />
         ) : (
           <>
-            {reading.status === 'VALIDATED' || reading.flagReason || reading.rejectionReason ? (
+            {reading.status !== 'PENDING' ? (
               <View
                 style={[
                   styles.card,
@@ -88,20 +98,20 @@ export default function ReadingDetailScreen() {
                     backgroundColor:
                       reading.status === 'REJECTED'
                         ? '#fff0ef'
-                        : reading.status === 'FLAGGED'
+                        : reading.status === 'FLAGGED' || reading.status === 'RESUBMISSION_REQUESTED'
                           ? '#fff6e7'
                           : palette.surface,
                     borderColor:
                       reading.status === 'REJECTED'
                         ? '#efc0bb'
-                        : reading.status === 'FLAGGED'
+                        : reading.status === 'FLAGGED' || reading.status === 'RESUBMISSION_REQUESTED'
                           ? '#f3c98b'
                           : palette.border,
                   },
                 ]}>
                 <Text style={[styles.sectionTitle, { color: palette.headline }]}>Décision agent</Text>
                 <Text style={[styles.decisionTitle, { color: palette.headline }]}>
-                  {getClientReviewDecisionTitle(reading.status, reading.flagReason || reading.rejectionReason)}
+                  {reading.decisionTitle || reading.statusLabel || '--'}
                 </Text>
                 <Text
                   style={[
@@ -110,13 +120,31 @@ export default function ReadingDetailScreen() {
                       color:
                         reading.status === 'REJECTED'
                           ? '#8f443a'
-                          : reading.status === 'FLAGGED'
+                          : reading.status === 'FLAGGED' || reading.status === 'RESUBMISSION_REQUESTED'
                             ? '#9a6514'
                             : palette.muted,
                     },
                   ]}>
-                  {getClientReviewDecisionMessage(reading.status, reading.flagReason || reading.rejectionReason)}
+                  {reading.decisionMessage || 'Une mise à jour est disponible pour ce relevé.'}
                 </Text>
+                {reading.canResubmit ? (
+                  <Pressable
+                    onPress={() =>
+                      safePush({
+                        pathname: '/(tabs)/readings',
+                        params: {
+                          resubmitReadingId: reading.id,
+                          meterId: reading.meterId,
+                        },
+                      })
+                    }
+                    style={[styles.resubmitButton, { backgroundColor: '#ffffffa8' }]}>
+                    <Ionicons name="camera-outline" size={16} color={palette.primary} />
+                    <Text style={[styles.resubmitButtonText, { color: palette.primary }]}>
+                      Refaire le relevé
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
 
@@ -126,7 +154,7 @@ export default function ReadingDetailScreen() {
                 {reading.meter.city} / {reading.meter.zone}
               </Text>
               <View style={styles.infoRow}>
-                <InfoItem label="Statut" value={humanizeReadingStatus(reading.status)} palette={palette} />
+                <InfoItem label="Statut" value={reading.statusLabel || '--'} palette={palette} />
                 <InfoItem label="Index" value={String(reading.primaryIndex ?? '--')} palette={palette} />
               </View>
               <View style={styles.infoRow}>
@@ -408,6 +436,20 @@ const styles = StyleSheet.create({
   decisionMessage: {
     fontSize: 14,
     lineHeight: 21,
+  },
+  resubmitButton: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  resubmitButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   eventsStack: {
     gap: 10,

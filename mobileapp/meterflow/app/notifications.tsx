@@ -1,85 +1,218 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
+import { AppStateCard } from '@/components/app/app-state-card';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { listClientNotifications, type MobileNotification } from '@/lib/api/mobile-notifications';
-import { humanizeReadingStatus } from '@/lib/readings/review-reasons';
+import { useI18n } from '@/hooks/use-i18n';
+import { useSafePush } from '@/hooks/use-safe-push';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
+import {
+  listClientNotifications,
+  type MobileNotification,
+} from '@/lib/api/mobile-notifications';
+import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
+
+const NOTIFICATIONS_PAGE_SIZE = 20;
 
 export default function NotificationsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const { logout } = useMobileSession();
+  const { unreadCount, markNotificationsRead } = useMobileNotifications();
+  const { safePush } = useSafePush();
   const [notifications, setNotifications] = useState<MobileNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadNotifications() {
-      setLoading(true);
-      setError(null);
+  const loadNotifications = useCallback(
+    async ({
+      activeRef = { current: true },
+      cursor,
+      append = false,
+    }: {
+      activeRef?: { current: boolean };
+      cursor?: string | null;
+      append?: boolean;
+    } = {}) => {
+      if (append) {
+        setLoadingMore(true);
+        setLoadMoreError(null);
+      } else {
+        setLoading(true);
+        setError(null);
+        setLoadMoreError(null);
+      }
 
       try {
-        const result = await listClientNotifications();
-        if (!active) return;
-        setNotifications(result.notifications);
+        const result = await listClientNotifications({
+          limit: NOTIFICATIONS_PAGE_SIZE,
+          cursor: cursor ?? undefined,
+        });
+        if (!activeRef.current) return;
+        setNotifications((current) => {
+          if (!append) {
+            return result.notifications;
+          }
+
+          const seenIds = new Set(current.map((notification) => notification.id));
+          const nextItems = result.notifications.filter((notification) => !seenIds.has(notification.id));
+          return [...current, ...nextItems];
+        });
+        setHasMore(result.hasMore);
+        setNextCursor(result.nextCursor);
       } catch (loadError) {
-        if (!active) return;
-        const message = loadError instanceof Error ? loadError.message : 'Impossible de charger les notifications.';
-        setError(message);
-        if (message.includes('Session invalide')) {
+        if (!activeRef.current) return;
+        const message = toMobileErrorMessage(loadError, t('notifications.unavailableTitle'));
+        if (append) {
+          setLoadMoreError(message);
+        } else {
+          setError(message);
+        }
+        if (isMobileAuthError(loadError)) {
           await logout();
         }
       } finally {
-        if (active) {
-          setLoading(false);
+        if (activeRef.current) {
+          if (append) {
+            setLoadingMore(false);
+          } else {
+            setLoading(false);
+          }
         }
       }
+    },
+    [logout, t]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const activeRef = { current: true };
+      void loadNotifications({ activeRef });
+
+      return () => {
+        activeRef.current = false;
+      };
+    }, [loadNotifications])
+  );
+
+  async function handleLoadMore() {
+    if (loading || loadingMore || !hasMore || !nextCursor) {
+      return;
     }
 
-    void loadNotifications();
+    await loadNotifications({ cursor: nextCursor, append: true });
+  }
 
-    return () => {
-      active = false;
-    };
-  }, [logout]);
+  async function handleMarkAllRead() {
+    if (notifications.length === 0 || markingAllRead) {
+      return;
+    }
+
+    setMarkingAllRead(true);
+
+    try {
+      await markNotificationsRead();
+      setNotifications((current) =>
+        current.map((notification) => ({
+          ...notification,
+          isRead: true,
+          readAt: notification.readAt ?? new Date().toISOString(),
+        }))
+      );
+    } catch (error) {
+      setError(toMobileErrorMessage(error, t('notifications.unavailableTitle')));
+    } finally {
+      setMarkingAllRead(false);
+    }
+  }
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Notifications" subtitle="Mises à jour de vos relevés" topBarMode="back" backHref="/(tabs)">
+      <AppPage
+        title={t('common.notifications')}
+        subtitle={t('notifications.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)">
+        {!loading && !error && notifications.length > 0 && unreadCount > 0 ? (
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => void handleMarkAllRead()}
+              disabled={markingAllRead}
+              style={[
+                styles.markAllButton,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                  opacity: markingAllRead ? 0.6 : 1,
+                },
+              ]}>
+              <Ionicons
+                name={markingAllRead ? 'hourglass-outline' : 'checkmark-done-outline'}
+                size={16}
+                color={palette.accent}
+              />
+              <Text style={[styles.markAllButtonText, { color: palette.primary }]}>
+                {t('notifications.markAllRead')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {loading ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
         ) : error ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="cloud-offline-outline"
+            title={t('notifications.unavailableTitle')}
+            description={error}
+            tone="danger"
+            actionLabel={t('common.retry')}
+            onActionPress={() => void loadNotifications()}
+          />
         ) : notifications.length === 0 ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <View style={[styles.emptyIconWrap, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Ionicons name="notifications-off-outline" size={22} color={palette.icon} />
-            </View>
-            <Text style={[styles.stateTitle, { color: palette.headline }]}>Aucune notification pour le moment</Text>
-            <Text style={[styles.stateText, { color: palette.muted }]}>
-              Les décisions sur vos relevés apparaîtront ici avec des messages plus clairs.
-            </Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="notifications-off-outline"
+            title={t('notifications.emptyTitle')}
+            description={t('notifications.emptyDescription')}
+          />
         ) : (
           <View style={styles.stack}>
             {notifications.map((notification) => (
               <Pressable
                 key={notification.id}
-                onPress={() => router.push(`/readings/${notification.readingId}`)}
-                style={[styles.notificationCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                onPress={() =>
+                  safePush({
+                    pathname: '/readings/[id]',
+                    params: {
+                      id: notification.readingId,
+                      notificationId: notification.id,
+                    },
+                  })
+                }
+                style={[
+                  styles.notificationCard,
+                  {
+                    backgroundColor: notification.isRead ? palette.surface : palette.surfaceMuted,
+                    borderColor: notification.isRead ? palette.border : `${palette.accent}33`,
+                  },
+                ]}>
                 <View
                   style={[
                     styles.notificationIconWrap,
@@ -98,23 +231,66 @@ export default function NotificationsScreen() {
                       {notification.title}
                     </Text>
                     <Text style={[styles.notificationDate, { color: palette.muted }]}>
-                      {formatDisplayDate(notification.createdAt)}
+                      {formatDisplayDate(notification.createdAt, locale)}
                     </Text>
                   </View>
 
-                  <Text style={[styles.notificationText, { color: palette.muted }]}>{notification.body}</Text>
+                  <Text style={[styles.notificationText, { color: palette.muted }]}>
+                    {notification.body}
+                  </Text>
 
                   <View style={styles.notificationFooter}>
                     <Text style={[styles.meterText, { color: palette.headline }]}>
                       {notification.meterSerialNumber}
                     </Text>
-                    <Text style={[styles.statusText, { color: notificationTone(notification.status, palette).textColor }]}>
-                      {humanizeReadingStatus(notification.status)}
-                    </Text>
+
+                    <View style={styles.notificationStatusGroup}>
+                      {!notification.isRead ? (
+                        <View style={[styles.unreadDot, { backgroundColor: palette.accent }]} />
+                      ) : null}
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: notificationTone(notification.status, palette).textColor },
+                        ]}>
+                        {notification.statusLabel || '--'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </Pressable>
             ))}
+
+            {hasMore ? (
+              <View style={styles.loadMoreSection}>
+                {loadingMore ? (
+                  <View style={styles.loadMoreLoading}>
+                    <CircularLoading palette={palette} size={40} />
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => void handleLoadMore()}
+                    style={[
+                      styles.loadMoreButton,
+                      {
+                        backgroundColor: palette.surface,
+                        borderColor: palette.border,
+                      },
+                    ]}>
+                    <Text style={[styles.loadMoreButtonText, { color: palette.primary }]}>
+                      {t('notifications.loadMore')}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={palette.accent} />
+                  </Pressable>
+                )}
+
+                {loadMoreError ? (
+                  <Text style={[styles.loadMoreErrorText, { color: palette.danger }]}>
+                    {loadMoreError}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         )}
       </AppPage>
@@ -132,7 +308,7 @@ function notificationTone(status: string, palette: (typeof Colors)['light']) {
     };
   }
 
-  if (status === 'FLAGGED') {
+  if (status === 'FLAGGED' || status === 'RESUBMISSION_REQUESTED') {
     return {
       icon: 'alert-circle-outline' as const,
       iconWrap: { backgroundColor: '#fff6e7' },
@@ -149,10 +325,10 @@ function notificationTone(status: string, palette: (typeof Colors)['light']) {
   };
 }
 
-function formatDisplayDate(value: string) {
+function formatDisplayDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleString('fr-FR', {
+  return date.toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -161,6 +337,22 @@ function formatDisplayDate(value: string) {
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    alignItems: 'flex-end',
+  },
+  markAllButton: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  markAllButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
   loadingWrap: {
     minHeight: 240,
     alignItems: 'center',
@@ -168,6 +360,34 @@ const styles = StyleSheet.create({
   },
   stack: {
     gap: 12,
+  },
+  loadMoreSection: {
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 4,
+  },
+  loadMoreLoading: {
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreButton: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadMoreButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  loadMoreErrorText: {
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   notificationCard: {
     borderWidth: 1,
@@ -218,33 +438,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  notificationStatusGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
   statusText: {
     fontSize: 12,
     fontWeight: '800',
-  },
-  stateCard: {
-    borderWidth: 1,
-    borderRadius: 24,
-    padding: 22,
-    gap: 12,
-    alignItems: 'center',
-  },
-  emptyIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  stateTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  stateText: {
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
   },
 });

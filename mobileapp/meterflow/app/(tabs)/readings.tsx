@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as Location from 'expo-location';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,9 +21,11 @@ import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AuthInput } from '@/components/auth/auth-input';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSafePush } from '@/hooks/use-safe-push';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
 import { getMobileAppConfig } from '@/lib/api/mobile-app-config';
-import { createClientReading } from '@/lib/api/mobile-readings';
+import { createClientReading, resubmitClientReading } from '@/lib/api/mobile-readings';
 import { uploadReadingPhoto } from '@/lib/api/mobile-uploads';
 import { useMobileDrawer } from '@/providers/mobile-drawer-provider';
 import { useMobilePreferences } from '@/providers/mobile-preferences-provider';
@@ -34,17 +36,25 @@ type Step = 'capture' | 'preview' | 'details';
 type CapturedReadingPhoto = {
   uri: string;
   capturedAt: string;
-  gpsLatitude: number;
-  gpsLongitude: number;
+  gpsLatitude: number | null;
+  gpsLongitude: number | null;
+  gpsAccuracyMeters: number | null;
+};
+
+type CapturedReadingPhotoLocation = {
+  gpsLatitude: number | null;
+  gpsLongitude: number | null;
   gpsAccuracyMeters: number | null;
 };
 
 export default function ReadingsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const params = useLocalSearchParams<{ resubmitReadingId?: string; meterId?: string }>();
   const { openDrawer } = useMobileDrawer();
   const { preferences } = useMobilePreferences();
   const { session, logout } = useMobileSession();
+  const { safePush } = useSafePush();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView | null>(null);
   const [step, setStep] = useState<Step>('capture');
@@ -58,9 +68,18 @@ export default function ReadingsScreen() {
   const [selectedMeterId, setSelectedMeterId] = useState<string | null>(null);
   const [primaryIndex, setPrimaryIndex] = useState('');
   const [secondaryIndex, setSecondaryIndex] = useState('');
+  const [requireGpsForReading, setRequireGpsForReading] = useState(true);
   const [gpsThresholdMeters, setGpsThresholdMeters] = useState(200);
+  const [maxImageSizeMb, setMaxImageSizeMb] = useState(8);
+  const resubmitReadingId =
+    typeof params.resubmitReadingId === 'string' ? params.resubmitReadingId : null;
+  const forcedMeterId = typeof params.meterId === 'string' ? params.meterId : null;
+  const isResubmissionFlow = Boolean(resubmitReadingId);
 
   const selectedMeter = meters.find((meter) => meter.id === selectedMeterId) ?? null;
+  const isResubmissionMeterLocked =
+    isResubmissionFlow && Boolean(forcedMeterId) && Boolean(selectedMeter);
+  const selectableMeters = isResubmissionMeterLocked && selectedMeter ? [selectedMeter] : meters;
   const mobileGpsDistanceMeters =
     selectedMeter && capturedPhoto
       ? calculateGpsDistanceMeters(
@@ -73,10 +92,8 @@ export default function ReadingsScreen() {
   const gpsDistanceWarning =
     mobileGpsDistanceMeters !== null && mobileGpsDistanceMeters > gpsThresholdMeters;
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadMeters() {
+  const loadMeters = useCallback(
+    async (activeRef: { current: boolean } = { current: true }) => {
       if (!session?.accessToken) {
         setLoadingMeters(false);
         return;
@@ -87,29 +104,41 @@ export default function ReadingsScreen() {
 
       try {
         const result = await listClientMeters(session.accessToken);
-        if (!active) return;
+        if (!activeRef.current) return;
         setMeters(result.meters);
-        setSelectedMeterId((current) => current ?? result.meters[0]?.id ?? null);
+        setSelectedMeterId((current) => {
+          if (current && result.meters.some((meter) => meter.id === current)) {
+            return current;
+          }
+          if (forcedMeterId && result.meters.some((meter) => meter.id === forcedMeterId)) {
+            return forcedMeterId;
+          }
+          return result.meters[0]?.id ?? null;
+        });
       } catch (loadError) {
-        if (!active) return;
-        const message = loadError instanceof Error ? loadError.message : 'Impossible de charger les compteurs.';
+        if (!activeRef.current) return;
+        const message = toMobileErrorMessage(loadError, 'Impossible de charger les compteurs.');
         setMetersError(message);
-        if (message.includes('Session invalide')) {
+        if (isMobileAuthError(loadError)) {
           await logout();
         }
       } finally {
-        if (active) {
+        if (activeRef.current) {
           setLoadingMeters(false);
         }
       }
-    }
+    },
+    [forcedMeterId, logout, session?.accessToken]
+  );
 
-    void loadMeters();
+  useEffect(() => {
+    const activeRef = { current: true };
+    void loadMeters(activeRef);
 
     return () => {
-      active = false;
+      activeRef.current = false;
     };
-  }, [logout, session?.accessToken]);
+  }, [loadMeters]);
 
   useEffect(() => {
     let active = true;
@@ -118,8 +147,12 @@ export default function ReadingsScreen() {
       try {
         const result = await getMobileAppConfig();
         if (!active) return;
+        setRequireGpsForReading(result.config.requireGpsForReading);
         if (typeof result.config.maxGpsDistanceMeters === 'number' && result.config.maxGpsDistanceMeters > 0) {
           setGpsThresholdMeters(result.config.maxGpsDistanceMeters);
+        }
+        if (typeof result.config.maxImageSizeMb === 'number' && result.config.maxImageSizeMb > 0) {
+          setMaxImageSizeMb(result.config.maxImageSizeMb);
         }
       } catch {
         if (!active) return;
@@ -142,42 +175,63 @@ export default function ReadingsScreen() {
 
     try {
       const locationPermission = await Location.requestForegroundPermissionsAsync();
-      if (!locationPermission.granted) {
-        Alert.alert('Position requise', 'Autorise la localisation pour joindre les coordonnées GPS au relevé.');
+      if (!locationPermission.granted && requireGpsForReading) {
+        Alert.alert(
+          'Position requise',
+          'Autorise la localisation pour joindre les coordonnées GPS au relevé avant de continuer.'
+        );
         return;
       }
 
-      const [photo, position] = await Promise.all([
+      const [photo, location] = await Promise.all([
         cameraRef.current.takePictureAsync({
           quality: 0.82,
           shutterSound: false,
         }),
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        }),
+        locationPermission.granted
+          ? getReadingLocationWithTimeout()
+          : Promise.resolve<CapturedReadingPhotoLocation>({
+              gpsLatitude: null,
+              gpsLongitude: null,
+              gpsAccuracyMeters: null,
+            }),
       ]);
 
       if (!photo?.uri) {
         throw new Error('photo_missing');
       }
 
+      if (requireGpsForReading && (location.gpsLatitude === null || location.gpsLongitude === null)) {
+        Alert.alert(
+          'Position indisponible',
+          'Nous n’avons pas pu récupérer votre position. Active la localisation puis réessaie.'
+        );
+        return;
+      }
+
       setCapturedPhoto({
         uri: photo.uri,
         capturedAt: new Date().toISOString(),
-        gpsLatitude: position.coords.latitude,
-        gpsLongitude: position.coords.longitude,
-        gpsAccuracyMeters:
-          typeof position.coords.accuracy === 'number' ? position.coords.accuracy : null,
+        gpsLatitude: location.gpsLatitude,
+        gpsLongitude: location.gpsLongitude,
+        gpsAccuracyMeters: location.gpsAccuracyMeters,
       });
       setStep('preview');
-    } catch {
-      Alert.alert('Capture impossible', 'Nous n’avons pas pu prendre la photo du compteur avec la géolocalisation.');
+    } catch (captureError) {
+      Alert.alert(
+        'Capture impossible',
+        toCaptureErrorMessage(captureError, requireGpsForReading)
+      );
     } finally {
       setIsCapturing(false);
     }
   }
 
   async function handleSubmitReading() {
+    if (isSubmitting || loadingMeters) {
+      return;
+    }
+
     if (!capturedPhoto) {
       Alert.alert('Photo manquante', 'Commence par capturer une photo du compteur.');
       return;
@@ -185,6 +239,14 @@ export default function ReadingsScreen() {
 
     if (!selectedMeter) {
       Alert.alert('Compteur requis', 'Choisis le compteur concerné.');
+      return;
+    }
+
+    if (requireGpsForReading && (capturedPhoto.gpsLatitude === null || capturedPhoto.gpsLongitude === null)) {
+      Alert.alert(
+        'Position requise',
+        'La localisation est nécessaire pour transmettre ce relevé. Reprends la photo après avoir activé la position.'
+      );
       return;
     }
 
@@ -214,46 +276,70 @@ export default function ReadingsScreen() {
     setIsSubmitting(true);
 
     try {
-      const uploadedFile = await uploadReadingPhoto(capturedPhoto.uri);
-
-      const result = await createClientReading({
-        meterId: selectedMeter.id,
+      const uploadedFile = await uploadReadingPhoto(capturedPhoto.uri, {
+        maxSizeBytes: maxImageSizeMb * 1024 * 1024,
+      });
+      const readingPayload = {
         primaryIndex: primaryValue,
         ...(selectedMeter.type === 'DUAL_INDEX' ? { secondaryIndex: secondaryValue } : {}),
         imageUrl: uploadedFile.url,
         imageHash: uploadedFile.sha256,
         imageMimeType: uploadedFile.mimeType,
         imageSizeBytes: uploadedFile.sizeBytes,
-        gpsLatitude: capturedPhoto.gpsLatitude,
-        gpsLongitude: capturedPhoto.gpsLongitude,
+        ...(capturedPhoto.gpsLatitude !== null ? { gpsLatitude: capturedPhoto.gpsLatitude } : {}),
+        ...(capturedPhoto.gpsLongitude !== null ? { gpsLongitude: capturedPhoto.gpsLongitude } : {}),
         ...(capturedPhoto.gpsAccuracyMeters !== null
           ? { gpsAccuracyMeters: capturedPhoto.gpsAccuracyMeters }
           : {}),
         readingAt: capturedPhoto.capturedAt,
-        idempotencyKey: `${selectedMeter.id}-${uploadedFile.sha256.slice(0, 16)}`,
-      });
+      };
+
+      const result =
+        isResubmissionFlow && resubmitReadingId
+          ? await resubmitClientReading(resubmitReadingId, readingPayload)
+          : await createClientReading({
+              meterId: selectedMeter.id,
+              ...readingPayload,
+              idempotencyKey: `${selectedMeter.id}-${uploadedFile.sha256.slice(0, 16)}`,
+            });
 
       Alert.alert(
-        'Relevé envoyé',
-        `Le relevé du compteur ${result.reading.meter.serialNumber} a bien été transmis.`,
+        isResubmissionFlow ? 'Relevé renvoyé' : 'Relevé transmis',
+        isResubmissionFlow
+          ? `Le relevé du compteur ${result.reading.meter.serialNumber} a bien été renvoyé pour validation.`
+          : `Le relevé du compteur ${result.reading.meter.serialNumber} a bien été transmis et sera vérifié par un agent.`,
         [
           {
-            text: 'Voir historique',
+            text: 'Voir mes relevés',
             onPress: () => {
               resetFlow();
-              router.push('/readings-history');
+              safePush('/readings-history');
             },
           },
           {
-            text: 'Nouveau relevé',
-            onPress: resetFlow,
+            text: isResubmissionFlow ? 'Retour caméra' : "Retour à l'accueil",
+            onPress: () => {
+              resetFlow();
+              if (isResubmissionFlow) {
+                router.replace('/(tabs)/readings');
+                return;
+              }
+
+              router.replace('/(tabs)');
+            },
           },
         ]
       );
     } catch (submitError) {
+      if (isMobileAuthError(submitError)) {
+        await logout();
+      }
       Alert.alert(
         'Envoi impossible',
-        submitError instanceof Error ? submitError.message : "Le relevé n'a pas pu être envoyé."
+        toMobileErrorMessage(
+          submitError,
+          "Le relevé n'a pas pu être envoyé. Vérifie ta connexion puis réessaie."
+        )
       );
     } finally {
       setIsSubmitting(false);
@@ -312,8 +398,8 @@ export default function ReadingsScreen() {
     return (
       <RequireMobileAuth>
         <AppPage
-          title="Finaliser le relevé"
-          subtitle="Compteur et index"
+          title={isResubmissionFlow ? 'Renvoyer le relevé' : 'Finaliser le relevé'}
+          subtitle={isResubmissionFlow ? 'Nouvelle photo et index' : 'Compteur et index'}
           topBarMode="back"
           onBackPress={() => setStep('capture')}
           contentStyle={styles.detailsContainer}>
@@ -322,9 +408,13 @@ export default function ReadingsScreen() {
               <Image source={{ uri: capturedPhoto.uri }} style={styles.thumbnail} contentFit="cover" alt="" />
 
               <View style={styles.compactHeroBody}>
-                <Text style={[styles.compactHeroTitle, { color: palette.headline }]}>Photo validée</Text>
+                <Text style={[styles.compactHeroTitle, { color: palette.headline }]}>
+                  {isResubmissionFlow ? 'Nouvelle photo prête' : 'Photo validée'}
+                </Text>
                 <Text style={[styles.compactHeroText, { color: palette.muted }]}>
-                  Choisis maintenant le compteur concerné et renseigne ses index.
+                  {isResubmissionFlow
+                    ? 'Reprenez les index du même compteur puis renvoyez le relevé.'
+                    : 'Choisis maintenant le compteur concerné et renseigne ses index.'}
                 </Text>
 
                 {selectedMeter ? (
@@ -347,15 +437,24 @@ export default function ReadingsScreen() {
                 <CircularLoading palette={palette} size={52} />
               </View>
             ) : metersError ? (
-              <Text style={[styles.inlineErrorText, { color: palette.danger }]}>{metersError}</Text>
+              <View style={styles.inlineStateError}>
+                <Text style={[styles.inlineErrorText, { color: palette.danger }]}>{metersError}</Text>
+                <Pressable
+                  onPress={() => void loadMeters()}
+                  style={[styles.inlineRetryButton, { backgroundColor: palette.accentSoft }]}>
+                  <Ionicons name="refresh-outline" size={15} color={palette.accent} />
+                  <Text style={[styles.inlineRetryButtonText, { color: palette.primary }]}>Réessayer</Text>
+                </Pressable>
+              </View>
             ) : (
               <View style={styles.metersStack}>
-                {meters.map((meter) => {
+                {selectableMeters.map((meter) => {
                   const selected = selectedMeterId === meter.id;
 
                   return (
                     <Pressable
                       key={meter.id}
+                      disabled={isResubmissionMeterLocked || isSubmitting}
                       onPress={() => setSelectedMeterId(meter.id)}
                       style={[
                         styles.meterChoice,
@@ -498,7 +597,9 @@ export default function ReadingsScreen() {
               ) : (
                 <>
                   <Ionicons name="cloud-upload-outline" size={18} color="#ffffff" />
-                  <Text style={styles.submitButtonText}>Envoyer le relevé</Text>
+                  <Text style={styles.submitButtonText}>
+                    {isResubmissionFlow ? 'Renvoyer le relevé' : 'Envoyer le relevé'}
+                  </Text>
                 </>
               )}
             </Pressable>
@@ -518,6 +619,7 @@ export default function ReadingsScreen() {
             <View style={styles.previewOverlay}>
               <View style={styles.previewHeader}>
                 <Pressable
+                  disabled={isCapturing}
                   onPress={resetFlow}
                   style={[styles.iconButton, { backgroundColor: 'rgba(7, 17, 31, 0.44)' }]}>
                   <Ionicons name="arrow-back" size={22} color="#ffffff" />
@@ -527,12 +629,25 @@ export default function ReadingsScreen() {
               <View style={styles.previewFooter}>
                 <View style={styles.previewActions}>
                   <Pressable
+                    disabled={isCapturing}
                     onPress={resetFlow}
-                    style={[styles.previewActionIconButton, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+                    style={[
+                      styles.previewActionIconButton,
+                      {
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                        opacity: isCapturing ? 0.55 : 1,
+                      },
+                    ]}>
                     <Ionicons name="refresh-outline" size={24} color="#ffffff" />
                   </Pressable>
 
-                  <Pressable onPress={() => setStep('details')} style={styles.previewActionIconButtonPrimary}>
+                  <Pressable
+                    disabled={isCapturing}
+                    onPress={() => setStep('details')}
+                    style={[
+                      styles.previewActionIconButtonPrimary,
+                      { opacity: isCapturing ? 0.55 : 1 },
+                    ]}>
                     <Ionicons name="arrow-forward" size={24} color="#08101f" />
                   </Pressable>
                 </View>
@@ -546,14 +661,22 @@ export default function ReadingsScreen() {
             <View style={styles.overlay}>
               <View style={styles.topBar}>
                 <Pressable
-                  onPress={openDrawer}
+                  onPress={isResubmissionFlow ? () => router.back() : openDrawer}
                   style={[styles.iconButton, { backgroundColor: 'rgba(7, 17, 31, 0.44)' }]}>
-                  <Ionicons name="menu-outline" size={24} color="#ffffff" />
+                  <Ionicons
+                    name={isResubmissionFlow ? 'arrow-back' : 'menu-outline'}
+                    size={24}
+                    color="#ffffff"
+                  />
                 </Pressable>
 
                 <View style={styles.headerTextBlock}>
-                  <Text style={styles.headerEyebrow}>Relevé compteur</Text>
-                  <Text style={styles.headerTitle}>Prends une photo nette</Text>
+                  <Text style={styles.headerEyebrow}>
+                    {isResubmissionFlow ? 'Nouvelle soumission' : 'Relevé compteur'}
+                  </Text>
+                  <Text style={styles.headerTitle}>
+                    {isResubmissionFlow ? 'Refais une photo nette' : 'Prends une photo nette'}
+                  </Text>
                 </View>
 
                 {preferences.showCameraHelp ? (
@@ -580,9 +703,11 @@ export default function ReadingsScreen() {
               <View style={styles.captureFooter}>
                 <Pressable
                   onPress={() => void handleCapture()}
+                  disabled={isCapturing || isSubmitting}
                   style={({ pressed }) => [
                     styles.captureButtonOuter,
                     pressed && styles.captureButtonOuterPressed,
+                    (isCapturing || isSubmitting) && styles.captureButtonOuterDisabled,
                   ]}>
                   <View
                     style={[
@@ -799,6 +924,9 @@ const styles = StyleSheet.create({
   captureButtonOuterPressed: {
     transform: [{ scale: 0.96 }],
   },
+  captureButtonOuterDisabled: {
+    opacity: 0.72,
+  },
   captureButtonInner: {
     width: 72,
     height: 72,
@@ -988,6 +1116,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  inlineStateError: {
+    gap: 12,
+  },
   inlineStateText: {
     fontSize: 14,
     lineHeight: 20,
@@ -995,6 +1126,19 @@ const styles = StyleSheet.create({
   inlineErrorText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  inlineRetryButton: {
+    alignSelf: 'flex-start',
+    minHeight: 36,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  inlineRetryButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   metersStack: {
     gap: 10,
@@ -1072,10 +1216,10 @@ function toNumberOrNull(value: string | number | null | undefined) {
 function calculateGpsDistanceMeters(
   meterLat: number | null,
   meterLng: number | null,
-  readLat: number,
-  readLng: number
+  readLat: number | null,
+  readLng: number | null
 ) {
-  if (meterLat === null || meterLng === null) return null;
+  if (meterLat === null || meterLng === null || readLat === null || readLng === null) return null;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const earthRadiusMeters = 6371000;
   const dLat = toRad(readLat - meterLat);
@@ -1089,6 +1233,47 @@ function calculateGpsDistanceMeters(
 
 function formatMeters(value: number) {
   return `${Math.round(value)} m`;
+}
+
+async function getReadingLocationWithTimeout(): Promise<CapturedReadingPhotoLocation> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('gps_timeout')), 8000);
+  });
+
+  const position = await Promise.race([
+    Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    }),
+    timeoutPromise,
+  ]);
+
+  return {
+    gpsLatitude: position.coords.latitude,
+    gpsLongitude: position.coords.longitude,
+    gpsAccuracyMeters:
+      typeof position.coords.accuracy === 'number' ? position.coords.accuracy : null,
+  };
+}
+
+function toCaptureErrorMessage(error: unknown, requireGpsForReading: boolean) {
+  if (error instanceof Error) {
+    switch (error.message) {
+      case 'photo_missing':
+        return 'La photo du compteur n’a pas pu être récupérée. Reprends la capture.';
+      case 'gps_timeout':
+        return requireGpsForReading
+          ? 'La position met trop de temps à se charger. Vérifie le GPS puis réessaie.'
+          : 'La photo a bien été lancée, mais la position n’a pas répondu à temps.';
+      default:
+        return requireGpsForReading
+          ? 'Nous n’avons pas pu prendre la photo du compteur avec une position valide.'
+          : 'Nous n’avons pas pu prendre la photo du compteur.';
+    }
+  }
+
+  return requireGpsForReading
+    ? 'Nous n’avons pas pu prendre la photo du compteur avec une position valide.'
+    : 'Nous n’avons pas pu prendre la photo du compteur.';
 }
 
 function confirmGpsDistanceWarning(distanceMeters: number, thresholdMeters: number) {

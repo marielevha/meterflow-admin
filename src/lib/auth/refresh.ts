@@ -1,4 +1,4 @@
-import { UserStatus } from "@prisma/client";
+import { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   authDurations,
@@ -67,12 +67,34 @@ export async function refreshSession(payload: RefreshPayload) {
       role: true,
       firstName: true,
       lastName: true,
+      region: true,
+      city: true,
+      zone: true,
       status: true,
+      activatedAt: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
   if (!user) {
     return { status: 401, body: { error: "user_not_found" } };
+  }
+
+  if (
+    (platform === "mobile" && user.role !== UserRole.CLIENT) ||
+    (platform === "web" &&
+      ![UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN].includes(user.role))
+  ) {
+    return {
+      status: 403,
+      body: {
+        error:
+          platform === "mobile"
+            ? "role_not_allowed_for_mobile"
+            : "role_not_allowed_for_web",
+      },
+    };
   }
 
   if (user.status !== UserStatus.ACTIVE) {
@@ -152,6 +174,13 @@ export async function refreshSession(payload: RefreshPayload) {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
+        region: user.region,
+        city: user.city,
+        zone: user.zone,
+        status: user.status,
+        activatedAt: user.activatedAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       },
     },
   };

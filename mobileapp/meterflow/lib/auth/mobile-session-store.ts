@@ -13,6 +13,13 @@ export type MobileAuthUser = {
   role: string;
   firstName: string | null;
   lastName: string | null;
+  region?: string | null;
+  city?: string | null;
+  zone?: string | null;
+  status?: string | null;
+  activatedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type MobileSession = {
@@ -68,6 +75,35 @@ export async function setCurrentMobileSession(session: MobileSession) {
   } else {
     await clearStoredMobileSession();
   }
+  notify();
+}
+
+export async function updateCurrentMobileSessionUser(
+  nextUser: Partial<MobileAuthUser> & { id?: string }
+) {
+  if (!currentSession) {
+    return;
+  }
+
+  const mergedUser = {
+    ...currentSession.user,
+    ...nextUser,
+  };
+
+  if (JSON.stringify(mergedUser) === JSON.stringify(currentSession.user)) {
+    return;
+  }
+
+  currentSession = {
+    ...currentSession,
+    user: mergedUser,
+  };
+
+  const preferences = await readStoredAppPreferences();
+  if (preferences.keepSession) {
+    await writeStoredMobileSession(JSON.stringify(currentSession));
+  }
+
   notify();
 }
 

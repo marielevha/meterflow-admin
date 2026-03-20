@@ -26,6 +26,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark } from '@/components/app/brand-mark';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
+import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 type DrawerContextValue = {
@@ -37,22 +39,24 @@ type DrawerContextValue = {
 const MobileDrawerContext = createContext<DrawerContextValue | null>(null);
 
 const MENU_ITEMS = [
-  { label: 'Accueil', route: '/(tabs)', icon: 'home-outline' as const, matches: ['/', '/(tabs)', '/(tabs)/index'] },
-  { label: 'Relevés', route: '/readings-history', icon: 'time-outline' as const, matches: ['/readings-history'] },
-  { label: 'Notifications', route: '/notifications', icon: 'notifications-outline' as const, matches: ['/notifications'] },
-  { label: 'Mes compteurs', route: '/meters', icon: 'speedometer-outline' as const, matches: ['/meters'] },
-  { label: 'Profil', route: '/profile', icon: 'person-outline' as const, matches: ['/profile'] },
-  { label: 'Paramètres', route: '/settings', icon: 'settings-outline' as const, matches: ['/settings'] },
-  { label: 'À propos', route: '/about', icon: 'information-circle-outline' as const, matches: ['/about'] },
+  { labelKey: 'common.home', route: '/(tabs)', icon: 'home-outline' as const, matches: ['/', '/(tabs)', '/(tabs)/index'] },
+  { labelKey: 'drawer.releves', route: '/readings-history', icon: 'time-outline' as const, matches: ['/readings-history'] },
+  { labelKey: 'common.notifications', route: '/notifications', icon: 'notifications-outline' as const, matches: ['/notifications'] },
+  { labelKey: 'common.meters', route: '/meters', icon: 'speedometer-outline' as const, matches: ['/meters'] },
+  { labelKey: 'common.profile', route: '/profile', icon: 'person-outline' as const, matches: ['/profile'] },
+  { labelKey: 'common.settings', route: '/settings', icon: 'settings-outline' as const, matches: ['/settings'] },
+  { labelKey: 'common.about', route: '/about', icon: 'information-circle-outline' as const, matches: ['/about'] },
 ];
 
 export function MobileDrawerProvider({ children }: PropsWithChildren) {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { session, isAuthenticated, logout } = useMobileSession();
+  const { unreadCount } = useMobileNotifications();
   const drawerWidth = Math.min(width * 0.82, 340);
   const [translateX] = useState(() => new Animated.Value(-drawerWidth));
   const [overlayOpacity] = useState(() => new Animated.Value(0));
@@ -199,10 +203,10 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
 
                 <View style={styles.profileBlock}>
                   <Text style={[styles.profileName, { color: palette.headline }]}>
-                    {[session?.user.firstName, session?.user.lastName].filter(Boolean).join(' ') || 'Client'}
+                    {[session?.user.firstName, session?.user.lastName].filter(Boolean).join(' ') || t('common.client')}
                   </Text>
                   <Text style={[styles.profileMeta, { color: palette.muted }]}>
-                    {session?.user.username || session?.user.email || session?.user.phone || 'Compte client'}
+                    {session?.user.username || session?.user.email || session?.user.phone || t('common.clientAccount')}
                   </Text>
                 </View>
               </View>
@@ -215,6 +219,11 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
                     <Pressable
                       key={item.route}
                       onPress={() => {
+                        if (active) {
+                          closeDrawer();
+                          return;
+                        }
+
                         closeDrawer();
                         router.push(item.route as never);
                       }}
@@ -242,8 +251,16 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
                           styles.menuLabel,
                           { color: active ? palette.headline : palette.text },
                         ]}>
-                        {item.label}
+                        {t(item.labelKey)}
                       </Text>
+
+                      {item.route === '/notifications' && unreadCount > 0 ? (
+                        <View style={[styles.menuBadge, { backgroundColor: palette.danger }]}>
+                          <Text style={styles.menuBadgeText}>
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </Text>
+                        </View>
+                      ) : null}
                     </Pressable>
                   );
                 })}
@@ -355,6 +372,20 @@ const styles = StyleSheet.create({
   menuLabel: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  menuBadge: {
+    marginLeft: 'auto',
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '900',
   },
   logoutButton: {
     minHeight: 54,

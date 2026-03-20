@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type StoredThemePreference = 'system' | 'light' | 'dark';
+export type StoredLanguagePreference = 'fr' | 'en' | 'ln';
 
 export type StoredAppPreferences = {
   themePreference: StoredThemePreference;
+  language: StoredLanguagePreference;
   keepSession: boolean;
   showCameraHelp: boolean;
 };
@@ -12,6 +14,7 @@ const APP_PREFERENCES_KEY = 'meterflow.app.preferences';
 
 const DEFAULT_APP_PREFERENCES: StoredAppPreferences = {
   themePreference: 'system',
+  language: 'fr',
   keepSession: true,
   showCameraHelp: true,
 };
@@ -32,6 +35,10 @@ function normalizePreferences(value: unknown): StoredAppPreferences {
       candidate.themePreference === 'system'
         ? candidate.themePreference
         : DEFAULT_APP_PREFERENCES.themePreference,
+    language:
+      candidate.language === 'en' || candidate.language === 'fr' || candidate.language === 'ln'
+        ? candidate.language
+        : DEFAULT_APP_PREFERENCES.language,
     keepSession:
       typeof candidate.keepSession === 'boolean'
         ? candidate.keepSession

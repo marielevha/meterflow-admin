@@ -1,8 +1,8 @@
 import { PropsWithChildren, useEffect, useRef } from 'react';
-import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { useSafePush } from '@/hooks/use-safe-push';
 import {
   getMobileAppVersion,
   registerMobilePushToken,
@@ -22,6 +22,7 @@ Notifications.setNotificationHandler({
 
 export function MobilePushProvider({ children }: PropsWithChildren) {
   const { session, isReady } = useMobileSession();
+  const { safePush } = useSafePush();
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
   const registeredAccessTokenRef = useRef<string | null>(null);
 
@@ -29,18 +30,18 @@ export function MobilePushProvider({ children }: PropsWithChildren) {
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const readingId = response.notification.request.content.data?.readingId;
       if (typeof readingId === 'string' && readingId) {
-        router.push(`/readings/${readingId}`);
+        safePush(`/readings/${readingId}`);
         return;
       }
 
-      router.push('/notifications');
+      safePush('/notifications');
     });
 
     return () => {
       notificationResponseListener.current?.remove();
       notificationResponseListener.current = null;
     };
-  }, []);
+  }, [safePush]);
 
   useEffect(() => {
     if (!isReady || !session?.accessToken) {

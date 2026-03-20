@@ -1,14 +1,15 @@
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSafePush } from '@/hooks/use-safe-push';
 import { useMobileDrawer } from '@/providers/mobile-drawer-provider';
+import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 
 type AppTopBarProps = {
   title: string;
-  subtitle?: string;
   mode?: 'drawer' | 'back';
   backHref?:
     | '/consumption/[meterId]'
@@ -24,7 +25,6 @@ type AppTopBarProps = {
 
 export function AppTopBar({
   title,
-  subtitle,
   mode = 'drawer',
   backHref,
   onBackPress,
@@ -32,7 +32,9 @@ export function AppTopBar({
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
   const { openDrawer } = useMobileDrawer();
+  const { unreadCount } = useMobileNotifications();
   const router = useRouter();
+  const { safePush } = useSafePush();
 
   function handleLeadingAction() {
     if (mode === 'back') {
@@ -57,7 +59,7 @@ export function AppTopBar({
   }
 
   function handleTrailingAction() {
-    router.push('/notifications');
+    safePush('/notifications');
   }
 
   return (
@@ -73,7 +75,6 @@ export function AppTopBar({
       </Pressable>
 
       <View style={styles.titleBlock}>
-        {subtitle ? <Text style={[styles.subtitle, { color: palette.accent }]}>{subtitle}</Text> : null}
         <Text style={[styles.title, { color: palette.headline }]}>{title}</Text>
       </View>
 
@@ -81,6 +82,11 @@ export function AppTopBar({
         onPress={handleTrailingAction}
         style={[styles.menuButton, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <Ionicons name="notifications-outline" size={20} color={palette.headline} />
+        {unreadCount > 0 ? (
+          <View style={[styles.badge, { backgroundColor: palette.danger }]}>
+            <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -100,20 +106,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   titleBlock: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
-  },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.9,
-    textTransform: 'uppercase',
   },
   title: {
     fontSize: 18,
     fontWeight: '800',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
   },
 });

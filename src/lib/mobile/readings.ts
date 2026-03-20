@@ -7,6 +7,12 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveGpsThresholdMeters, haversineMeters } from "@/lib/geo/gps";
+import {
+  getClientReadingDecisionMessage,
+  getClientReadingDecisionTitle,
+  getReadingStatusLabel,
+  getReviewReasonLabel,
+} from "@/lib/readings/reviewReasons";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 
 type CreateReadingPayload = {
@@ -95,7 +101,13 @@ export async function createClientReading(userId: string, payload: CreateReading
           meter: { select: { id: true, serialNumber: true, meterReference: true, type: true } },
         },
       });
-      return { status: 200, body: { message: "idempotent_replay", reading: existingReading } };
+      return {
+        status: 200,
+        body: {
+          message: "idempotent_replay",
+          reading: existingReading ? decorateClientReading(existingReading) : existingReading,
+        },
+      };
     }
   }
 
@@ -128,6 +140,9 @@ export async function createClientReading(userId: string, payload: CreateReading
   const meterLng = toNumberOrNull(meter.longitude);
   const readLat = toNumberOrNull(gpsLatitude);
   const readLng = toNumberOrNull(gpsLongitude);
+  if (appSettings.requireGpsForReading && (readLat === null || readLng === null)) {
+    return { status: 400, body: { error: "gps_required_for_reading" } };
+  }
   const gpsThreshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
   const gpsDistanceMeters =
     meterLat !== null && meterLng !== null && readLat !== null && readLng !== null
@@ -206,7 +221,10 @@ export async function createClientReading(userId: string, payload: CreateReading
     return reading;
   });
 
-  return { status: 201, body: { message: "reading_created", reading: created } };
+  return {
+    status: 201,
+    body: { message: "reading_created", reading: decorateClientReading(created) },
+  };
 }
 
 export async function listClientReadings(
@@ -282,13 +300,42 @@ export async function listClientReadings(
     orderBy: { readingAt: "desc" },
   });
 
-  return { status: 200, body: { readings } };
+  return {
+    status: 200,
+    body: { readings: readings.map((reading) => decorateClientReading(reading)) },
+  };
 }
 
 function toNumberOrNull(value: Prisma.Decimal | null | undefined) {
   if (value === null || value === undefined) return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
+}
+
+function decorateClientReading<
+  T extends {
+    status: string | null;
+    flagReason: string | null;
+    rejectionReason: string | null;
+    meter?: { serialNumber?: string | null } | null;
+  },
+>(reading: T) {
+  const reasonCode = reading.flagReason || reading.rejectionReason || null;
+
+  return {
+    ...reading,
+    statusLabel: getReadingStatusLabel(reading.status),
+    reasonLabel: getReviewReasonLabel(reasonCode),
+    decisionTitle: getClientReadingDecisionTitle(reading.status, reasonCode),
+    decisionMessage: getClientReadingDecisionMessage(
+      reading.status,
+      reasonCode,
+      reading.meter?.serialNumber ?? null
+    ),
+    canResubmit:
+      reading.status === ReadingStatus.REJECTED ||
+      reading.status === ReadingStatus.RESUBMISSION_REQUESTED,
+  };
 }
 
 export async function getClientReadingDetail(userId: string, readingId: string) {
@@ -344,7 +391,7 @@ export async function getClientReadingDetail(userId: string, readingId: string) 
     return { status: 404, body: { error: "reading_not_found" } };
   }
 
-  return { status: 200, body: { reading } };
+  return { status: 200, body: { reading: decorateClientReading(reading) } };
 }
 
 export async function resubmitClientReading(
@@ -382,7 +429,13 @@ export async function resubmitClientReading(
       id: true,
       meterId: true,
       status: true,
-      meter: { select: { type: true } },
+      meter: {
+        select: {
+          type: true,
+          latitude: true,
+          longitude: true,
+        },
+      },
     },
   });
 
@@ -400,6 +453,22 @@ export async function resubmitClientReading(
   if (existing.meter.type === MeterType.DUAL_INDEX && !secondaryIndex) {
     return { status: 400, body: { error: "secondary_index_required_for_dual_meter" } };
   }
+
+  const appSettings = await getAppSettings();
+  const meterLat = toNumberOrNull(existing.meter.latitude);
+  const meterLng = toNumberOrNull(existing.meter.longitude);
+  const readLat = toNumberOrNull(gpsLatitude);
+  const readLng = toNumberOrNull(gpsLongitude);
+  if (appSettings.requireGpsForReading && (readLat === null || readLng === null)) {
+    return { status: 400, body: { error: "gps_required_for_reading" } };
+  }
+  const gpsThreshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
+  const gpsDistanceMeters =
+    meterLat !== null && meterLng !== null && readLat !== null && readLng !== null
+      ? haversineMeters(meterLat, meterLng, readLat, readLng)
+      : null;
+  const gpsWithinExpectedArea =
+    gpsDistanceMeters === null ? null : gpsDistanceMeters <= gpsThreshold;
 
   const updated = await prisma.$transaction(async (tx) => {
     const reading = await tx.reading.update({
@@ -420,6 +489,8 @@ export async function resubmitClientReading(
         gpsLatitude,
         gpsLongitude,
         gpsAccuracyMeters,
+        gpsDistanceMeters:
+          gpsDistanceMeters !== null ? new Prisma.Decimal(gpsDistanceMeters) : null,
         reviewedById: null,
         reviewedAt: null,
         rejectionReason: null,
@@ -439,8 +510,31 @@ export async function resubmitClientReading(
       },
     });
 
+    if (gpsDistanceMeters !== null) {
+      await tx.readingEvent.create({
+        data: {
+          readingId: reading.id,
+          userId,
+          type: ReadingEventType.ANOMALY_DETECTED,
+          payload: {
+            check: "gps_distance",
+            passed: gpsWithinExpectedArea,
+            distanceMeters: gpsDistanceMeters,
+            thresholdMeters: gpsThreshold,
+            meterLatitude: meterLat,
+            meterLongitude: meterLng,
+            readingLatitude: readLat,
+            readingLongitude: readLng,
+          },
+        },
+      });
+    }
+
     return reading;
   });
 
-  return { status: 200, body: { message: "reading_resubmitted", reading: updated } };
+  return {
+    status: 200,
+    body: { message: "reading_resubmitted", reading: decorateClientReading(updated) },
+  };
 }

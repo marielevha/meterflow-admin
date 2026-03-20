@@ -208,6 +208,7 @@ model User {
   deliveryLogs           InvoiceDelivery[]    @relation("InvoiceDeliveryTriggeredBy")
   readingReminderLogs    ReadingReminderLog[]
   mobilePushDevices      MobilePushDevice[]
+  mobileNotificationReads MobileNotificationRead[]
 
   @@index([role, status])
   @@index([deletedAt])
@@ -401,6 +402,7 @@ model ReadingEvent {
   deletedAt DateTime?        @map("deleted_at")
   reading   Reading          @relation(fields: [readingId], references: [id])
   user      User?            @relation(fields: [userId], references: [id])
+  notificationReads MobileNotificationRead[]
 
   @@index([readingId, type, createdAt])
   @@index([deletedAt, createdAt])
@@ -833,4 +835,20 @@ model MobilePushDevice {
   @@index([userId, deletedAt])
   @@index([deletedAt, lastSeenAt])
   @@map("mobile_push_devices")
+}
+
+model MobileNotificationRead {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  readingEventId String       @map("reading_event_id") @db.Uuid
+  readAt         DateTime     @default(now()) @map("read_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  user           User         @relation(fields: [userId], references: [id])
+  readingEvent   ReadingEvent @relation(fields: [readingEventId], references: [id])
+
+  @@unique([userId, readingEventId])
+  @@index([userId, readAt])
+  @@index([readingEventId])
+  @@map("mobile_notification_reads")
 }

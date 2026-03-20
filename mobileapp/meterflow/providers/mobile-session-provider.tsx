@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 
 import { loginWithBackend, type MobileLoginResponse } from '@/lib/auth/mobile-auth-api';
 import { unregisterStoredMobilePushToken } from '@/lib/api/mobile-push';
@@ -7,7 +15,9 @@ import {
   hydrateMobileSessionStore,
   setCurrentMobileSession,
   subscribeToMobileSession,
+  updateCurrentMobileSessionUser,
   type MobileSession,
+  type MobileAuthUser,
 } from '@/lib/auth/mobile-session-store';
 
 type LoginParams = {
@@ -22,6 +32,7 @@ type MobileSessionContextValue = {
   isReady: boolean;
   login: (params: LoginParams) => Promise<MobileLoginResponse>;
   logout: () => Promise<void>;
+  updateSessionUser: (nextUser: Partial<MobileAuthUser>) => Promise<void>;
 };
 
 const MobileSessionContext = createContext<MobileSessionContextValue | null>(null);
@@ -41,7 +52,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     return unsubscribe;
   }, []);
 
-  async function login(params: LoginParams) {
+  const login = useCallback(async (params: LoginParams) => {
     setIsLoading(true);
     try {
       const result = await loginWithBackend(params);
@@ -50,16 +61,20 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
-  async function logout() {
+  const logout = useCallback(async () => {
     try {
       await unregisterStoredMobilePushToken();
     } catch {
       // best effort cleanup
     }
     await clearCurrentMobileSession();
-  }
+  }, []);
+
+  const updateSessionUser = useCallback(async (nextUser: Partial<MobileAuthUser>) => {
+    await updateCurrentMobileSessionUser(nextUser);
+  }, []);
 
   const value = useMemo<MobileSessionContextValue>(
     () => ({
@@ -69,8 +84,9 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       isReady,
       login,
       logout,
+      updateSessionUser,
     }),
-    [session, isLoading, isReady]
+    [session, isLoading, isReady, login, logout, updateSessionUser]
   );
 
   return <MobileSessionContext.Provider value={value}>{children}</MobileSessionContext.Provider>;

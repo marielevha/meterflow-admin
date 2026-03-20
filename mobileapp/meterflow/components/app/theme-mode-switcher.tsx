@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useAppTheme, type ThemePreference } from '@/providers/app-theme-provider';
 
 const OPTIONS: ThemePreference[] = ['system', 'light', 'dark'];
@@ -15,6 +16,7 @@ function iconNameForTheme(option: ThemePreference): keyof typeof Ionicons.glyphM
 export function ThemeModeSwitcher() {
   const { preference, setPreference, resolvedTheme } = useAppTheme();
   const palette = Colors[resolvedTheme];
+  const { t } = useI18n();
 
   return (
     <View style={[styles.wrapper, { borderColor: palette.border, backgroundColor: palette.surfaceMuted }]}>
@@ -44,7 +46,7 @@ export function ThemeModeSwitcher() {
                     color: selected ? '#ffffff' : palette.muted,
                   },
                 ]}>
-                Auto
+                {t('settings.themeSystem')}
               </Text>
             ) : null}
           </Pressable>

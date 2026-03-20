@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-
+import { useFocusEffect } from 'expo-router';
 import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
+import { AppStateCard } from '@/components/app/app-state-card';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
+import { useSafePush } from '@/hooks/use-safe-push';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientConsumption } from '@/lib/api/mobile-consumption';
 import type { MobileConsumptionEntry, MobileConsumptionMeter } from '@/lib/api/mobile-consumption';
 import { useMobileSession } from '@/providers/mobile-session-provider';
@@ -15,7 +18,9 @@ import { useMobileSession } from '@/providers/mobile-session-provider';
 export default function ConsumptionScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const { logout } = useMobileSession();
+  const { safePush } = useSafePush();
   const [meters, setMeters] = useState<MobileConsumptionMeter[]>([]);
   const [entries, setEntries] = useState<MobileConsumptionEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,57 +28,56 @@ export default function ConsumptionScreen() {
   const [selectedMeterId, setSelectedMeterId] = useState<string>('ALL');
   const [showMeterSelect, setShowMeterSelect] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadConsumption() {
+  const loadConsumption = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
+    try {
       setLoading(true);
       setError(null);
-
-      try {
-        const result = await listClientConsumption({
-          meterId: selectedMeterId === 'ALL' ? undefined : selectedMeterId,
-          limit: 12,
-        });
-        if (!active) return;
-        setMeters(result.meters);
-        setEntries(result.consumptions);
-      } catch (loadError) {
-        if (!active) return;
-        const message =
-          loadError instanceof Error ? loadError.message : 'Impossible de charger la consommation.';
-        setError(message);
-        if (message.includes('Session invalide')) {
-          await logout();
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
+      const result = await listClientConsumption({
+        meterId: selectedMeterId === 'ALL' ? undefined : selectedMeterId,
+        limit: 12,
+      });
+      if (!activeRef.current) return;
+      setMeters(result.meters);
+      setEntries(result.consumptions);
+    } catch (loadError) {
+      if (!activeRef.current) return;
+      const message = toMobileErrorMessage(loadError, t('consumption.loadingFallback'));
+      setError(message);
+      if (isMobileAuthError(loadError)) {
+        await logout();
+      }
+    } finally {
+      if (activeRef.current) {
+        setLoading(false);
       }
     }
+  }, [logout, selectedMeterId, t]);
 
-    void loadConsumption();
+  useFocusEffect(
+    useCallback(() => {
+      const activeRef = { current: true };
+      void loadConsumption(activeRef);
 
-    return () => {
-      active = false;
-    };
-  }, [logout, selectedMeterId]);
+      return () => {
+        activeRef.current = false;
+      };
+    }, [loadConsumption])
+  );
 
   const selectedMeterLabel = useMemo(() => {
-    if (selectedMeterId === 'ALL') return 'Tous les compteurs';
-    return meters.find((meter) => meter.id === selectedMeterId)?.serialNumber ?? 'Compteur';
-  }, [meters, selectedMeterId]);
+    if (selectedMeterId === 'ALL') return t('common.allMeters');
+    return meters.find((meter) => meter.id === selectedMeterId)?.serialNumber ?? t('common.meter');
+  }, [meters, selectedMeterId, t]);
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Consommation" subtitle="Historique mensuel">
+      <AppPage title={t('common.consumption')} subtitle={t('consumption.subtitle')}>
         <Pressable
           onPress={() => setShowMeterSelect(true)}
           style={[styles.filterSelect, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <View style={styles.filterSelectLeft}>
             <Ionicons name="flash-outline" size={18} color={palette.icon} />
-            <Text style={[styles.filterSelectLabel, { color: palette.muted }]}>Compteur</Text>
+            <Text style={[styles.filterSelectLabel, { color: palette.muted }]}>{t('consumption.filterLabel')}</Text>
           </View>
           <View style={styles.filterSelectRight}>
             <Text
@@ -90,22 +94,29 @@ export default function ConsumptionScreen() {
             <CircularLoading palette={palette} />
           </View>
         ) : error ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="cloud-offline-outline"
+            title={t('consumption.loadingErrorTitle')}
+            description={error}
+            tone="danger"
+            actionLabel={t('common.retry')}
+            onActionPress={() => void loadConsumption()}
+          />
         ) : entries.length === 0 ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.muted }]}>
-              Aucune consommation calculée pour le moment.
-            </Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="stats-chart-outline"
+            title={t('consumption.emptyTitle')}
+            description={t('consumption.emptyDescription')}
+          />
         ) : (
           <View style={styles.stack}>
             {entries.map((entry) => (
               <Pressable
                 key={`${entry.meterId}-${entry.periodKey}`}
                 onPress={() =>
-                  router.push({
+                  safePush({
                     pathname: '/consumption/[meterId]',
                     params: { meterId: entry.meterId, periodKey: entry.periodKey },
                   })
@@ -160,7 +171,7 @@ export default function ConsumptionScreen() {
               ]}>
               <View style={styles.filterModalHeader}>
                 <Text style={[styles.filterModalTitle, { color: palette.headline }]}>
-                  Filtrer la consommation
+                  {t('consumption.filterTitle')}
                 </Text>
                 <Pressable
                   onPress={() => setShowMeterSelect(false)}
@@ -170,7 +181,7 @@ export default function ConsumptionScreen() {
               </View>
 
               <View style={styles.filterOptions}>
-                {[{ id: 'ALL', serialNumber: 'Tous les compteurs' }, ...meters].map((meter) => {
+                {[{ id: 'ALL', serialNumber: t('common.allMeters') }, ...meters].map((meter) => {
                   const active = selectedMeterId === meter.id;
                   return (
                     <Pressable

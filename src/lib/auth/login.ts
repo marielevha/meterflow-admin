@@ -30,6 +30,7 @@ const WEB_ALLOWED_ROLES = new Set<UserRole>([
   UserRole.SUPERVISOR,
   UserRole.ADMIN,
 ]);
+const MOBILE_ALLOWED_ROLES = new Set<UserRole>([UserRole.CLIENT]);
 
 function normalizeIdentifier(identifier: string) {
   return identifier.trim();
@@ -80,6 +81,10 @@ export async function loginUser(payload: LoginPayload, options?: LoginOptions) {
 
   if (platform === "web" && !WEB_ALLOWED_ROLES.has(user.role)) {
     return { status: 403, body: { error: "role_not_allowed_for_web" } };
+  }
+
+  if (platform === "mobile" && !MOBILE_ALLOWED_ROLES.has(user.role)) {
+    return { status: 403, body: { error: "role_not_allowed_for_mobile" } };
   }
 
   if (user.status !== "ACTIVE") {
@@ -144,6 +149,13 @@ export async function loginUser(payload: LoginPayload, options?: LoginOptions) {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
+        region: user.region,
+        city: user.city,
+        zone: user.zone,
+        status: user.status,
+        activatedAt: user.activatedAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       },
     },
   };

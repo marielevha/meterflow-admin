@@ -5,11 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? 'light'];
+  const { t } = useI18n();
   const { isAuthenticated, isReady } = useMobileSession();
 
   if (!isReady) {
@@ -37,21 +39,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Accueil',
+          title: t('common.home'),
           tabBarIcon: ({ color }) => <Ionicons size={24} name="home-outline" color={color} />,
         }}
       />
       <Tabs.Screen
         name="readings"
         options={{
-          title: 'Releves',
+          title: t('tabs.readings'),
           tabBarIcon: ({ color }) => <Ionicons size={24} name="camera-outline" color={color} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Consommation',
+          title: t('common.consumption'),
           tabBarIcon: ({ color }) => <Ionicons size={24} name="stats-chart-outline" color={color} />,
         }}
       />

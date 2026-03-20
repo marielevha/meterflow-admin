@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 
 import { MobileSessionProvider } from '@/providers/mobile-session-provider';
 import { MobileDrawerProvider } from '@/providers/mobile-drawer-provider';
+import { MobileNotificationsProvider } from '@/providers/mobile-notifications-provider';
 import { MobilePreferencesProvider } from '@/providers/mobile-preferences-provider';
 import { MobilePushProvider } from '@/providers/mobile-push-provider';
 import { AppThemeProvider, useAppTheme } from '@/providers/app-theme-provider';
@@ -15,7 +16,9 @@ export default function RootLayout() {
       <MobilePreferencesProvider>
         <MobileSessionProvider>
           <MobilePushProvider>
-            <RootNavigator />
+            <MobileNotificationsProvider>
+              <RootNavigator />
+            </MobileNotificationsProvider>
           </MobilePushProvider>
         </MobileSessionProvider>
       </MobilePreferencesProvider>

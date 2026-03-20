@@ -7,15 +7,17 @@ import { AppPage } from '@/components/app/app-page';
 import { BrandMark } from '@/components/app/brand-mark';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function AboutScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   return (
     <RequireMobileAuth>
-      <AppPage title="A propos" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)">
+      <AppPage title={t('common.about')} subtitle={t('about.subtitle')} topBarMode="back" backHref="/(tabs)">
         <View style={styles.container}>
           <View style={[styles.heroCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <View style={[styles.logoBox, { backgroundColor: palette.accentSoft }]}>
@@ -30,57 +32,57 @@ export default function AboutScreen() {
             </View>
             <Text style={[styles.title, { color: palette.headline }]}>MeterFlow Mobile</Text>
             <Text style={[styles.text, { color: palette.muted }]}>
-              L&apos;application client pour l&apos;auto-relevé, le suivi des compteurs et les notifications liées à votre consommation.
+              {t('about.appDescription')}
             </Text>
             <View style={[styles.versionBadge, { backgroundColor: palette.accentSoft }]}>
-              <Text style={[styles.versionLabel, { color: palette.primary }]}>Version {appVersion}</Text>
+              <Text style={[styles.versionLabel, { color: palette.primary }]}>
+                {t('common.version')} {appVersion}
+              </Text>
             </View>
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Ce que permet l&apos;application</Text>
+            <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('about.whatItDoes')}</Text>
 
             <FeatureItem
               icon="camera-outline"
-              title="Prendre un relevé"
-              text="Capturez une photo du compteur et suivez ensuite l&apos;état de traitement de votre relevé."
+              title={t('about.takeReading')}
+              text={t('about.takeReadingText')}
               palette={palette}
             />
             <FeatureItem
               icon="flash-outline"
-              title="Consulter vos compteurs"
-              text="Retrouvez les informations essentielles de vos compteurs, leur localisation et leur dernier état connu."
+              title={t('about.viewMeters')}
+              text={t('about.viewMetersText')}
               palette={palette}
             />
             <FeatureItem
               icon="time-outline"
-              title="Suivre l&apos;historique"
-              text="Accédez à la liste de vos relevés soumis et au détail de chaque traitement."
+              title={t('about.trackHistory')}
+              text={t('about.trackHistoryText')}
               palette={palette}
             />
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Informations produit</Text>
+            <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('about.productInfo')}</Text>
 
-            <InfoRow label="Application" value="MeterFlow Mobile" palette={palette} />
-            <InfoRow label="Version" value={appVersion} palette={palette} />
-            <InfoRow label="Cible" value="Clients abonnés" palette={palette} />
-            <InfoRow label="Fonction principale" value="Auto-relevé de compteur" palette={palette} />
+            <InfoRow label={t('about.appLabel')} value="MeterFlow Mobile" palette={palette} />
+            <InfoRow label={t('common.version')} value={appVersion} palette={palette} />
+            <InfoRow label={t('about.targetLabel')} value={t('about.targetValue')} palette={palette} />
+            <InfoRow label={t('about.mainFunctionLabel')} value={t('about.mainFunctionValue')} palette={palette} />
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Pourquoi cette application</Text>
+            <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('about.whyTitle')}</Text>
             <Text style={[styles.longText, { color: palette.muted }]}>
-              MeterFlow Mobile a été conçue pour rendre la remontée des relevés plus simple, plus rapide et plus
-              traçable. L&apos;objectif est de permettre aux clients de transmettre un relevé fiable, tout en améliorant
-              le suivi centralisé et la transparence du processus.
+              {t('about.whyText')}
             </Text>
           </View>
 
           <View style={styles.footerNote}>
             <Text style={[styles.footerText, { color: palette.muted }]}>
-              © 2026 MeterFlow. Propulsé par E2C.
+              {t('about.footer')}
             </Text>
           </View>
         </View>

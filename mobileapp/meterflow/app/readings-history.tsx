@@ -1,33 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-
+import { useFocusEffect } from 'expo-router';
 import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
+import { AppStateCard } from '@/components/app/app-state-card';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSafePush } from '@/hooks/use-safe-push';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientReadings, type MobileReading } from '@/lib/api/mobile-readings';
-import { getReviewReasonLabel } from '@/lib/readings/review-reasons';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
-type HistoryFilter = 'ALL' | 'PENDING' | 'VALIDATED' | 'FLAGGED' | 'REJECTED';
+type HistoryFilter =
+  | 'ALL'
+  | 'PENDING'
+  | 'VALIDATED'
+  | 'FLAGGED'
+  | 'REJECTED'
+  | 'RESUBMISSION_REQUESTED';
 
 export default function ReadingsHistoryScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
   const { session, logout } = useMobileSession();
+  const { safePush } = useSafePush();
   const [readings, setReadings] = useState<MobileReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>('ALL');
   const [showFilterSelect, setShowFilterSelect] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadReadings() {
+  const loadReadings = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
       if (!session?.accessToken) {
         setLoading(false);
         return;
@@ -38,29 +43,33 @@ export default function ReadingsHistoryScreen() {
 
       try {
         const result = await listClientReadings(session.accessToken);
-        if (!active) return;
+        if (!activeRef.current) return;
         setReadings(result.readings);
       } catch (loadError) {
-        if (!active) return;
-        const message = loadError instanceof Error ? loadError.message : 'Impossible de charger les relevés.';
+        if (!activeRef.current) return;
+        const message = toMobileErrorMessage(loadError, 'Impossible de charger les relevés.');
         setError(message);
 
-        if (message.includes('Session invalide')) {
-          logout();
+        if (isMobileAuthError(loadError)) {
+          await logout();
         }
       } finally {
-        if (active) {
+        if (activeRef.current) {
           setLoading(false);
         }
       }
-    }
+    }, [logout, session?.accessToken]);
 
-    void loadReadings();
+  useFocusEffect(
+    useCallback(() => {
+      const activeRef = { current: true };
+      void loadReadings(activeRef);
 
-    return () => {
-      active = false;
-    };
-  }, [logout, session?.accessToken]);
+      return () => {
+        activeRef.current = false;
+      };
+    }, [loadReadings])
+  );
 
   const filteredReadings =
     filter === 'ALL' ? readings : readings.filter((reading) => reading.status === filter);
@@ -88,19 +97,28 @@ export default function ReadingsHistoryScreen() {
             <CircularLoading palette={palette} />
           </View>
         ) : error ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="cloud-offline-outline"
+            title="Historique indisponible"
+            description={error}
+            tone="danger"
+            actionLabel="Réessayer"
+            onActionPress={() => void loadReadings()}
+          />
         ) : filteredReadings.length === 0 ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.muted }]}>Aucun relevé disponible pour le moment.</Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="receipt-outline"
+            title="Aucun relevé trouvé"
+            description="Les relevés envoyés apparaîtront ici avec leur statut et les éventuelles actions à faire."
+          />
         ) : (
           <View style={styles.stack}>
             {filteredReadings.map((reading) => (
               <Pressable
                 key={reading.id}
-                onPress={() => router.push(`/readings/${reading.id}`)}
+                onPress={() => safePush(`/readings/${reading.id}`)}
                 style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                 <View style={styles.rowBetween}>
                   <View style={{ flex: 1 }}>
@@ -108,15 +126,15 @@ export default function ReadingsHistoryScreen() {
                     <Text style={[styles.meta, { color: palette.muted }]}>
                       {formatDisplayDate(reading.readingAt)}
                     </Text>
-                    {reading.status === 'FLAGGED' || reading.status === 'REJECTED' ? (
+                    {reading.reasonLabel ? (
                       <Text style={[styles.reasonText, { color: palette.muted }]}>
-                        {getReviewReasonLabel(reading.flagReason || reading.rejectionReason) || 'Décision en cours'}
+                        {reading.reasonLabel}
                       </Text>
                     ) : null}
                   </View>
                   <View style={[styles.statusPill, statusPillStyle(reading.status, palette)]}>
                     <Text style={[styles.statusText, statusTextStyle(reading.status, palette)]}>
-                      {humanizeStatus(reading.status)}
+                      {reading.statusLabel || '--'}
                     </Text>
                   </View>
                 </View>
@@ -156,6 +174,26 @@ export default function ReadingsHistoryScreen() {
                     </View>
                   )}
                 </View>
+
+                {reading.canResubmit ? (
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      safePush({
+                        pathname: '/(tabs)/readings',
+                        params: {
+                          resubmitReadingId: reading.id,
+                          meterId: reading.meterId,
+                        },
+                      });
+                    }}
+                    style={[styles.resubmitButton, { backgroundColor: palette.accentSoft }]}>
+                    <Ionicons name="camera-outline" size={16} color={palette.accent} />
+                    <Text style={[styles.resubmitButtonText, { color: palette.primary }]}>
+                      Refaire le relevé
+                    </Text>
+                  </Pressable>
+                ) : null}
               </Pressable>
             ))}
           </View>
@@ -223,6 +261,7 @@ function statusPillStyle(status: string, palette: (typeof Colors)['light']) {
   if (status === 'VALIDATED') return { backgroundColor: `${palette.success}1f` };
   if (status === 'REJECTED') return { backgroundColor: `${palette.danger}1a` };
   if (status === 'FLAGGED') return { backgroundColor: `${palette.warning}1f` };
+  if (status === 'RESUBMISSION_REQUESTED') return { backgroundColor: `${palette.warning}1f` };
   return { backgroundColor: palette.accentSoft };
 }
 
@@ -230,22 +269,8 @@ function statusTextStyle(status: string, palette: (typeof Colors)['light']) {
   if (status === 'VALIDATED') return { color: palette.success };
   if (status === 'REJECTED') return { color: palette.danger };
   if (status === 'FLAGGED') return { color: palette.warning };
+  if (status === 'RESUBMISSION_REQUESTED') return { color: palette.warning };
   return { color: palette.primary };
-}
-
-function humanizeStatus(status: string) {
-  switch (status) {
-    case 'VALIDATED':
-      return 'Validé';
-    case 'REJECTED':
-      return 'Rejeté';
-    case 'FLAGGED':
-      return 'Signalé';
-    case 'PENDING':
-      return 'En attente';
-    default:
-      return status;
-  }
 }
 
 function formatDisplayDate(value: string) {
@@ -414,12 +439,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'capitalize',
   },
+  resubmitButton: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  resubmitButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });
 
 const HISTORY_FILTERS: { label: string; value: HistoryFilter }[] = [
   { label: 'Tous', value: 'ALL' },
   { label: 'En attente', value: 'PENDING' },
-  { label: 'Validés', value: 'VALIDATED' },
-  { label: 'Signalés', value: 'FLAGGED' },
-  { label: 'Rejetés', value: 'REJECTED' },
+  { label: 'Validé', value: 'VALIDATED' },
+  { label: 'En vérification', value: 'FLAGGED' },
+  { label: 'Rejeté', value: 'REJECTED' },
+  { label: 'Nouvelle soumission demandée', value: 'RESUBMISSION_REQUESTED' },
 ];

@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,13 +7,18 @@ import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
+import { useSafePush } from '@/hooks/use-safe-push';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function MetersScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const { session, logout } = useMobileSession();
+  const { safePush } = useSafePush();
   const [meters, setMeters] = useState<MobileMeter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +41,11 @@ export default function MetersScreen() {
         setMeters(result.meters);
       } catch (loadError) {
         if (!active) return;
-        const message = loadError instanceof Error ? loadError.message : 'Impossible de charger les compteurs.';
+        const message = toMobileErrorMessage(loadError, t('meters.unavailableFallback'));
         setError(message);
 
-        if (message.includes('Session invalide')) {
-          logout();
+        if (isMobileAuthError(loadError)) {
+          await logout();
         }
       } finally {
         if (active) {
@@ -55,11 +59,11 @@ export default function MetersScreen() {
     return () => {
       active = false;
     };
-  }, [logout, session?.accessToken]);
+  }, [logout, session?.accessToken, t]);
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Mes compteurs" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)">
+      <AppPage title={t('common.meters')} subtitle={t('meters.subtitle')} topBarMode="back" backHref="/(tabs)">
         {loading ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
@@ -70,7 +74,7 @@ export default function MetersScreen() {
           </View>
         ) : meters.length === 0 ? (
           <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.muted }]}>Aucun compteur associé à ce compte.</Text>
+            <Text style={[styles.stateText, { color: palette.muted }]}>{t('meters.emptyDescription')}</Text>
           </View>
         ) : (
           <View style={styles.stack}>
@@ -80,7 +84,7 @@ export default function MetersScreen() {
               return (
                 <Pressable
                   key={meter.id}
-                  onPress={() => router.push(`/meters/${meter.id}`)}
+                  onPress={() => safePush(`/meters/${meter.id}`)}
                   style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                   <View style={styles.row}>
                     <View style={[styles.iconWrap, { backgroundColor: palette.accentSoft }]}>
@@ -89,7 +93,7 @@ export default function MetersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.title, { color: palette.headline }]}>{meter.serialNumber}</Text>
                       <Text style={[styles.meta, { color: palette.muted }]}>
-                        {[meter.city, meter.zone].filter(Boolean).join(' / ') || 'Localisation non renseignée'} • {meter.type}
+                        {[meter.city, meter.zone].filter(Boolean).join(' / ') || t('meters.locationMissing')} • {meter.type}
                       </Text>
                     </View>
                     <View style={styles.rowRight}>
@@ -100,16 +104,16 @@ export default function MetersScreen() {
 
                   <View style={styles.metricsRow}>
                     <View style={styles.metricBlock}>
-                      <Text style={[styles.metricLabel, { color: palette.muted }]}>Dernier index</Text>
+                      <Text style={[styles.metricLabel, { color: palette.muted }]}>{t('meters.lastIndex')}</Text>
                       <Text style={[styles.metricValue, { color: palette.headline }]}>
                         {latestState?.currentPrimary ?? '--'}
                       </Text>
                     </View>
                     <View style={styles.metricBlock}>
-                      <Text style={[styles.metricLabel, { color: palette.muted }]}>Date</Text>
+                      <Text style={[styles.metricLabel, { color: palette.muted }]}>{t('meters.date')}</Text>
                       <Text style={[styles.metricValue, { color: palette.headline }]}>
                         {latestState?.effectiveAt
-                          ? formatDisplayDate(latestState.effectiveAt)
+                          ? formatDisplayDate(latestState.effectiveAt, locale)
                           : '--'}
                       </Text>
                     </View>
@@ -124,10 +128,10 @@ export default function MetersScreen() {
   );
 }
 
-function formatDisplayDate(value: string) {
+function formatDisplayDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

@@ -78,6 +78,8 @@ function mapLoginError(code?: string) {
       return 'Identifiants invalides.';
     case 'user_not_active':
       return "Votre compte n'est pas encore active.";
+    case 'role_not_allowed_for_mobile':
+      return 'Cette application est reservee aux clients.';
     case 'role_not_allowed_for_web':
       return 'Ce profil ne peut pas utiliser cette connexion.';
     case 'invalid_request':
@@ -96,6 +98,8 @@ function mapRefreshError(code?: string) {
       return 'Session invalide. Reconnectez-vous.';
     case 'user_not_active':
       return "Votre compte n'est pas actif.";
+    case 'role_not_allowed_for_mobile':
+      return 'Cette application est reservee aux clients.';
     default:
       return 'Impossible de rafraichir la session.';
   }

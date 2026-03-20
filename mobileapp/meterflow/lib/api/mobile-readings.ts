@@ -4,6 +4,7 @@ export type MobileReading = {
   id: string;
   meterId: string;
   status: string;
+  statusLabel: string | null;
   source: string;
   readingAt: string;
   primaryIndex: string | number | null;
@@ -15,6 +16,10 @@ export type MobileReading = {
   gpsDistanceMeters: string | number | null;
   rejectionReason: string | null;
   flagReason: string | null;
+  reasonLabel: string | null;
+  decisionTitle: string | null;
+  decisionMessage: string | null;
+  canResubmit: boolean;
   reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +56,16 @@ type CreateReadingPayload = {
 export async function createClientReading(payload: CreateReadingPayload) {
   return fetchMobileJson<{ message: string; reading: MobileReading }>({
     path: '/api/v1/mobile/readings',
+    method: 'POST',
+    body: payload,
+  });
+}
+
+type ResubmitReadingPayload = Omit<CreateReadingPayload, 'meterId' | 'idempotencyKey'>;
+
+export async function resubmitClientReading(readingId: string, payload: ResubmitReadingPayload) {
+  return fetchMobileJson<{ message: string; reading: MobileReading }>({
+    path: `/api/v1/mobile/readings/${readingId}/resubmit`,
     method: 'POST',
     body: payload,
   });

@@ -613,6 +613,71 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - il faut un `development build` sur vrai appareil pour verifier correctement les push natives
   - en attendant, le centre de notifications in-app reste la source fiable cote client
 
+### 25) Stabilisation MVP mobile, profil complet et internationalisation
+
+- Stabilisation du workflow mobile de releve:
+  - anti double action sur les soumissions critiques
+  - messages d'erreur/succes homogenises cote mobile
+  - meilleure robustesse camera / GPS avant envoi
+  - resoumission plus fluide apres rejet avec navigation et etats mieux geres
+  - actualisation plus intelligente des ecrans apres action metier:
+    - accueil
+    - releves
+    - consommation
+    - notifications
+
+- Notifications in-app consolidees:
+  - badge non lu dans la topbar et le drawer
+  - marquage fin comme lu a l'ouverture du detail du releve
+  - bouton `Tout marquer comme lu`
+  - pagination par curseur sur `GET /api/v1/mobile/notifications`
+  - composant d'etat partage pour les cas vides / erreurs:
+    - `mobileapp/meterflow/components/app/app-state-card.tsx`
+
+- Page `Profil` transformee en vrai ecran compte client:
+  - chargement des vraies donnees via `GET /api/v1/mobile/me`
+  - edition des informations personnelles (`firstName`, `lastName`, `region`, `city`, `zone`)
+  - resume compte simplifie (`Compteurs`, `Releves`)
+  - section securite avec changement de mot de passe
+  - support backend:
+    - `PATCH /api/v1/mobile/me`
+    - `PATCH /api/v1/mobile/me/password`
+  - deconnexion forcee apres changement de mot de passe, conformement a l'invalidation des sessions cote serveur
+
+- Navigation mobile plus propre:
+  - prevention de l'empilement des pages identiques (`safePush`)
+  - topbar partage simplifie:
+    - un seul titre visible
+    - bouton menu ou retour selon le contexte
+  - drawer stabilise sur login/logout et changements de route
+
+- Internationalisation mobile:
+  - infrastructure i18n legere ajoutee:
+    - `mobileapp/meterflow/lib/i18n/translations.ts`
+    - `mobileapp/meterflow/hooks/use-i18n.ts`
+  - preference de langue persistante dans `app-preferences`
+  - choix de langue dans la page `Parametres`
+  - langues actuellement supportees:
+    - francais (`fr`)
+    - anglais (`en`)
+    - lingala (`ln`)
+  - couverture i18n deja branchee sur les principaux ecrans clients:
+    - accueil
+    - notifications
+    - profil
+    - compteurs
+    - consommation
+    - a propos
+    - drawer / tabs / parametres
+
+- Cloisonnement des roles cote mobile:
+  - l'app mobile client est maintenant reservee aux profils `CLIENT`
+  - verrou applique sur:
+    - `POST /api/v1/mobile/auth/login`
+    - `POST /api/v1/mobile/auth/refresh`
+  - les profils `AGENT`, `SUPERVISOR` et `ADMIN` ne peuvent plus ouvrir de session dans cette app
+  - cette separation prepare la future app mobile dediee aux agents sans dupliquer tout le backend
+
 
 ## Overview
 

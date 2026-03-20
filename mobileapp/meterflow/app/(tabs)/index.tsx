@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -9,14 +8,20 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
+import { AppStateCard } from '@/components/app/app-state-card';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientConsumption, type MobileConsumptionEntry } from '@/lib/api/mobile-consumption';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
+import { useSafePush } from '@/hooks/use-safe-push';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
+import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 type DashboardData = {
@@ -27,8 +32,11 @@ type DashboardData = {
 export default function HomeScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const { width: screenWidth } = useWindowDimensions();
   const { session, logout } = useMobileSession();
+  const { unreadCount } = useMobileNotifications();
+  const { safePush } = useSafePush();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -37,10 +45,7 @@ export default function HomeScreen() {
   });
   const [activeMeterIndex, setActiveMeterIndex] = useState(0);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadDashboard() {
+  const loadDashboard = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
       if (!session?.accessToken) {
         setLoading(false);
         return;
@@ -55,32 +60,38 @@ export default function HomeScreen() {
           listClientConsumption({ limit: 12 }),
         ]);
 
-        if (!active) return;
+        if (!activeRef.current) return;
         setDashboardData({
           meters: metersResult.meters,
           consumptions: consumptionsResult.consumptions,
         });
       } catch (loadError) {
-        if (!active) return;
-        const message =
-          loadError instanceof Error ? loadError.message : 'Impossible de charger votre tableau de bord.';
+        if (!activeRef.current) return;
+        const message = toMobileErrorMessage(
+          loadError,
+          t('home.metersUnavailableTitle')
+        );
         setError(message);
-        if (message.includes('Session invalide')) {
+        if (isMobileAuthError(loadError)) {
           await logout();
         }
       } finally {
-        if (active) {
+        if (activeRef.current) {
           setLoading(false);
         }
       }
-    }
+    }, [logout, session?.accessToken, t]);
 
-    void loadDashboard();
+  useFocusEffect(
+    useCallback(() => {
+      const activeRef = { current: true };
+      void loadDashboard(activeRef);
 
-    return () => {
-      active = false;
-    };
-  }, [logout, session?.accessToken]);
+      return () => {
+        activeRef.current = false;
+      };
+    }, [loadDashboard])
+  );
 
   useEffect(() => {
     if (dashboardData.meters.length === 0) {
@@ -105,7 +116,7 @@ export default function HomeScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Accueil" subtitle="Vue d’ensemble">
+      <AppPage title={t('common.home')} subtitle={t('home.subtitle')}>
         {/* <View style={styles.header}>
           <View style={styles.headerTextBlock}>
             <Text style={[styles.eyebrow, { color: palette.accent }]}>Bonjour</Text>
@@ -128,17 +139,22 @@ export default function HomeScreen() {
               <CircularLoading palette={palette} />
             </View>
           ) : error ? (
-            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-              <Ionicons name="alert-circle-outline" size={20} color={palette.danger} />
-              <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
-            </View>
+            <AppStateCard
+              palette={palette}
+              icon="cloud-offline-outline"
+              title={t('home.metersUnavailableTitle')}
+              description={error}
+              tone="danger"
+              actionLabel={t('common.retry')}
+              onActionPress={() => void loadDashboard()}
+            />
           ) : dashboardData.meters.length === 0 ? (
-            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-              <Ionicons name="flash-outline" size={20} color={palette.icon} />
-              <Text style={[styles.stateText, { color: palette.muted }]}>
-                Aucun compteur associé à ce compte.
-              </Text>
-            </View>
+            <AppStateCard
+              palette={palette}
+              icon="flash-outline"
+              title={t('home.noMeterTitle')}
+              description={t('home.noMeterDescription')}
+            />
           ) : (
             <>
               <ScrollView
@@ -160,7 +176,7 @@ export default function HomeScreen() {
                   return (
                     <Pressable
                       key={meter.id}
-                      onPress={() => router.push(`/meters/${meter.id}`)}
+                      onPress={() => safePush(`/meters/${meter.id}`)}
                       style={[
                         styles.financeCard,
                         {
@@ -171,7 +187,7 @@ export default function HomeScreen() {
                       ]}>
                       <View style={styles.financeCardTop}>
                         <View style={styles.financeCardTitleBlock}>
-                          <Text style={[styles.financeCardLabel, { color: palette.muted }]}>Compteur</Text>
+                          <Text style={[styles.financeCardLabel, { color: palette.muted }]}>{t('home.meterLabel')}</Text>
                           <Text
                             numberOfLines={1}
                             style={[styles.financeCardTitle, { color: palette.headline }]}>
@@ -184,7 +200,7 @@ export default function HomeScreen() {
                             { backgroundColor: `${palette.accent}1f` },
                           ]}>
                           <Text style={[styles.financeStatusText, { color: palette.accent }]}>
-                            {humanizeMeterStatus(meter.status)}
+                            {humanizeMeterStatus(meter.status, t)}
                           </Text>
                         </View>
                       </View>
@@ -192,7 +208,7 @@ export default function HomeScreen() {
                       <View style={styles.financeBottomRow}>
                         <View style={styles.financeMetric}>
                           <Text style={[styles.financeMetricLabel, { color: palette.muted }]}>
-                            Index principal
+                            {t('home.primaryIndex')}
                           </Text>
                           <Text style={[styles.financeMetricValue, { color: palette.headline }]}>
                             {latestState?.currentPrimary?.toString() || '--'}
@@ -201,7 +217,7 @@ export default function HomeScreen() {
                         {meter.type === 'DUAL_INDEX' ? (
                           <View style={styles.financeMetric}>
                             <Text style={[styles.financeMetricLabel, { color: palette.muted }]}>
-                              Index secondaire
+                              {t('home.secondaryIndex')}
                             </Text>
                             <Text style={[styles.financeMetricValue, { color: palette.headline }]}>
                               {latestState?.currentSecondary?.toString() || '--'}
@@ -237,15 +253,53 @@ export default function HomeScreen() {
           )}
         </View>
 
+        <Pressable
+          onPress={() => safePush('/notifications')}
+          style={[
+            styles.notificationsShortcut,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+            },
+          ]}>
+          <View style={[styles.notificationsShortcutIcon, { backgroundColor: palette.surfaceMuted }]}>
+            <Ionicons name="notifications-outline" size={18} color={palette.accent} />
+            {unreadCount > 0 ? (
+              <View style={[styles.notificationsShortcutBadge, { backgroundColor: palette.danger }]}>
+                <Text style={styles.notificationsShortcutBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.notificationsShortcutBody}>
+            <Text style={[styles.notificationsShortcutTitle, { color: palette.headline }]}>
+              {t('common.notifications')}
+            </Text>
+            <Text style={[styles.notificationsShortcutSubtitle, { color: palette.muted }]}>
+              {unreadCount > 0
+                ? t('home.notificationsNewMessages', {
+                    count: unreadCount,
+                    x: unreadCount > 1 ? 'x' : '',
+                    s: unreadCount > 1 ? 's' : '',
+                  })
+                : t('home.notificationsNoNew')}
+            </Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={18} color={palette.muted} />
+        </Pressable>
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text
               numberOfLines={2}
               style={[styles.sectionTitle, { color: palette.headline }]}>
-              Dernières consommations
+              {t('home.latestConsumptions')}
             </Text>
-            <Pressable onPress={() => router.push('/(tabs)/account')}>
-              <Text style={[styles.sectionLink, { color: palette.accent }]}>Voir tout</Text>
+            <Pressable onPress={() => safePush('/(tabs)/account')}>
+              <Text style={[styles.sectionLink, { color: palette.accent }]}>{t('home.viewAll')}</Text>
             </Pressable>
           </View>
 
@@ -254,24 +308,29 @@ export default function HomeScreen() {
               <CircularLoading palette={palette} />
             </View>
           ) : error ? (
-            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-              <Ionicons name="alert-circle-outline" size={20} color={palette.danger} />
-              <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
-            </View>
+            <AppStateCard
+              palette={palette}
+              icon="cloud-offline-outline"
+              title={t('home.consumptionsUnavailableTitle')}
+              description={error}
+              tone="danger"
+              actionLabel={t('common.retry')}
+              onActionPress={() => void loadDashboard()}
+            />
           ) : latestConsumptions.length === 0 ? (
-            <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-              <Ionicons name="stats-chart-outline" size={20} color={palette.icon} />
-              <Text style={[styles.stateText, { color: palette.muted }]}>
-                Aucune consommation calculée pour le moment.
-              </Text>
-            </View>
+            <AppStateCard
+              palette={palette}
+              icon="stats-chart-outline"
+              title={t('home.noConsumptionTitle')}
+              description={t('home.noConsumptionDescription')}
+            />
           ) : (
             <View style={styles.readingsList}>
               {latestConsumptions.map((consumption) => (
                 <Pressable
                   key={`${consumption.meterId}-${consumption.periodKey}`}
                   onPress={() =>
-                    router.push({
+                    safePush({
                       pathname: '/consumption/[meterId]',
                       params: { meterId: consumption.meterId, periodKey: consumption.periodKey },
                     })
@@ -306,7 +365,9 @@ export default function HomeScreen() {
                       <Text style={[styles.readingAmountValue, { color: palette.headline }]}>
                         {formatConsumption(consumption.totalConsumption)}
                       </Text>
-                      <Text style={[styles.readingAmountMeta, { color: palette.muted }]}>consommation</Text>
+                      <Text style={[styles.readingAmountMeta, { color: palette.muted }]}>
+                        {t('home.consumptionLabel')}
+                      </Text>
                     </View>
                   </View>
                 </Pressable>
@@ -324,16 +385,16 @@ function formatConsumption(value: number | null) {
   return `${value.toFixed(0)} kWh`;
 }
 
-function humanizeMeterStatus(status: string) {
+function humanizeMeterStatus(status: string, t: (key: string) => string) {
   switch (status) {
     case 'ACTIVE':
-      return 'Actif';
+      return t('common.status.active');
     case 'INACTIVE':
-      return 'Inactif';
+      return t('common.status.inactive');
     case 'MAINTENANCE':
-      return 'Maintenance';
+      return t('common.status.maintenance');
     case 'REPLACED':
-      return 'Remplacé';
+      return t('common.status.replaced');
     default:
       return status;
   }
@@ -379,6 +440,51 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 12,
+  },
+  notificationsShortcut: {
+    minHeight: 72,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationsShortcutIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationsShortcutBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationsShortcutBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  notificationsShortcutBody: {
+    flex: 1,
+    gap: 4,
+  },
+  notificationsShortcutTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  notificationsShortcutSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   sectionHeader: {
     flexDirection: 'row',

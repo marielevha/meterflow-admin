@@ -50,7 +50,6 @@ export function AppPage({
           ]}>
           <AppTopBar
             title={title}
-            subtitle={subtitle}
             mode={topBarMode}
             backHref={backHref}
             onBackPress={onBackPress}

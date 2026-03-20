@@ -15,6 +15,7 @@ type MobilePreferencesContextValue = {
 
 const DEFAULT_PREFERENCES: StoredAppPreferences = {
   themePreference: 'system',
+  language: 'fr',
   keepSession: true,
   showCameraHelp: true,
 };

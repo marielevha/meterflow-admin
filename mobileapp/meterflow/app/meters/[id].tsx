@@ -8,6 +8,7 @@ import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { getClientMeterDetail, type MobileMeter } from '@/lib/api/mobile-meters';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
@@ -39,9 +40,9 @@ export default function MeterDetailScreen() {
         setMeter(result.meter);
       } catch (loadError) {
         if (!active) return;
-        const message = loadError instanceof Error ? loadError.message : 'Impossible de charger le compteur.';
+        const message = toMobileErrorMessage(loadError, 'Impossible de charger le compteur.');
         setError(message);
-        if (message.includes('Session invalide')) {
+        if (isMobileAuthError(loadError)) {
           await logout();
         }
       } finally {

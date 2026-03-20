@@ -7,6 +7,7 @@ import { AppPage } from '@/components/app/app-page';
 import { ThemeModeSwitcher } from '@/components/app/theme-mode-switcher';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { getMobileAppConfig, type MobileAppConfig } from '@/lib/api/mobile-app-config';
 import { resetOnboardingCompleted } from '@/lib/storage/onboarding';
 import { useMobilePreferences } from '@/providers/mobile-preferences-provider';
@@ -15,6 +16,7 @@ import { useMobileSession } from '@/providers/mobile-session-provider';
 export default function SettingsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const { logout } = useMobileSession();
   const { preferences, updatePreferences } = useMobilePreferences();
   const [appConfig, setAppConfig] = useState<MobileAppConfig | null>(null);
@@ -47,28 +49,39 @@ export default function SettingsScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Parametres" subtitle="Drawer menu" topBarMode="back" backHref="/(tabs)">
+      <AppPage title={t('settings.title')} subtitle={t('settings.subtitle')} topBarMode="back" backHref="/(tabs)">
         <View style={styles.container}>
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.cardTitle, { color: palette.headline }]}>Apparence</Text>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.appearanceTitle')}</Text>
             <Text style={[styles.cardText, { color: palette.muted }]}>
-              Choisissez votre mode avec les icônes ci-dessous.
+              {t('settings.appearanceText')}
             </Text>
             <ThemeModeSwitcher />
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.cardTitle, { color: palette.headline }]}>Préférences</Text>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.languageTitle')}</Text>
+            <Text style={[styles.cardText, { color: palette.muted }]}>{t('settings.languageText')}</Text>
+            <LanguageSwitcher
+              value={preferences.language}
+              onChange={(value) => void updatePreferences({ language: value })}
+              palette={palette}
+              t={t}
+            />
+          </View>
+
+          <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.preferencesTitle')}</Text>
             <SettingToggleRow
-              label="Rester connecté"
-              description="Conserver votre session sur cet appareil."
+              label={t('settings.keepSessionLabel')}
+              description={t('settings.keepSessionDesc')}
               value={preferences.keepSession}
               onValueChange={(value) => void updatePreferences({ keepSession: value })}
               palette={palette}
             />
             <SettingToggleRow
-              label="Afficher l'aide caméra"
-              description="Afficher le bouton d'information sur l'écran de prise de photo."
+              label={t('settings.showCameraHelpLabel')}
+              description={t('settings.showCameraHelpDesc')}
               value={preferences.showCameraHelp}
               onValueChange={(value) => void updatePreferences({ showCameraHelp: value })}
               palette={palette}
@@ -77,19 +90,19 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.cardTitle, { color: palette.headline }]}>Règles de relevé</Text>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.rulesTitle')}</Text>
             <InfoRow
-              label="GPS requis"
-              value={appConfig ? (appConfig.requireGpsForReading ? 'Oui' : 'Non') : '--'}
+              label={t('settings.gpsRequired')}
+              value={appConfig ? (appConfig.requireGpsForReading ? t('common.yes') : t('common.no')) : '--'}
               palette={palette}
             />
             <InfoRow
-              label="Seuil GPS"
+              label={t('settings.gpsThreshold')}
               value={appConfig ? `${appConfig.maxGpsDistanceMeters} m` : '--'}
               palette={palette}
             />
             <InfoRow
-              label="Taille max photo"
+              label={t('settings.maxPhotoSize')}
               value={appConfig ? `${appConfig.maxImageSizeMb} MB` : '--'}
               palette={palette}
               last
@@ -97,12 +110,12 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.cardTitle, { color: palette.headline }]}>Actions</Text>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.actionsTitle')}</Text>
 
             <Pressable
               onPress={() => void handleReplayOnboarding()}
               style={[styles.actionButton, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-              <Text style={[styles.actionButtonLabel, { color: palette.headline }]}>Revoir l&apos;onboarding</Text>
+              <Text style={[styles.actionButtonLabel, { color: palette.headline }]}>{t('settings.replayOnboarding')}</Text>
             </Pressable>
 
             <Pressable
@@ -114,12 +127,55 @@ export default function SettingsScreen() {
                   borderColor: `${palette.danger}33`,
                 },
               ]}>
-              <Text style={[styles.actionButtonDanger, { color: palette.danger }]}>Se déconnecter</Text>
+              <Text style={[styles.actionButtonDanger, { color: palette.danger }]}>{t('settings.logout')}</Text>
             </Pressable>
           </View>
         </View>
       </AppPage>
     </RequireMobileAuth>
+  );
+}
+
+function LanguageSwitcher({
+  value,
+  onChange,
+  palette,
+  t,
+}: {
+  value: 'fr' | 'en' | 'ln';
+  onChange: (value: 'fr' | 'en' | 'ln') => void;
+  palette: (typeof Colors)['light'];
+  t: (key: string) => string;
+}) {
+  return (
+    <View style={[styles.languageSwitcher, { borderColor: palette.border, backgroundColor: palette.surfaceMuted }]}>
+      {(['fr', 'en', 'ln'] as const).map((option) => {
+        const selected = option === value;
+
+        return (
+          <Pressable
+            key={option}
+            onPress={() => onChange(option)}
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor: selected ? palette.accent : 'transparent',
+              },
+            ]}>
+            <Text style={[styles.languageOptionCode, { color: selected ? '#ffffff' : palette.muted }]}>
+              {option.toUpperCase()}
+            </Text>
+            <Text style={[styles.languageOptionLabel, { color: selected ? '#ffffff' : palette.headline }]}>
+              {option === 'fr'
+                ? t('common.french')
+                : option === 'en'
+                  ? t('common.english')
+                  : t('common.lingala')}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -178,6 +234,31 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: 24, padding: 22, gap: 14 },
   cardTitle: { fontSize: 18, fontWeight: '800' },
   cardText: { fontSize: 14, lineHeight: 21 },
+  languageSwitcher: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 4,
+    gap: 4,
+  },
+  languageOption: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  languageOptionCode: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  languageOptionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
