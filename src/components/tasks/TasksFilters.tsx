@@ -9,6 +9,9 @@ type TasksFiltersProps = {
   initialPriority: string;
   initialType: string;
   initialAssignedToId: string;
+  initialAssignmentState: string;
+  initialDueState: string;
+  initialReportState: string;
   initialPageSize: number;
   statusOptions: string[];
   priorityOptions: string[];
@@ -23,6 +26,9 @@ export default function TasksFilters({
   initialPriority,
   initialType,
   initialAssignedToId,
+  initialAssignmentState,
+  initialDueState,
+  initialReportState,
   initialPageSize,
   statusOptions,
   priorityOptions,
@@ -39,6 +45,9 @@ export default function TasksFilters({
   const [priority, setPriority] = useState(initialPriority);
   const [type, setType] = useState(initialType);
   const [assignedToId, setAssignedToId] = useState(initialAssignedToId);
+  const [assignmentState, setAssignmentState] = useState(initialAssignmentState);
+  const [dueState, setDueState] = useState(initialDueState);
+  const [reportState, setReportState] = useState(initialReportState);
   const [pageSize, setPageSize] = useState(String(initialPageSize));
 
   const isFirstRender = useRef(true);
@@ -49,6 +58,9 @@ export default function TasksFilters({
     priority?: string;
     type?: string;
     assignedToId?: string;
+    assignmentState?: string;
+    dueState?: string;
+    reportState?: string;
     pageSize?: string;
     keepPage?: boolean;
   }) => {
@@ -59,6 +71,9 @@ export default function TasksFilters({
     const nextPriority = overrides?.priority ?? priority;
     const nextType = overrides?.type ?? type;
     const nextAssignedToId = overrides?.assignedToId ?? assignedToId;
+    const nextAssignmentState = overrides?.assignmentState ?? assignmentState;
+    const nextDueState = overrides?.dueState ?? dueState;
+    const nextReportState = overrides?.reportState ?? reportState;
     const nextPageSize = overrides?.pageSize ?? pageSize;
     const keepPage = overrides?.keepPage ?? false;
 
@@ -76,6 +91,15 @@ export default function TasksFilters({
 
     if (nextAssignedToId) params.set("assignedToId", nextAssignedToId);
     else params.delete("assignedToId");
+
+    if (nextAssignmentState) params.set("assignmentState", nextAssignmentState);
+    else params.delete("assignmentState");
+
+    if (nextDueState) params.set("dueState", nextDueState);
+    else params.delete("dueState");
+
+    if (nextReportState) params.set("reportState", nextReportState);
+    else params.delete("reportState");
 
     if (nextPageSize) params.set("pageSize", nextPageSize);
     else params.delete("pageSize");
@@ -187,7 +211,56 @@ export default function TasksFilters({
         </select>
       </div>
 
-      <div className="lg:col-span-10" />
+      <div className="lg:col-span-1" />
+
+      <div className="lg:col-span-3">
+        <select
+          value={assignmentState}
+          onChange={(event) => {
+            const value = event.target.value;
+            setAssignmentState(value);
+            pushFilters({ assignmentState: value, keepPage: false });
+          }}
+          className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+        >
+          <option value="">All assignments</option>
+          <option value="assigned">Assigned only</option>
+          <option value="unassigned">Unassigned only</option>
+        </select>
+      </div>
+
+      <div className="lg:col-span-3">
+        <select
+          value={dueState}
+          onChange={(event) => {
+            const value = event.target.value;
+            setDueState(value);
+            pushFilters({ dueState: value, keepPage: false });
+          }}
+          className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+        >
+          <option value="">All due dates</option>
+          <option value="overdue">Overdue</option>
+          <option value="today">Due today</option>
+          <option value="upcoming">Upcoming</option>
+        </select>
+      </div>
+
+      <div className="lg:col-span-3">
+        <select
+          value={reportState}
+          onChange={(event) => {
+            const value = event.target.value;
+            setReportState(value);
+            pushFilters({ reportState: value, keepPage: false });
+          }}
+          className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+        >
+          <option value="">All field reports</option>
+          <option value="with_report">With report</option>
+          <option value="without_report">Without report</option>
+        </select>
+      </div>
 
       <div className="lg:col-span-1">
         <select
@@ -216,6 +289,9 @@ export default function TasksFilters({
             setPriority("");
             setType("");
             setAssignedToId("");
+            setAssignmentState("");
+            setDueState("");
+            setReportState("");
             setPageSize(String(pageSizeOptions[0] ?? 10));
             router.replace(pathname, { scroll: false });
           }}

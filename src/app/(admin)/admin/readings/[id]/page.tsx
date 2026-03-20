@@ -6,6 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { staffHasAnyPermissionFromServerComponent } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
 import { getReviewReasonLabel } from "@/lib/readings/reviewReasons";
@@ -29,6 +30,16 @@ function decimalToNumber(value: { toString(): string } | null) {
   if (!value) return null;
   const num = Number(value.toString());
   return Number.isFinite(num) ? num : null;
+}
+
+function formatGpsPair(
+  latitude: { toString(): string } | null,
+  longitude: { toString(): string } | null
+) {
+  const lat = decimalToNumber(latitude);
+  const lng = decimalToNumber(longitude);
+  if (lat === null || lng === null) return "N/A";
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
 function readingStatusBadge(status: ReadingStatus) {
@@ -133,6 +144,9 @@ export default async function ReadingDetailPage({
 }) {
   const staff = await getCurrentStaffFromServerAction();
   if (!staff) redirect("/signin");
+  const canViewReadingEventsAuditTrail = await staffHasAnyPermissionFromServerComponent(staff, [
+    "reading-event:view",
+  ], { requireExplicitPermissions: true });
 
   const { id } = await params;
 
@@ -193,7 +207,9 @@ export default async function ReadingDetailPage({
         },
       },
       events: {
-        where: { deletedAt: null },
+        where: canViewReadingEventsAuditTrail
+          ? { deletedAt: null }
+          : { deletedAt: null, type: ReadingEventType.RESUBMITTED },
         orderBy: { createdAt: "desc" },
         include: {
           user: {
@@ -219,6 +235,18 @@ export default async function ReadingDetailPage({
           createdAt: true,
         },
       },
+      reportedTasks: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          createdAt: true,
+          resolutionCode: true,
+        },
+      },
     },
   });
 
@@ -226,6 +254,12 @@ export default async function ReadingDetailPage({
   const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
   const gpsThreshold = gpsThresholdMeters();
   const gpsWithinThreshold = gpsDistance === null ? null : gpsDistance <= gpsThreshold;
+  const resubmissionEvents = reading.events.filter((event) => event.type === ReadingEventType.RESUBMITTED);
+  const auditTrailEvents = canViewReadingEventsAuditTrail ? reading.events : [];
+  const linkedTasks = [
+    ...reading.tasks.map((task) => ({ ...task, relation: "SOURCE" as const })),
+    ...reading.reportedTasks.map((task) => ({ ...task, relation: "MISSION_OUTPUT" as const })),
+  ];
 
   return (
     <div>
@@ -313,6 +347,36 @@ export default async function ReadingDetailPage({
                 <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{reading.ocrText}</p>
               </div>
             ) : null}
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">GPS snapshot</p>
+                <div className="mt-3 grid grid-cols-1 gap-3">
+                  <Info label="Meter coordinates" value={formatGpsPair(reading.meter.latitude, reading.meter.longitude)} />
+                  <Info label="Reading coordinates" value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude)} />
+                  <Info label="GPS accuracy" value={decimalToString(reading.gpsAccuracyMeters)} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Resubmission history</p>
+                <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">
+                  {resubmissionEvents.length} resubmission{resubmissionEvents.length > 1 ? "s" : ""}
+                </p>
+                {resubmissionEvents.length === 0 ? (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">This reading has not been resubmitted.</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {resubmissionEvents.map((event) => (
+                      <div key={event.id} className="rounded-lg border border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-white/[0.03]">
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-200">{formatDate(event.createdAt)}</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">By {personLabel(event.user)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -325,62 +389,57 @@ export default async function ReadingDetailPage({
               />
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Info label="Image URL" value={reading.imageUrl} breakAll />
-              <Info label="Image hash" value={reading.imageHash || "N/A"} />
-              <Info label="Image mime" value={reading.imageMimeType || "N/A"} />
-              <Info
-                label="Image size bytes"
-                value={reading.imageSizeBytes ? String(reading.imageSizeBytes) : "N/A"}
-              />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading events audit trail</h3>
-            <div className="mt-4 space-y-3">
-              {reading.events.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No event found.</p>
-              ) : (
-                reading.events.map((event) => {
-                  const payloadEntries = flattenPayload(event.payload as Prisma.JsonValue);
-                  return (
-                    <div key={event.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Badge size="sm" color={eventBadge(event.type)}>
-                          {event.type}
-                        </Badge>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.createdAt)}</p>
+          {canViewReadingEventsAuditTrail ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading events audit trail</h3>
+              <div className="mt-4 space-y-3">
+                {auditTrailEvents.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No event found.</p>
+                ) : (
+                  auditTrailEvents.map((event) => {
+                    const payloadEntries = flattenPayload(event.payload as Prisma.JsonValue);
+                    return (
+                      <div key={event.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Badge size="sm" color={eventBadge(event.type)}>
+                            {event.type}
+                          </Badge>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.createdAt)}</p>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                          By: {personLabel(event.user)}
+                        </p>
+                        <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                          {payloadEntries.length === 0 ? (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">No additional details.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {payloadEntries.map((item) => (
+                                <div
+                                  key={`${event.id}-${item.key}`}
+                                  className="rounded-md border border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-white/[0.03]"
+                                >
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    {humanizeKey(item.key)}
+                                  </p>
+                                  <p className="mt-1 break-words text-xs font-medium text-gray-700 dark:text-gray-200">
+                                    {formatPayloadValue(item.value)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                        By: {personLabel(event.user)}
-                      </p>
-                      <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
-                        {payloadEntries.length === 0 ? (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">No additional details.</p>
-                        ) : (
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {payloadEntries.map((item) => (
-                              <div
-                                key={`${event.id}-${item.key}`}
-                                className="rounded-md border border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-white/[0.03]"
-                              >
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  {humanizeKey(item.key)}
-                                </p>
-                                <p className="mt-1 break-words text-xs font-medium text-gray-700 dark:text-gray-200">
-                                  {formatPayloadValue(item.value)}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
 
         <aside className="space-y-6">
@@ -402,36 +461,40 @@ export default async function ReadingDetailPage({
               <Info label="Type" value={reading.meter.type} />
               <Info label="Status" value={reading.meter.status} />
               <Info label="City / Zone" value={`${reading.meter.city || "-"} / ${reading.meter.zone || "-"}`} />
-              <Info
-                label="Meter coordinates"
-                value={`${decimalToString(reading.meter.latitude)} / ${decimalToString(reading.meter.longitude)}`}
-              />
-              <Info
-                label="Reading coordinates"
-                value={`${decimalToString(reading.gpsLatitude)} / ${decimalToString(reading.gpsLongitude)}`}
-              />
+              <Info label="Meter coordinates" value={formatGpsPair(reading.meter.latitude, reading.meter.longitude)} />
+              <Info label="Reading coordinates" value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude)} />
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Linked tasks</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{reading.tasks.length}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{linkedTasks.length}</span>
             </div>
-            {reading.tasks.length === 0 ? (
+            {linkedTasks.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No task linked to this reading.</p>
             ) : (
               <div className="space-y-2">
-                {reading.tasks.map((task) => (
+                {linkedTasks.map((task) => (
                   <Link
-                    key={task.id}
+                    key={`${task.relation}-${task.id}`}
                     href={`/admin/tasks/${task.id}`}
                     className="block rounded-lg border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/[0.03]"
                   >
-                    <p className="text-sm font-medium text-gray-800 dark:text-white/90">{task.title}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-gray-800 dark:text-white/90">{task.title}</p>
+                      <Badge size="sm" color={task.relation === "MISSION_OUTPUT" ? "success" : "info"}>
+                        {task.relation === "MISSION_OUTPUT" ? "MISSION OUTPUT" : "SOURCE TASK"}
+                      </Badge>
+                    </div>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {task.status} - {task.priority} - {formatDate(task.createdAt)}
                     </p>
+                    {"resolutionCode" in task && task.resolutionCode ? (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Outcome: {task.resolutionCode}
+                      </p>
+                    ) : null}
                   </Link>
                 ))}
               </div>

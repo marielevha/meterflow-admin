@@ -32,6 +32,7 @@ async function computeOverviewDashboardData() {
   const appSettingsPromise = getAppSettings();
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -55,6 +56,11 @@ async function computeOverviewDashboardData() {
     recentTasks,
     reviewedReadingsOneYear,
     readingsOneYearForKpis,
+    openTasksCount,
+    overdueTasksCount,
+    dueTodayTasksCount,
+    tasksGroupedByAssignee,
+    activeAgents,
   ] = await prisma.$transaction([
     prisma.user.aggregate({ where: { deletedAt: null, role: UserRole.CLIENT }, _count: { id: true } }),
     prisma.user.aggregate({ where: { deletedAt: null, role: UserRole.CLIENT, status: UserStatus.ACTIVE }, _count: { id: true } }),
@@ -125,6 +131,49 @@ async function computeOverviewDashboardData() {
       },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.task.count({
+      where: {
+        deletedAt: null,
+        status: TaskStatus.OPEN,
+      },
+    }),
+    prisma.task.count({
+      where: {
+        deletedAt: null,
+        dueAt: { lt: startOfToday },
+        status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED] },
+      },
+    }),
+    prisma.task.count({
+      where: {
+        deletedAt: null,
+        dueAt: { gte: startOfToday, lt: startOfTomorrow },
+        status: { in: [TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED] },
+      },
+    }),
+    prisma.task.groupBy({
+      by: ["assignedToId", "status"],
+      where: {
+        deletedAt: null,
+        assignedToId: { not: null },
+      },
+      orderBy: [{ assignedToId: "asc" }, { status: "asc" }],
+      _count: { _all: true },
+    }),
+    prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        role: UserRole.AGENT,
+        status: UserStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+      },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    }),
   ]);
 
   const appSettings = await appSettingsPromise;
@@ -184,26 +233,29 @@ async function computeOverviewDashboardData() {
   const statusValues = [statusMix.pending, statusMix.validated, statusMix.flagged, statusMix.rejected, statusMix.other];
 
   const taskStatusOrder = [TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.DONE, TaskStatus.CANCELED];
-  const taskCountMap = new Map(taskCountsByStatus.map((row) => [row.status, row._count.status]));
+  const taskStatusRows = taskCountsByStatus as Array<{ status: TaskStatus; _count: { status: number } }>;
+  const taskCountMap = new Map(taskStatusRows.map((row) => [row.status, row._count.status]));
   const taskStatusLabels = taskStatusOrder.map((status) => status.replace("_", " "));
   const taskStatusValues = taskStatusOrder.map((status) => taskCountMap.get(status) || 0);
 
   const roleOrder = [UserRole.CLIENT, UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN];
-  const userRoleMap = new Map(usersByRole.map((row) => [row.role, row._count.role]));
+  const userRoleRows = usersByRole as Array<{ role: UserRole; _count: { role: number } }>;
+  const userRoleMap = new Map(userRoleRows.map((row) => [row.role, row._count.role]));
   const userRoleLabels = roleOrder.map((role) => role);
   const userRoleValues = roleOrder.map((role) => userRoleMap.get(role) || 0);
 
-  const topAgentIds = topAgentsRaw.map((item) => item.reviewedById).filter((id): id is string => Boolean(id));
+  const topAgentRows = topAgentsRaw as Array<{ reviewedById: string | null; _count: { reviewedById: number } }>;
+  const topAgentIds = topAgentRows.map((item) => item.reviewedById).filter((id): id is string => Boolean(id));
   const topAgentUsers = topAgentIds.length
     ? await prisma.user.findMany({ where: { id: { in: topAgentIds }, deletedAt: null }, select: { id: true, firstName: true, lastName: true, phone: true } })
     : [];
   const topAgentMap = new Map(topAgentUsers.map((agent) => [agent.id, agent]));
-  const topAgentLabels = topAgentsRaw.map((item) => {
+  const topAgentLabels = topAgentRows.map((item) => {
     const user = item.reviewedById ? topAgentMap.get(item.reviewedById) : null;
     const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
     return fullName || user?.phone || "Unknown";
   });
-  const topAgentValues = topAgentsRaw.map((item) => item._count.reviewedById);
+  const topAgentValues = topAgentRows.map((item) => item._count.reviewedById);
 
   const riskyZones = Array.from(riskByZone.entries())
     .map(([zone, values]) => ({ zone, ratio: values.total > 0 ? (values.suspicious / values.total) * 100 : 0, total: values.total }))
@@ -271,7 +323,11 @@ async function computeOverviewDashboardData() {
   readings30d.forEach((reading) => {
     const submittedAt = reading.createdAt;
     const reviewedAt = reading.reviewedAt;
-    const isReviewed = Boolean(reviewedAt) && [ReadingStatus.VALIDATED, ReadingStatus.FLAGGED, ReadingStatus.REJECTED].includes(reading.status);
+    const isReviewed =
+      Boolean(reviewedAt) &&
+      (reading.status === ReadingStatus.VALIDATED ||
+        reading.status === ReadingStatus.FLAGGED ||
+        reading.status === ReadingStatus.REJECTED);
     const isPending = reading.status === ReadingStatus.PENDING;
     const gpsDistance = reading.gpsDistanceMeters !== null && reading.gpsDistanceMeters !== undefined ? Number(reading.gpsDistanceMeters.toString()) : null;
     const isSuspicious =
@@ -475,6 +531,36 @@ async function computeOverviewDashboardData() {
     }),
   };
 
+  const groupedTaskRows = tasksGroupedByAssignee as Array<{
+    assignedToId: string | null;
+    status: TaskStatus;
+    _count: { _all: number };
+  }>;
+
+  const supervisionByAgent = activeAgents
+    .map((agent) => {
+      const rows = groupedTaskRows.filter((item) => item.assignedToId === agent.id);
+      const statusCount = (status: TaskStatus) =>
+        rows.find((row) => row.status === status)?._count._all || 0;
+      const open = statusCount(TaskStatus.OPEN);
+      const inProgress = statusCount(TaskStatus.IN_PROGRESS);
+      const blocked = statusCount(TaskStatus.BLOCKED);
+      const done = statusCount(TaskStatus.DONE);
+      const totalActive = open + inProgress + blocked;
+
+      return {
+        id: agent.id,
+        label:
+          [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim() || agent.username || "Agent",
+        open,
+        inProgress,
+        blocked,
+        done,
+        totalActive,
+      };
+    })
+    .sort((a, b) => b.totalActive - a.totalActive || b.blocked - a.blocked || a.label.localeCompare(b.label));
+
   return {
     appSettings,
     recentReadings,
@@ -493,6 +579,12 @@ async function computeOverviewDashboardData() {
       metersCoverage,
       todayTrend,
       volumeTrend,
+    },
+    supervision: {
+      openTasksCount,
+      overdueTasksCount,
+      dueTodayTasksCount,
+      agentLoad: supervisionByAgent,
     },
     charts: {
       dailyLabels,

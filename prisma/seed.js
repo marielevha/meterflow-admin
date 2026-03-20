@@ -34,6 +34,7 @@ const roles = [
 const permissions = [
   { code: "reading:create", name: "Create reading", resource: "reading", action: "create" },
   { code: "reading:view", name: "View reading", resource: "reading", action: "view" },
+  { code: "reading-event:view", name: "View reading event audit trail", resource: "reading_event", action: "view" },
   { code: "reading:review", name: "Review reading", resource: "reading", action: "review" },
   { code: "reading:flag", name: "Flag reading", resource: "reading", action: "flag" },
   { code: "reading:reject", name: "Reject reading", resource: "reading", action: "reject" },
@@ -42,6 +43,7 @@ const permissions = [
   { code: "task:update", name: "Update task", resource: "task", action: "update" },
   { code: "user:manage", name: "Manage users", resource: "user", action: "manage" },
   { code: "meter:manage", name: "Manage meters", resource: "meter", action: "manage" },
+  { code: "meter:import", name: "Import meters", resource: "meter", action: "import" },
   { code: "dashboard:view", name: "View dashboard", resource: "dashboard", action: "view" },
   { code: "audit:view", name: "View audit", resource: "audit", action: "view" },
 ];
@@ -51,6 +53,7 @@ const rolePermissionCodes = {
   AGENT: ["reading:view", "reading:review", "reading:flag", "reading:reject", "task:update", "dashboard:view"],
   SUPERVISOR: [
     "reading:view",
+    "reading-event:view",
     "reading:review",
     "reading:flag",
     "reading:reject",
@@ -63,6 +66,7 @@ const rolePermissionCodes = {
   ADMIN: [
     "reading:create",
     "reading:view",
+    "reading-event:view",
     "reading:review",
     "reading:flag",
     "reading:reject",
@@ -71,6 +75,7 @@ const rolePermissionCodes = {
     "task:update",
     "user:manage",
     "meter:manage",
+    "meter:import",
     "dashboard:view",
     "audit:view",
   ],

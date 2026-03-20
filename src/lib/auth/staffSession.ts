@@ -10,6 +10,7 @@ const STAFF_ROLES = new Set<UserRole>([
 
 type StaffAuthOptions = {
   anyOfPermissions?: string[];
+  requireExplicitPermissions?: boolean;
 };
 
 function extractAccessToken(request: Request): string | null {
@@ -103,7 +104,10 @@ export async function getCurrentStaffUser(request: Request, options?: StaffAuthO
   }
 
   const requiredPermissions = (options?.anyOfPermissions || []).filter(Boolean);
-  if (requiredPermissions.length > 0 && user.role !== UserRole.ADMIN) {
+  if (
+    requiredPermissions.length > 0 &&
+    (options?.requireExplicitPermissions === true || user.role !== UserRole.ADMIN)
+  ) {
     const allowed = await hasAnyPermission(user.id, requiredPermissions);
     if (!allowed) {
       return {

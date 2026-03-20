@@ -18,13 +18,18 @@ import {
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
-import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  subItems?: {
+    name: string;
+    path: string;
+    pro?: boolean;
+    new?: boolean;
+    requiredAnyOfPermissions?: string[];
+  }[];
 };
 const SHOW_DEMO_MENU = process.env.NEXT_PUBLIC_SHOW_DEMO_MENU === "1";
 
@@ -47,13 +52,25 @@ const navItems: NavItem[] = [
   },
   {
     icon: <ListIcon />,
-    name: "Operations",
+    name: "Reading management",
     subItems: [
-      { name: "Meters", path: "/admin/meters", pro: false },
-      { name: "Add meter", path: "/admin/meters/create", pro: false },
       { name: "Readings", path: "/admin/readings", pro: false },
       { name: "History", path: "/admin/history", pro: false },
       { name: "Consumption", path: "/admin/consumption", pro: false },
+    ],
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Meter management",
+    subItems: [
+      { name: "Meters", path: "/admin/meters", pro: false },
+      { name: "Add meter", path: "/admin/meters/create", pro: false },
+      {
+        name: "Import meters",
+        path: "/admin/meters/import",
+        pro: false,
+        requiredAnyOfPermissions: ["meter:import"],
+      },
     ],
   },
   {
@@ -144,10 +161,31 @@ const demoOtherItems: NavItem[] = [
   },
 ];
 
-const AppSidebar: React.FC = () => {
+const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes = [] }) => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
-  const effectiveMainItems = SHOW_DEMO_MENU ? [...navItems, ...demoMainItems] : navItems;
+  const hasAnyPermission = useCallback(
+    (requiredPermissions?: string[]) => {
+      if (!requiredPermissions || requiredPermissions.length === 0) return true;
+      return requiredPermissions.some((code) => permissionCodes.includes(code));
+    },
+    [permissionCodes]
+  );
+
+  const filterNavItems = useCallback(
+    (items: NavItem[]) =>
+      items.flatMap((nav) => {
+        if (!nav.subItems) return [nav];
+        const allowedSubItems = nav.subItems.filter((subItem) =>
+          hasAnyPermission(subItem.requiredAnyOfPermissions)
+        );
+        if (allowedSubItems.length === 0) return [];
+        return [{ ...nav, subItems: allowedSubItems }];
+      }),
+    [hasAnyPermission]
+  );
+
+  const effectiveMainItems = filterNavItems(SHOW_DEMO_MENU ? [...navItems, ...demoMainItems] : navItems);
   const effectiveOtherItems = SHOW_DEMO_MENU ? demoOtherItems : [];
 
   const renderMenuItems = (
@@ -445,7 +483,6 @@ const AppSidebar: React.FC = () => {
             ) : null}
           </div>
         </nav>
-        {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
       </div>
     </aside>
   );

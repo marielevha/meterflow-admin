@@ -6,7 +6,10 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["audit:view"] });
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: ["reading-event:view"],
+    requireExplicitPermissions: true,
+  });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

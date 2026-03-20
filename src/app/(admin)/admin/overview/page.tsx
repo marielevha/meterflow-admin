@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ReadingStatus, TaskStatus } from "@prisma/client";
+import Link from "next/link";
 import { BoxCubeIcon, PieChartIcon, TaskIcon, UserCircleIcon } from "@/icons";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
@@ -33,7 +34,7 @@ function readingStatusColor(status: ReadingStatus) {
 
 export default async function OverviewPage() {
   const overview = await getOverviewDashboardData();
-  const { appSettings, recentReadings, recentTasks, metrics, charts } = overview;
+  const { appSettings, recentReadings, recentTasks, metrics, charts, supervision } = overview;
 
   return (
     <div>
@@ -113,6 +114,77 @@ export default async function OverviewPage() {
       />
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <ComponentCard title="Mission supervision" desc="Pilotage des files terrain et retards.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <SupervisionCard
+              label="Missions ouvertes"
+              value={supervision.openTasksCount}
+              hint="Taches en attente de prise en charge"
+              tone="info"
+            />
+            <SupervisionCard
+              label="En retard"
+              value={supervision.overdueTasksCount}
+              hint="Missions echeance depassee encore actives"
+              tone="error"
+            />
+            <SupervisionCard
+              label="Du jour"
+              value={supervision.dueTodayTasksCount}
+              hint="Missions a traiter aujourd'hui"
+              tone="warning"
+            />
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <Link
+              href="/admin/tasks"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+            >
+              Ouvrir les missions
+            </Link>
+          </div>
+        </ComponentCard>
+
+        <ComponentCard title="Charge par agent" desc="Suivi des missions ouvertes, bloquees et terminees par agent.">
+          <div className="max-w-full overflow-x-auto">
+            <div className="min-w-[720px] overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+              <Table>
+                <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+                  <TableRow>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Agent</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Open</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">In progress</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Blocked</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Done</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Active total</TableCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                  {supervision.agentLoad.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        No active agents found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    supervision.agentLoad.map((agent) => (
+                      <TableRow key={agent.id}>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{agent.label}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{agent.open}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{agent.inProgress}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{agent.blocked}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{agent.done}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{agent.totalActive}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </ComponentCard>
+
         <ComponentCard title="Recent readings" desc="Derniers releves a superviser.">
           <div className="max-w-full overflow-x-auto">
             <div className="min-w-[920px] overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
@@ -258,6 +330,36 @@ function MetricCard({
         </span>
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{hint} · {trendLabel}</p>
+    </div>
+  );
+}
+
+function SupervisionCard({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  tone: "info" | "warning" | "error";
+}) {
+  const badgeClass =
+    tone === "error"
+      ? "bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-400"
+      : tone === "warning"
+        ? "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"
+        : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300";
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-3xl font-semibold tracking-tight text-gray-800 dark:text-white/90">{value}</p>
+        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badgeClass}`}>{tone.toUpperCase()}</span>
+      </div>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{hint}</p>
     </div>
   );
 }

@@ -24,6 +24,9 @@ type TaskFilters = {
   priority?: string;
   type?: string;
   assignedToId?: string;
+  assignmentState?: string;
+  dueState?: string;
+  reportState?: string;
   meterId?: string;
   readingId?: string;
   page?: number;
@@ -114,6 +117,23 @@ function toNullableDate(value: unknown): Date | null {
   if (typeof value !== "string") return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+const ACTIVE_TASK_STATUSES = [TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED] as const;
+
+function parseAssignmentState(value: unknown) {
+  if (value === "assigned" || value === "unassigned") return value;
+  return null;
+}
+
+function parseDueState(value: unknown) {
+  if (value === "overdue" || value === "today" || value === "upcoming") return value;
+  return null;
+}
+
+function parseReportState(value: unknown) {
+  if (value === "with_report" || value === "without_report") return value;
+  return null;
 }
 
 async function ensureTaskExists(taskId: string) {
@@ -234,6 +254,57 @@ export async function listTasks(staff: StaffUser, filters: TaskFilters) {
     where.assignedToId = filters.assignedToId;
   }
 
+  if (filters.assignmentState) {
+    const assignmentState = parseAssignmentState(filters.assignmentState);
+    if (!assignmentState) return { status: 400, body: { error: "invalid_assignment_state_filter" } };
+    where.assignedToId = assignmentState === "assigned" ? { not: null } : null;
+  }
+
+  if (filters.dueState) {
+    const dueState = parseDueState(filters.dueState);
+    if (!dueState) return { status: 400, body: { error: "invalid_due_state_filter" } };
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    if (dueState === "overdue") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          dueAt: { lt: todayStart },
+          status: { in: [...ACTIVE_TASK_STATUSES] },
+        },
+      ];
+    }
+
+    if (dueState === "today") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          dueAt: { gte: todayStart, lt: tomorrowStart },
+          status: { in: [...ACTIVE_TASK_STATUSES] },
+        },
+      ];
+    }
+
+    if (dueState === "upcoming") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          dueAt: { gte: tomorrowStart },
+          status: { in: [...ACTIVE_TASK_STATUSES] },
+        },
+      ];
+    }
+  }
+
+  if (filters.reportState) {
+    const reportState = parseReportState(filters.reportState);
+    if (!reportState) return { status: 400, body: { error: "invalid_report_state_filter" } };
+    where.fieldSubmittedAt = reportState === "with_report" ? { not: null } : null;
+  }
+
   if (filters.meterId) where.meterId = filters.meterId;
   if (filters.readingId) where.readingId = filters.readingId;
 
@@ -254,9 +325,13 @@ export async function listTasks(staff: StaffUser, filters: TaskFilters) {
         type: true,
         status: true,
         priority: true,
+        resolutionCode: true,
         title: true,
         description: true,
         dueAt: true,
+        startedAt: true,
+        fieldSubmittedAt: true,
+        reportedReadingId: true,
         closedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -267,9 +342,25 @@ export async function listTasks(staff: StaffUser, filters: TaskFilters) {
             meterReference: true,
             city: true,
             zone: true,
+            customer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+                phone: true,
+              },
+            },
           },
         },
         reading: {
+          select: {
+            id: true,
+            status: true,
+            readingAt: true,
+          },
+        },
+        reportedReading: {
           select: {
             id: true,
             status: true,
@@ -421,6 +512,13 @@ export async function createTask(staff: StaffUser, payload: CreateTaskPayload) {
 function buildTaskTimeline(task: {
   createdAt: Date;
   updatedAt: Date;
+  events: Array<{
+    id: string;
+    createdAt: Date;
+    type: TaskEventType;
+    payload: Prisma.JsonValue | null;
+    actorUser: { firstName: string | null; lastName: string | null; username: string | null } | null;
+  }>;
   comments: Array<{
     id: string;
     createdAt: Date;
@@ -477,6 +575,27 @@ function buildTaskTimeline(task: {
       at: item.updatedAt,
       type: "CHECKLIST",
       label: `Checklist item '${item.title}' -> ${item.status}`,
+    });
+  }
+
+  for (const event of task.events) {
+    const actor =
+      [event.actorUser?.firstName, event.actorUser?.lastName].filter(Boolean).join(" ").trim() ||
+      event.actorUser?.username ||
+      "System";
+    const payload =
+      event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
+        ? (event.payload as Record<string, unknown>)
+        : null;
+    const status = typeof payload?.nextStatus === "string" ? payload.nextStatus : null;
+    const resolution = typeof payload?.resolutionCode === "string" ? payload.resolutionCode : null;
+    const suffix = resolution ? ` (${resolution})` : status ? ` (${status})` : "";
+
+    timeline.push({
+      id: `event-${event.id}`,
+      at: event.createdAt,
+      type: "EVENT",
+      label: `${actor} -> ${event.type}${suffix}`,
     });
   }
 
@@ -643,6 +762,34 @@ export async function getTaskDetail(staff: StaffUser, taskId: string) {
           fileSizeBytes: true,
           createdAt: true,
           uploadedBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              role: true,
+            },
+          },
+        },
+      },
+      events: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          type: true,
+          payload: true,
+          createdAt: true,
+          actorUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              role: true,
+            },
+          },
+          recipientUser: {
             select: {
               id: true,
               firstName: true,

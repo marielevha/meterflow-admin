@@ -1,18 +1,19 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { ReadingStatus } from "@prisma/client";
+import { ReadingStatus, UserRole } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import Label from "@/components/form/Label";
-import Input from "@/components/form/input/InputField";
+import Badge from "@/components/ui/badge/Badge";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
 import {
   FLAG_REASON_OPTIONS,
   REJECTION_REASON_OPTIONS,
-  getReviewReasonLabel,
 } from "@/lib/readings/reviewReasons";
+import { isReadingTransitionAllowed } from "@/lib/workflows/stateMachines";
 import { updateReadingAction } from "./actions";
+import ReadingDecisionFields from "./ReadingDecisionFields";
 
 export const metadata: Metadata = {
   title: "Edit reading",
@@ -26,22 +27,49 @@ function firstValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
-function toDatetimeLocal(value: Date | null) {
-  if (!value) return "";
-  return value.toISOString().slice(0, 16);
+function formatDateTime(value: Date | null) {
+  if (!value) return "N/A";
+  return value.toISOString().slice(0, 19).replace("T", " ");
 }
 
 function decimalToInput(value: { toString(): string } | null) {
   return value ? value.toString() : "";
 }
 
+function decimalToNumber(value: { toString(): string } | null) {
+  if (!value) return null;
+  const numeric = Number(value.toString());
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatGpsPair(
+  latitude: { toString(): string } | null,
+  longitude: { toString(): string } | null
+) {
+  const lat = decimalToNumber(latitude);
+  const lng = decimalToNumber(longitude);
+  if (lat === null || lng === null) return "N/A";
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function readingStatusBadge(status: ReadingStatus) {
+  if (status === ReadingStatus.VALIDATED) return "success" as const;
+  if (status === ReadingStatus.FLAGGED) return "warning" as const;
+  if (status === ReadingStatus.REJECTED) return "error" as const;
+  if (status === ReadingStatus.PENDING) return "info" as const;
+  return "light" as const;
+}
+
 function mapError(code: string) {
   if (!code) return "";
   if (code === "invalid_status") return "Invalid status selected.";
-  if (code === "invalid_reading_date") return "Reading date is invalid.";
+  if (code === "invalid_status_transition") return "This status transition is not allowed.";
   if (code === "invalid_primary_index") return "Primary index is invalid.";
   if (code === "invalid_secondary_index") return "Secondary index is invalid.";
-  if (code === "image_url_required") return "Image URL is required.";
+  if (code === "invalid_gps_latitude") return "GPS latitude is invalid.";
+  if (code === "invalid_gps_longitude") return "GPS longitude is invalid.";
+  if (code === "invalid_gps_accuracy") return "GPS accuracy is invalid.";
+  if (code === "invalid_gps_distance") return "GPS distance is invalid.";
   if (code === "flag_reason_required") return "Select a normalized flag reason when status is Flagged.";
   if (code === "rejection_reason_required") return "Select a normalized rejection reason when status is Rejected.";
   if (code === "invalid_flag_reason") return "The selected flag reason is invalid.";
@@ -72,10 +100,28 @@ export default async function EditReadingPage({
           serialNumber: true,
           meterReference: true,
           type: true,
+          status: true,
+          city: true,
+          zone: true,
+          addressLine1: true,
+          addressLine2: true,
+          latitude: true,
+          longitude: true,
           customer: {
             select: {
               firstName: true,
               lastName: true,
+              username: true,
+              email: true,
+              phone: true,
+            },
+          },
+          assignedAgent: {
+            select: {
+              firstName: true,
+              lastName: true,
+              username: true,
+              email: true,
               phone: true,
             },
           },
@@ -105,10 +151,25 @@ export default async function EditReadingPage({
   if (!reading) notFound();
 
   const submit = updateReadingAction.bind(null, reading.id);
+  const canEditGps = staff.role === UserRole.ADMIN || staff.role === UserRole.SUPERVISOR;
+  const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
+  const gpsThreshold = gpsThresholdMeters();
+  const gpsExceeded = gpsDistance !== null && gpsDistance > gpsThreshold;
+  const allowedReviewStatuses = [
+    reading.status,
+    ReadingStatus.VALIDATED,
+    ReadingStatus.FLAGGED,
+    ReadingStatus.REJECTED,
+  ].filter((status, index, source) => {
+    return (
+      source.indexOf(status) === index &&
+      (status === reading.status || isReadingTransitionAllowed(staff.role, reading.status, status))
+    );
+  });
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Edit reading" />
+      <PageBreadcrumb pageTitle="Review reading" />
 
       <form action={submit} className="space-y-6">
         {error ? (
@@ -117,221 +178,285 @@ export default async function EditReadingPage({
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading metadata</h3>
+        <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href={`/admin/readings/${reading.id}`}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+          >
+            Back to details
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <section className="space-y-6 xl:col-span-2">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Review decision</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {reading.meter.serialNumber} / {reading.meter.meterReference || "N/A"}
+                Status, decision reasons, and reading indexes can be adjusted here. The rest of the reading stays
+                read-only.
               </p>
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Submitted by: {personLabel(reading.submittedBy)}
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                name="status"
-                defaultValue={reading.status}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                {Object.values(ReadingStatus).map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div className="mt-4">
+                <ReadingDecisionFields
+                  allowedStatuses={allowedReviewStatuses}
+                  defaultStatus={reading.status}
+                  defaultFlagReason={reading.flagReason || ""}
+                  defaultRejectionReason={reading.rejectionReason || ""}
+                  flagOptions={FLAG_REASON_OPTIONS}
+                  rejectionOptions={REJECTION_REASON_OPTIONS}
+                />
+              </div>
 
-            <div>
-              <Label htmlFor="readingAt">Reading date</Label>
-              <Input
-                id="readingAt"
-                name="readingAt"
-                type="datetime-local"
-                defaultValue={toDatetimeLocal(reading.readingAt)}
-                required
-              />
-            </div>
+              <div className="mt-6 border-t border-gray-100 pt-6 dark:border-gray-800">
+                <div className="mb-3">
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">Reading indexes</h4>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    These values can be corrected during review by admins, supervisors, and agents.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="primaryIndex"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                    >
+                      Primary index
+                    </label>
+                    <input
+                      id="primaryIndex"
+                      name="primaryIndex"
+                      type="number"
+                      step={0.001}
+                      min="0"
+                      defaultValue={decimalToInput(reading.primaryIndex)}
+                      required
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    />
+                  </div>
 
-            <div>
-              <Label htmlFor="primaryIndex">Primary index</Label>
-              <Input
-                id="primaryIndex"
-                name="primaryIndex"
-                type="number"
-                step="0.001"
-                min="0"
-                defaultValue={decimalToInput(reading.primaryIndex)}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="secondaryIndex">Secondary index</Label>
-              <Input
-                id="secondaryIndex"
-                name="secondaryIndex"
-                type="number"
-                step="0.001"
-                min="0"
-                defaultValue={decimalToInput(reading.secondaryIndex)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="confidenceScore">Confidence score</Label>
-              <Input
-                id="confidenceScore"
-                name="confidenceScore"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={decimalToInput(reading.confidenceScore)}
-              />
+                  {reading.meter.type === "DUAL_INDEX" || reading.secondaryIndex !== null ? (
+                    <div>
+                      <label
+                        htmlFor="secondaryIndex"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                      >
+                        Secondary index
+                      </label>
+                      <input
+                        id="secondaryIndex"
+                        name="secondaryIndex"
+                        type="number"
+                        step={0.001}
+                        min="0"
+                        defaultValue={decimalToInput(reading.secondaryIndex)}
+                        className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="anomalyScore">Anomaly score</Label>
-              <Input
-                id="anomalyScore"
-                name="anomalyScore"
-                type="number"
-                step="0.001"
-                min="0"
-                defaultValue={decimalToInput(reading.anomalyScore)}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Evidence & location</h3>
-          <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-            <img
-              src={`/api/v1/readings/${reading.id}/image`}
-              alt={`Reading ${reading.id}`}
-              className="h-auto max-h-[380px] w-full object-cover"
-            />
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="md:col-span-2 xl:col-span-3">
-              <Label htmlFor="imageUrl">Image URL</Label>
-              <Input id="imageUrl" name="imageUrl" defaultValue={reading.imageUrl} required />
-            </div>
-
-            <div>
-              <Label htmlFor="gpsLatitude">GPS latitude</Label>
-              <Input
-                id="gpsLatitude"
-                name="gpsLatitude"
-                type="number"
-                step="0.0000001"
-                defaultValue={decimalToInput(reading.gpsLatitude)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="gpsLongitude">GPS longitude</Label>
-              <Input
-                id="gpsLongitude"
-                name="gpsLongitude"
-                type="number"
-                step="0.0000001"
-                defaultValue={decimalToInput(reading.gpsLongitude)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="gpsAccuracyMeters">GPS accuracy (m)</Label>
-              <Input
-                id="gpsAccuracyMeters"
-                name="gpsAccuracyMeters"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={decimalToInput(reading.gpsAccuracyMeters)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="gpsDistanceMeters">GPS distance (m)</Label>
-              <Input
-                id="gpsDistanceMeters"
-                name="gpsDistanceMeters"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={decimalToInput(reading.gpsDistanceMeters)}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Decision reasons</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            When status is <span className="font-medium text-gray-700 dark:text-gray-200">Flagged</span> or{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-200">Rejected</span>, selecting a normalized
-            reason is mandatory.
-          </p>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="flagReason">Flag reason</Label>
-              <select
-                id="flagReason"
-                name="flagReason"
-                defaultValue={reading.flagReason || ""}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="">Select a flag reason</option>
-                {FLAG_REASON_OPTIONS.map((reason) => (
-                  <option key={reason.code} value={reason.code}>
-                    {reason.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Current value: {getReviewReasonLabel(reading.flagReason) || "N/A"}
+            <div
+              className={`rounded-2xl border p-6 ${
+                gpsExceeded
+                  ? "border-warning-200 bg-warning-50/60 dark:border-warning-500/30 dark:bg-warning-500/10"
+                  : "border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+              }`}
+            >
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">GPS & location</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {canEditGps
+                  ? "Supervisors and admins can correct GPS values directly in this block when needed."
+                  : "GPS correction is restricted to supervisors and admins."}
               </p>
-            </div>
-            <div>
-              <Label htmlFor="rejectionReason">Rejection reason</Label>
-              <select
-                id="rejectionReason"
-                name="rejectionReason"
-                defaultValue={reading.rejectionReason || ""}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="">Select a rejection reason</option>
-                {REJECTION_REASON_OPTIONS.map((reason) => (
-                  <option key={reason.code} value={reason.code}>
-                    {reason.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Current value: {getReviewReasonLabel(reading.rejectionReason) || "N/A"}
-              </p>
-            </div>
-          </div>
-        </section>
+              {gpsExceeded ? (
+                <div className="mt-4 rounded-xl border border-warning-200 bg-white/70 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-200">
+                  GPS distance exceeds the configured threshold ({gpsThreshold} m).
+                  {gpsDistance !== null ? ` Current value: ${gpsDistance.toFixed(1)} m.` : ""}
+                </div>
+              ) : null}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Context (read only)</h3>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Readonly label="Meter type" value={reading.meter.type} />
-            <Readonly label="Customer" value={personLabel(reading.meter.customer)} />
-            <Readonly label="Submitted by" value={personLabel(reading.submittedBy)} />
-            <Readonly label="Reviewed by" value={personLabel(reading.reviewedBy)} />
-            <Readonly label="Reviewed at" value={reading.reviewedAt ? reading.reviewedAt.toISOString().slice(0, 19).replace("T", " ") : "N/A"} />
-            <Readonly label="Updated at" value={reading.updatedAt.toISOString().slice(0, 19).replace("T", " ")} />
-          </div>
-        </section>
+              <div
+                className={`mt-4 rounded-xl px-4 py-3 ${
+                  gpsExceeded
+                    ? "border border-warning-200 bg-white/70 dark:border-warning-500/30 dark:bg-white/5"
+                    : "border border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-white/[0.02]"
+                }`}
+              >
+                <p className="text-xs text-gray-500 dark:text-gray-400">Meter coordinates</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-white/90">
+                  {formatGpsPair(reading.meter.latitude, reading.meter.longitude)}
+                </p>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {canEditGps ? (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="gpsLatitude"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                      >
+                        GPS latitude
+                      </label>
+                      <input
+                        id="gpsLatitude"
+                        name="gpsLatitude"
+                        type="number"
+                        step="0.0000001"
+                        defaultValue={decimalToInput(reading.gpsLatitude)}
+                        className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="gpsLongitude"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                      >
+                        GPS longitude
+                      </label>
+                      <input
+                        id="gpsLongitude"
+                        name="gpsLongitude"
+                        type="number"
+                        step="0.0000001"
+                        defaultValue={decimalToInput(reading.gpsLongitude)}
+                        className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="gpsAccuracyMeters"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                      >
+                        GPS accuracy (m)
+                      </label>
+                      <input
+                        id="gpsAccuracyMeters"
+                        name="gpsAccuracyMeters"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        defaultValue={decimalToInput(reading.gpsAccuracyMeters)}
+                        className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="gpsDistanceMeters"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
+                      >
+                        GPS distance (m)
+                      </label>
+                      <input
+                        id="gpsDistanceMeters"
+                        name="gpsDistanceMeters"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        defaultValue={decimalToInput(reading.gpsDistanceMeters)}
+                        className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Info label="Reading coordinates" value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude)} />
+                    <Info label="GPS accuracy (m)" value={reading.gpsAccuracyMeters?.toString() || "N/A"} />
+                    <Info label="GPS distance (m)" value={reading.gpsDistanceMeters?.toString() || "N/A"} />
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Scoring & analysis</h3>
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Info label="Confidence score" value={reading.confidenceScore?.toString() || "N/A"} />
+                <Info label="Anomaly score" value={reading.anomalyScore?.toString() || "N/A"} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Evidence</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    The uploaded image stays attached to the reading. Admin edits do not replace the evidence file here.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                <img
+                  src={`/api/v1/readings/${reading.id}/image`}
+                  alt={`Reading ${reading.id}`}
+                  className="h-auto max-h-[420px] w-full object-cover"
+                />
+              </div>
+            </div>
+          </section>
+
+          <aside className="space-y-6">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading summary</h3>
+                <Badge size="sm" color={readingStatusBadge(reading.status)}>
+                  {reading.status}
+                </Badge>
+              </div>
+              <div className="space-y-3">
+                <Info label="Reading ID" value={reading.id} breakAll />
+                <Info
+                  label="Serial / Reference"
+                  value={`${reading.meter.serialNumber} / ${reading.meter.meterReference || "N/A"}`}
+                />
+                <Info label="Reading date" value={formatDateTime(reading.readingAt)} />
+                <Info label="Source" value={reading.source} />
+                <Info label="Meter type" value={reading.meter.type} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Actors</h3>
+              <div className="mt-4 space-y-3">
+                <Info label="Submitted by" value={personLabel(reading.submittedBy)} />
+                <Info label="Reviewed by" value={personLabel(reading.reviewedBy)} />
+                <Info label="Customer" value={personLabel(reading.meter.customer)} />
+                <Info label="Assigned agent" value={personLabel(reading.meter.assignedAgent)} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Meter details</h3>
+              <div className="mt-4 space-y-3">
+                <Info label="Serial" value={reading.meter.serialNumber} />
+                <Info label="Reference" value={reading.meter.meterReference || "N/A"} />
+                <Info label="Type" value={reading.meter.type} />
+                <Info label="Status" value={reading.meter.status} />
+                <Info label="City / Zone" value={`${reading.meter.city || "-"} / ${reading.meter.zone || "-"}`} />
+                <Info
+                  label="Address"
+                  value={[reading.meter.addressLine1, reading.meter.addressLine2].filter(Boolean).join(", ") || "N/A"}
+                />
+                <Info label="Meter coordinates" value={formatGpsPair(reading.meter.latitude, reading.meter.longitude)} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">System context</h3>
+              <div className="mt-4 space-y-3">
+                <Info label="Source" value={reading.source} />
+                <Info label="Reviewed at" value={formatDateTime(reading.reviewedAt)} />
+                <Info label="Updated at" value={formatDateTime(reading.updatedAt)} />
+              </div>
+            </div>
+          </aside>
+        </div>
 
         <div className="sticky bottom-4 z-30 rounded-xl border border-gray-200 bg-white/90 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
               href={`/admin/readings/${reading.id}`}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
@@ -367,11 +492,19 @@ function personLabel(person?: {
   );
 }
 
-function Readonly({ label, value }: { label: string; value: string }) {
+function Info({
+  label,
+  value,
+  breakAll = false,
+}: {
+  label: string;
+  value: string;
+  breakAll?: boolean;
+}) {
   return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-200">
+    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+      <p className={`mt-1 text-sm font-medium text-gray-800 dark:text-white/90 ${breakAll ? "break-all" : ""}`}>
         {value}
       </p>
     </div>

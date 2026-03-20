@@ -8,8 +8,10 @@ import Backdrop from "@/layout/Backdrop";
 
 export default function AdminShell({
   children,
+  permissionCodes = [],
 }: {
   children: React.ReactNode;
+  permissionCodes?: string[];
 }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
@@ -21,7 +23,7 @@ export default function AdminShell({
 
   return (
     <div className="min-h-screen xl:flex">
-      <AppSidebar />
+      <AppSidebar permissionCodes={permissionCodes} />
       <Backdrop />
       <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
         <AppHeader />
@@ -30,4 +32,3 @@ export default function AdminShell({
     </div>
   );
 }
-

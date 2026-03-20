@@ -1,7 +1,10 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import AdminShell from "@/layout/AdminShell";
-import { getCurrentStaffFromServerComponent } from "@/lib/auth/staffServerSession";
+import {
+  getCurrentStaffFromServerComponent,
+  getCurrentStaffPermissionCodes,
+} from "@/lib/auth/staffServerSession";
 
 export default async function AdminLayout({
   children,
@@ -13,6 +16,7 @@ export default async function AdminLayout({
     redirect("/signin");
   }
 
-  return <AdminShell>{children}</AdminShell>;
-}
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
 
+  return <AdminShell permissionCodes={permissionCodes}>{children}</AdminShell>;
+}

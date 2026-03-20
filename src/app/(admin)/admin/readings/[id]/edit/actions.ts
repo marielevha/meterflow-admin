@@ -1,6 +1,6 @@
 "use server";
 
-import { Prisma, ReadingEventType, ReadingStatus } from "@prisma/client";
+import { Prisma, ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
@@ -18,10 +18,10 @@ function asString(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function parseDate(value: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+function parseStatus(value: string): ReadingStatus | null {
+  return Object.values(ReadingStatus).includes(value as ReadingStatus)
+    ? (value as ReadingStatus)
+    : null;
 }
 
 function parseDecimal(value: string) {
@@ -38,28 +38,36 @@ function parseNumber(value: string) {
   return numeric;
 }
 
-function parseStatus(value: string): ReadingStatus | null {
-  return Object.values(ReadingStatus).includes(value as ReadingStatus)
-    ? (value as ReadingStatus)
-    : null;
-}
+type DecisionStatus = "VALIDATED" | "FLAGGED" | "REJECTED";
+
+type PushPayload = {
+  userId: string;
+  title: string;
+  body: string;
+  status: DecisionStatus;
+  meterSerialNumber: string;
+};
 
 export async function updateReadingAction(readingId: string, formData: FormData) {
   const staff = await getCurrentStaffFromServerAction();
   if (!staff) redirect("/signin");
+  const canEditGps = staff.role === UserRole.ADMIN || staff.role === UserRole.SUPERVISOR;
 
   const status = parseStatus(asString(formData.get("status")));
-  const readingAt = parseDate(asString(formData.get("readingAt")));
   const primaryIndex = parseDecimal(asString(formData.get("primaryIndex")));
   const secondaryIndexRaw = asString(formData.get("secondaryIndex"));
   const secondaryIndex = secondaryIndexRaw ? parseDecimal(secondaryIndexRaw) : null;
+  const gpsLatitudeRaw = asString(formData.get("gpsLatitude"));
+  const gpsLongitudeRaw = asString(formData.get("gpsLongitude"));
+  const gpsAccuracyRaw = asString(formData.get("gpsAccuracyMeters"));
+  const gpsDistanceRaw = asString(formData.get("gpsDistanceMeters"));
+  const gpsLatitude = gpsLatitudeRaw ? parseNumber(gpsLatitudeRaw) : null;
+  const gpsLongitude = gpsLongitudeRaw ? parseNumber(gpsLongitudeRaw) : null;
+  const gpsAccuracy = gpsAccuracyRaw ? parseDecimal(gpsAccuracyRaw) : null;
+  const gpsDistance = gpsDistanceRaw ? parseDecimal(gpsDistanceRaw) : null;
 
   if (!status) {
     redirect(`/admin/readings/${readingId}/edit?error=invalid_status`);
-  }
-
-  if (!readingAt) {
-    redirect(`/admin/readings/${readingId}/edit?error=invalid_reading_date`);
   }
 
   if (primaryIndex === null) {
@@ -70,9 +78,20 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     redirect(`/admin/readings/${readingId}/edit?error=invalid_secondary_index`);
   }
 
-  const imageUrl = asString(formData.get("imageUrl"));
-  if (!imageUrl) {
-    redirect(`/admin/readings/${readingId}/edit?error=image_url_required`);
+  if (canEditGps && gpsLatitudeRaw && gpsLatitude === null) {
+    redirect(`/admin/readings/${readingId}/edit?error=invalid_gps_latitude`);
+  }
+
+  if (canEditGps && gpsLongitudeRaw && gpsLongitude === null) {
+    redirect(`/admin/readings/${readingId}/edit?error=invalid_gps_longitude`);
+  }
+
+  if (canEditGps && gpsAccuracyRaw && gpsAccuracy === null) {
+    redirect(`/admin/readings/${readingId}/edit?error=invalid_gps_accuracy`);
+  }
+
+  if (canEditGps && gpsDistanceRaw && gpsDistance === null) {
+    redirect(`/admin/readings/${readingId}/edit?error=invalid_gps_distance`);
   }
 
   const flagReason = asString(formData.get("flagReason"));
@@ -80,36 +99,17 @@ export async function updateReadingAction(readingId: string, formData: FormData)
   const normalizedFlagReason = flagReason ? normalizeFlagReasonCode(flagReason) : null;
   const normalizedRejectionReason = rejectionReason ? normalizeRejectionReasonCode(rejectionReason) : null;
 
-  const gpsLatitudeRaw = asString(formData.get("gpsLatitude"));
-  const gpsLongitudeRaw = asString(formData.get("gpsLongitude"));
-  const gpsAccuracyRaw = asString(formData.get("gpsAccuracyMeters"));
-  const gpsDistanceRaw = asString(formData.get("gpsDistanceMeters"));
-  const confidenceRaw = asString(formData.get("confidenceScore"));
-  const anomalyRaw = asString(formData.get("anomalyScore"));
-
-  const gpsLatitude = gpsLatitudeRaw ? parseNumber(gpsLatitudeRaw) : null;
-  const gpsLongitude = gpsLongitudeRaw ? parseNumber(gpsLongitudeRaw) : null;
-  const gpsAccuracy = gpsAccuracyRaw ? parseDecimal(gpsAccuracyRaw) : null;
-  const gpsDistance = gpsDistanceRaw ? parseDecimal(gpsDistanceRaw) : null;
-  const confidenceScore = confidenceRaw ? parseDecimal(confidenceRaw) : null;
-  const anomalyScore = anomalyRaw ? parseDecimal(anomalyRaw) : null;
-
   const existing = await prisma.reading.findFirst({
     where: { id: readingId, deletedAt: null },
     select: {
       id: true,
-      meterId: true,
       status: true,
       primaryIndex: true,
       secondaryIndex: true,
-      readingAt: true,
-      imageUrl: true,
       gpsLatitude: true,
       gpsLongitude: true,
       gpsAccuracyMeters: true,
       gpsDistanceMeters: true,
-      confidenceScore: true,
-      anomalyScore: true,
       flagReason: true,
       rejectionReason: true,
       meter: {
@@ -146,36 +146,30 @@ export async function updateReadingAction(readingId: string, formData: FormData)
   }
 
   const now = new Date();
-  const isReviewed = [ReadingStatus.VALIDATED, ReadingStatus.FLAGGED, ReadingStatus.REJECTED].includes(status);
+  const isReviewed =
+    status === ReadingStatus.VALIDATED ||
+    status === ReadingStatus.FLAGGED ||
+    status === ReadingStatus.REJECTED;
 
   const data: Prisma.ReadingUpdateInput = {
     status,
-    readingAt,
-    primaryIndex: new Prisma.Decimal(primaryIndex),
-    secondaryIndex: secondaryIndex === null ? null : new Prisma.Decimal(secondaryIndex),
-    imageUrl,
+    primaryIndex: primaryIndex.toString(),
+    secondaryIndex: secondaryIndex === null ? null : secondaryIndex.toString(),
     flagReason: status === ReadingStatus.FLAGGED ? normalizedFlagReason : null,
     rejectionReason: status === ReadingStatus.REJECTED ? normalizedRejectionReason : null,
-    gpsLatitude: gpsLatitude === null ? null : new Prisma.Decimal(gpsLatitude),
-    gpsLongitude: gpsLongitude === null ? null : new Prisma.Decimal(gpsLongitude),
-    gpsAccuracyMeters: gpsAccuracy === null ? null : new Prisma.Decimal(gpsAccuracy),
-    gpsDistanceMeters: gpsDistance === null ? null : new Prisma.Decimal(gpsDistance),
-    confidenceScore: confidenceScore === null ? null : new Prisma.Decimal(confidenceScore),
-    anomalyScore: anomalyScore === null ? null : new Prisma.Decimal(anomalyScore),
     reviewedAt: isReviewed ? now : null,
     reviewedBy: isReviewed ? { connect: { id: staff.id } } : { disconnect: true },
   };
 
+  if (canEditGps) {
+    data.gpsLatitude = gpsLatitude === null ? null : new Prisma.Decimal(gpsLatitude);
+    data.gpsLongitude = gpsLongitude === null ? null : new Prisma.Decimal(gpsLongitude);
+    data.gpsAccuracyMeters = gpsAccuracy === null ? null : new Prisma.Decimal(gpsAccuracy);
+    data.gpsDistanceMeters = gpsDistance === null ? null : new Prisma.Decimal(gpsDistance);
+  }
+
   try {
-    let pushPayload:
-      | {
-          userId: string;
-          title: string;
-          body: string;
-          status: ReadingStatus;
-          meterSerialNumber: string;
-        }
-      | null = null;
+    const pushPayloadRef: { current: PushPayload | null } = { current: null };
 
     await prisma.$transaction(async (tx) => {
       await tx.reading.update({
@@ -185,37 +179,34 @@ export async function updateReadingAction(readingId: string, formData: FormData)
 
       const changes = {
         status: { from: existing.status, to: status },
-        readingAt: { from: existing.readingAt.toISOString(), to: readingAt.toISOString() },
-        primaryIndex: { from: existing.primaryIndex.toString(), to: primaryIndex.toString() },
+        primaryIndex: {
+          from: existing.primaryIndex.toString(),
+          to: primaryIndex.toString(),
+        },
         secondaryIndex: {
           from: existing.secondaryIndex ? existing.secondaryIndex.toString() : null,
           to: secondaryIndex === null ? null : secondaryIndex.toString(),
         },
-        imageUrl: { from: existing.imageUrl, to: imageUrl },
-        gpsLatitude: {
-          from: existing.gpsLatitude ? existing.gpsLatitude.toString() : null,
-          to: gpsLatitude === null ? null : gpsLatitude.toString(),
-        },
-        gpsLongitude: {
-          from: existing.gpsLongitude ? existing.gpsLongitude.toString() : null,
-          to: gpsLongitude === null ? null : gpsLongitude.toString(),
-        },
-        gpsAccuracyMeters: {
-          from: existing.gpsAccuracyMeters ? existing.gpsAccuracyMeters.toString() : null,
-          to: gpsAccuracy === null ? null : gpsAccuracy.toString(),
-        },
-        gpsDistanceMeters: {
-          from: existing.gpsDistanceMeters ? existing.gpsDistanceMeters.toString() : null,
-          to: gpsDistance === null ? null : gpsDistance.toString(),
-        },
-        confidenceScore: {
-          from: existing.confidenceScore ? existing.confidenceScore.toString() : null,
-          to: confidenceScore === null ? null : confidenceScore.toString(),
-        },
-        anomalyScore: {
-          from: existing.anomalyScore ? existing.anomalyScore.toString() : null,
-          to: anomalyScore === null ? null : anomalyScore.toString(),
-        },
+        ...(canEditGps
+          ? {
+              gpsLatitude: {
+                from: existing.gpsLatitude ? existing.gpsLatitude.toString() : null,
+                to: gpsLatitude === null ? null : gpsLatitude.toString(),
+              },
+              gpsLongitude: {
+                from: existing.gpsLongitude ? existing.gpsLongitude.toString() : null,
+                to: gpsLongitude === null ? null : gpsLongitude.toString(),
+              },
+              gpsAccuracyMeters: {
+                from: existing.gpsAccuracyMeters ? existing.gpsAccuracyMeters.toString() : null,
+                to: gpsAccuracy === null ? null : gpsAccuracy.toString(),
+              },
+              gpsDistanceMeters: {
+                from: existing.gpsDistanceMeters ? existing.gpsDistanceMeters.toString() : null,
+                to: gpsDistance === null ? null : gpsDistance.toString(),
+              },
+            }
+          : {}),
         flagReason: {
           from: existing.flagReason,
           to: status === ReadingStatus.FLAGGED ? normalizedFlagReason : null,
@@ -233,6 +224,7 @@ export async function updateReadingAction(readingId: string, formData: FormData)
           type: ReadingEventType.TASK_UPDATED,
           payload: {
             action: "reading_manual_edit",
+            scope: canEditGps ? "review_decision_indexes_gps" : "review_decision_only",
             source: "admin_edit",
             editedById: staff.id,
             editedByRole: staff.role,
@@ -262,10 +254,11 @@ export async function updateReadingAction(readingId: string, formData: FormData)
             existing.rejectionReason !== normalizedRejectionReason));
 
       if (shouldCreateDecisionEvent) {
+        const decisionStatus = status as DecisionStatus;
         const decisionEventType =
-          status === ReadingStatus.VALIDATED
+          decisionStatus === ReadingStatus.VALIDATED
             ? ReadingEventType.VALIDATED
-            : status === ReadingStatus.FLAGGED
+            : decisionStatus === ReadingStatus.FLAGGED
               ? ReadingEventType.FLAGGED
               : ReadingEventType.REJECTED;
 
@@ -279,9 +272,9 @@ export async function updateReadingAction(readingId: string, formData: FormData)
               editedById: staff.id,
               editedByRole: staff.role,
               reason: effectiveReason,
-              clientTitle: getClientReadingDecisionTitle(status, effectiveReason),
+              clientTitle: getClientReadingDecisionTitle(decisionStatus, effectiveReason),
               clientMessage: getClientReadingDecisionMessage(
-                status,
+                decisionStatus,
                 effectiveReason,
                 existing.meter.serialNumber
               ),
@@ -289,34 +282,35 @@ export async function updateReadingAction(readingId: string, formData: FormData)
           },
         });
 
-        const clientTitle = getClientReadingDecisionTitle(status, effectiveReason);
+        const clientTitle = getClientReadingDecisionTitle(decisionStatus, effectiveReason);
         const clientMessage = getClientReadingDecisionMessage(
-          status,
+          decisionStatus,
           effectiveReason,
           existing.meter.serialNumber
         );
 
         if (clientTitle && clientMessage) {
-          pushPayload = {
+          pushPayloadRef.current = {
             userId: existing.meter.customerId,
             title: clientTitle,
             body: clientMessage,
-            status,
+            status: decisionStatus,
             meterSerialNumber: existing.meter.serialNumber,
           };
         }
       }
     });
 
-    if (pushPayload) {
+    const finalPushPayload = pushPayloadRef.current;
+    if (finalPushPayload) {
       await sendPushNotificationToUser({
         userId: existing.meter.customerId,
-        title: pushPayload.title,
-        body: pushPayload.body,
+        title: finalPushPayload.title,
+        body: finalPushPayload.body,
         data: {
           readingId,
-          status: pushPayload.status,
-          meterSerialNumber: pushPayload.meterSerialNumber,
+          status: finalPushPayload.status,
+          meterSerialNumber: finalPushPayload.meterSerialNumber,
         },
       });
     }
