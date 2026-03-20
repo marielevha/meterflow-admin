@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { UserStatus } from "@prisma/client";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
+import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
 
 type UsersFiltersProps = {
   initialQ: string;
@@ -25,6 +28,7 @@ export default function UsersFilters({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { t } = useAdminI18n();
 
   const [q, setQ] = useState(initialQ);
   const [role, setRole] = useState(initialRole);
@@ -87,7 +91,7 @@ export default function UsersFilters({
           name="q"
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="Search by name, username, email, phone"
+          placeholder={t("userFilters.searchPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -103,10 +107,10 @@ export default function UsersFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All roles</option>
+          <option value="">{t("userFilters.allRoles")}</option>
           {roleOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {translateUserRole(item, t)}
             </option>
           ))}
         </select>
@@ -123,10 +127,10 @@ export default function UsersFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All statuses</option>
+          <option value="">{t("userFilters.allStatuses")}</option>
           {statusOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {translateUserStatus(item as UserStatus, t)}
             </option>
           ))}
         </select>
@@ -145,7 +149,7 @@ export default function UsersFilters({
         >
           {pageSizeOptions.map((option) => (
             <option key={option} value={option}>
-              {option} / page
+              {option} {t("userFilters.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -163,7 +167,7 @@ export default function UsersFilters({
           }}
           className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
         >
-          Reset
+          {t("userFilters.reset")}
         </button>
       </div>
     </div>

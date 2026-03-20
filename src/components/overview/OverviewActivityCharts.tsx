@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -51,6 +52,51 @@ export default function OverviewActivityCharts({
   userRoleValues,
   visibility,
 }: OverviewActivityChartsProps) {
+  const { t } = useAdminI18n();
+  const translatedStatusLabels = statusLabels.map((label) => {
+    switch (label.toUpperCase()) {
+      case "PENDING":
+        return t("overview.pending");
+      case "VALIDATED":
+        return t("overview.validated");
+      case "FLAGGED":
+        return t("overview.flagged");
+      case "REJECTED":
+        return t("overview.rejected");
+      default:
+        return t("overview.other");
+    }
+  });
+  const translatedTaskStatusLabels = taskStatusLabels.map((label) => {
+    switch (label.toUpperCase().replace(/\s+/g, "_")) {
+      case "OPEN":
+        return t("tasks.open");
+      case "IN_PROGRESS":
+        return t("tasks.inProgress");
+      case "BLOCKED":
+        return t("tasks.blocked");
+      case "DONE":
+        return t("tasks.done");
+      case "CANCELED":
+        return t("tasks.canceled");
+      default:
+        return label;
+    }
+  });
+  const translatedUserRoleLabels = userRoleLabels.map((label) => {
+    switch (label.toUpperCase()) {
+      case "CLIENT":
+        return t("overview.roleClient");
+      case "AGENT":
+        return t("overview.roleAgent");
+      case "SUPERVISOR":
+        return t("overview.roleSupervisor");
+      case "ADMIN":
+        return t("overview.roleAdmin");
+      default:
+        return label;
+    }
+  });
   const hasVisibleChart =
     visibility.activityTrend ||
     visibility.statusMix ||
@@ -96,7 +142,7 @@ export default function OverviewActivityCharts({
       type: "donut",
       fontFamily: "Outfit, sans-serif",
     },
-    labels: statusLabels,
+    labels: translatedStatusLabels,
     legend: { position: "bottom" },
     dataLabels: { enabled: true },
     colors: ["#6b7280", "#3B82F6", "#F59E0B", "#EF4444", "#10B981"],
@@ -125,7 +171,7 @@ export default function OverviewActivityCharts({
     },
     dataLabels: { enabled: false },
     xaxis: {
-      categories: taskStatusLabels,
+      categories: translatedTaskStatusLabels,
       axisBorder: { show: false },
       axisTicks: { show: false },
     },
@@ -190,7 +236,7 @@ export default function OverviewActivityCharts({
       type: "donut",
       fontFamily: "Outfit, sans-serif",
     },
-    labels: userRoleLabels,
+    labels: translatedUserRoleLabels,
     legend: { position: "bottom" },
     dataLabels: { enabled: true },
     colors: ["#22C55E", "#3B82F6", "#F59E0B", "#EF4444"],
@@ -209,10 +255,10 @@ export default function OverviewActivityCharts({
       {visibility.activityTrend ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-8">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Activity Trend (30 jours)
+            {t("overview.activityTrend")}
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Volumetrie quotidienne des releves et distribution des decisions.
+            {t("overview.activityTrendDescription")}
           </p>
           <div className="mt-4">
             <Chart
@@ -220,11 +266,11 @@ export default function OverviewActivityCharts({
               height={320}
               options={activityOptions}
               series={[
-                { name: "Total", data: dailyTotal },
-                { name: "Pending", data: dailyPending },
-                { name: "Validated", data: dailyValidated },
-                { name: "Flagged", data: dailyFlagged },
-                { name: "Rejected", data: dailyRejected },
+                { name: t("overview.total"), data: dailyTotal },
+                { name: t("overview.pending"), data: dailyPending },
+                { name: t("overview.validated"), data: dailyValidated },
+                { name: t("overview.flagged"), data: dailyFlagged },
+                { name: t("overview.rejected"), data: dailyRejected },
               ]}
             />
           </div>
@@ -234,10 +280,10 @@ export default function OverviewActivityCharts({
       {visibility.statusMix ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Status Mix (30 jours)
+            {t("overview.statusMix")}
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Repartition des statuts de releves.
+            {t("overview.statusMixDescription")}
           </p>
           <div className="mt-4">
             <Chart type="donut" height={320} options={statusOptions} series={statusValues} />
@@ -248,14 +294,14 @@ export default function OverviewActivityCharts({
       {visibility.tasksByStatus ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Tasks by Status
+            {t("overview.tasksByStatus")}
           </h3>
           <div className="mt-4">
             <Chart
               type="bar"
               height={260}
               options={taskOptions}
-              series={[{ name: "Tasks", data: taskStatusValues }]}
+              series={[{ name: t("overview.tasks"), data: taskStatusValues }]}
             />
           </div>
         </div>
@@ -264,7 +310,7 @@ export default function OverviewActivityCharts({
       {visibility.topAgents ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Top Agents (7 jours)
+            {t("overview.topAgentsWindow")}
           </h3>
           <div className="mt-4">
             <Chart
@@ -274,7 +320,7 @@ export default function OverviewActivityCharts({
                 ...topAgentsOptions,
                 xaxis: { ...topAgentsOptions.xaxis, categories: topAgentLabels },
               }}
-              series={[{ name: "Reviews", data: topAgentValues }]}
+              series={[{ name: t("nav.readings"), data: topAgentValues }]}
             />
           </div>
         </div>
@@ -283,14 +329,14 @@ export default function OverviewActivityCharts({
       {visibility.riskiestZones ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Riskiest Zones (30 jours)
+            {t("overview.riskiestZonesWindow")}
           </h3>
           <div className="mt-4">
             <Chart
               type="bar"
               height={260}
               options={riskZoneOptions}
-              series={[{ name: "Risk %", data: riskyZoneValues }]}
+              series={[{ name: t("overview.riskPercent"), data: riskyZoneValues }]}
             />
           </div>
         </div>
@@ -299,10 +345,10 @@ export default function OverviewActivityCharts({
       {visibility.userDistribution ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            User Distribution
+            {t("overview.userDistribution")}
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Repartition des utilisateurs par role.
+            {t("overview.userDistributionDescription")}
           </p>
           <div className="mt-4">
             <Chart type="donut" height={260} options={userRoleOptions} series={userRoleValues} />

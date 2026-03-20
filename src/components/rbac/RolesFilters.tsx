@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CloseLineIcon } from "@/icons";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 type RolesFiltersProps = {
   initialRolesQ: string;
@@ -27,6 +28,7 @@ export default function RolesFilters({
 }: RolesFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useAdminI18n();
 
   const [rolesQ, setRolesQ] = useState(initialRolesQ);
   const [rolesPageSize, setRolesPageSize] = useState(String(initialRolesPageSize));
@@ -77,7 +79,7 @@ export default function RolesFilters({
           type="text"
           value={rolesQ}
           onChange={(event) => setRolesQ(event.target.value)}
-          placeholder="Search role by code/name/description"
+          placeholder={t("roleFilters.searchPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -93,7 +95,7 @@ export default function RolesFilters({
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
-              {size} / page
+              {size} {t("roleFilters.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -107,8 +109,8 @@ export default function RolesFilters({
             setRolesPageSize(defaultSize);
             pushFilters({ rolesQ: "", rolesPageSize: defaultSize, rolesPage: 1 });
           }}
-          title="Reset roles filters"
-          aria-label="Reset roles filters"
+          title={t("roleFilters.reset")}
+          aria-label={t("roleFilters.reset")}
           className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
         >
           <CloseLineIcon />

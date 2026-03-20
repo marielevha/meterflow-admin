@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
+import { UserStatus } from "@prisma/client";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import { getAccessToken } from "@/lib/auth/clientSession";
+import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
 
 type PreviewRow = {
   rowNumber: number;
@@ -37,6 +40,7 @@ type PreviewResponse = {
 export default function ImportUsersModal() {
   const { isOpen, openModal, closeModal } = useModal();
   const router = useRouter();
+  const { t } = useAdminI18n();
 
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -63,7 +67,7 @@ export default function ImportUsersModal() {
     closeModal();
   }
 
-  async function handlePreview(fileToPreview: File) {
+  const handlePreview = useCallback(async (fileToPreview: File) => {
     setError("");
     setIsPreviewing(true);
     const requestId = Date.now();
@@ -84,9 +88,9 @@ export default function ImportUsersModal() {
 
       if (!response.ok) {
         if (Array.isArray(data?.missingHeaders)) {
-          setError(`Colonnes manquantes: ${data.missingHeaders.join(", ")}`);
+          setError(t("userImport.missingColumns", { columns: data.missingHeaders.join(", ") }));
         } else {
-          setError(data?.error || "Erreur de verification.");
+          setError(data?.error || t("userImport.previewError"));
         }
         return;
       }
@@ -94,23 +98,23 @@ export default function ImportUsersModal() {
       setPreview(data as PreviewResponse);
     } catch {
       if (latestRequestRef.current !== requestId) return;
-      setError("Erreur reseau pendant la verification.");
+      setError(t("userImport.previewNetworkError"));
     } finally {
       if (latestRequestRef.current === requestId) {
         setIsPreviewing(false);
       }
     }
-  }
+  }, [t]);
 
   useEffect(() => {
     if (!file) return;
     setPreview(null);
     void handlePreview(file);
-  }, [file]);
+  }, [file, handlePreview]);
 
   async function handleImport() {
     if (!preview || preview.validRows.length === 0) {
-      setError("Aucune ligne valide a importer.");
+      setError(t("userImport.noValidRows"));
       return;
     }
 
@@ -128,14 +132,14 @@ export default function ImportUsersModal() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data?.error || "Erreur pendant l'import.");
+        setError(data?.error || t("userImport.importError"));
         return;
       }
 
       handleClose();
       router.refresh();
     } catch {
-      setError("Erreur reseau pendant l'import.");
+      setError(t("userImport.importNetworkError"));
     } finally {
       setIsImporting(false);
     }
@@ -151,7 +155,7 @@ export default function ImportUsersModal() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        setError(data?.error || "Impossible de telecharger le template.");
+        setError(data?.error || t("userImport.templateError"));
         return;
       }
 
@@ -165,7 +169,7 @@ export default function ImportUsersModal() {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
     } catch {
-      setError("Erreur reseau pendant le telechargement du template.");
+      setError(t("userImport.templateNetworkError"));
     }
   }
 
@@ -176,23 +180,23 @@ export default function ImportUsersModal() {
         onClick={openModal}
         className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
       >
-        Import users
+        {t("userImport.button")}
       </button>
 
       <Modal isOpen={isOpen} onClose={handleClose} className="max-w-[980px] p-6 lg:p-8">
         <div>
           <div className="mb-5">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Import users</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{t("userImport.title")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Charge un CSV compatible Excel, verifie la coherence, puis importe en base.
+                {t("userImport.description")}
               </p>
             </div>
           </div>
 
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Fichier CSV
+              {t("userImport.csvFile")}
             </label>
             <input
               type="file"
@@ -217,14 +221,14 @@ export default function ImportUsersModal() {
           {preview ? (
             <div className="mt-5 space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <SummaryCard label="Total rows" value={preview.summary.totalRows} />
-                <SummaryCard label="Valid rows" value={preview.summary.validRows} />
-                <SummaryCard label="Invalid rows" value={preview.summary.invalidRows} />
+                <SummaryCard label={t("userImport.totalRows")} value={preview.summary.totalRows} />
+                <SummaryCard label={t("userImport.validRows")} value={preview.summary.validRows} />
+                <SummaryCard label={t("userImport.invalidRows")} value={preview.summary.invalidRows} />
               </div>
 
               {invalidRows.length > 0 ? (
                 <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-orange-300">
-                  {invalidRows.length} lignes invalides detectees. Elles ne seront pas importees.
+                  {t("userImport.invalidRowsDetected", { count: invalidRows.length })}
                 </div>
               ) : null}
 
@@ -232,19 +236,19 @@ export default function ImportUsersModal() {
                 <table className="min-w-[1500px] w-full">
                   <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Row</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Phone</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Username</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Email</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">First name</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Last name</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Region</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">City</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Zone</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Roles</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Password</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Errors</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("meterImport.row")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.phone")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.username")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.email")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.firstName")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.lastName")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.region")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.city")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("users.zone")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("common.status")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("rbac.rolesCount")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("common.password")}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">{t("meterImport.errors")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,16 +278,18 @@ export default function ImportUsersModal() {
                           {row.normalized.zone || "-"}
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
-                          {row.normalized.status || "-"}
+                          {row.normalized.status
+                            ? translateUserStatus(row.normalized.status as UserStatus, t)
+                            : "-"}
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
-                          {row.normalized.roleCodes.join(" | ")}
+                          {row.normalized.roleCodes.map((code) => translateUserRole(code, t)).join(" | ")}
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
                           {row.normalized.password || "-"}
                         </td>
                         <td className="px-3 py-2 text-xs text-error-600 dark:text-error-400">
-                          {row.errors.length ? row.errors.join(", ") : "OK"}
+                          {row.errors.length ? row.errors.join(", ") : t("meterImport.ok")}
                         </td>
                       </tr>
                     ))}
@@ -299,7 +305,7 @@ export default function ImportUsersModal() {
               onClick={handleDownloadTemplate}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Download template
+              {t("userImport.template")}
             </button>
 
             <div className="flex items-center gap-2">
@@ -308,7 +314,7 @@ export default function ImportUsersModal() {
               onClick={handleClose}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -316,7 +322,11 @@ export default function ImportUsersModal() {
               disabled={!preview || isImporting || isPreviewing || preview.validRows.length === 0}
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
             >
-              {isPreviewing ? "Verifying..." : isImporting ? "Importing..." : "Import valid rows"}
+              {isPreviewing
+                ? t("userImport.previewing")
+                : isImporting
+                  ? t("userImport.importing")
+                  : t("userImport.importCta")}
             </button>
             </div>
           </div>

@@ -7,18 +7,28 @@ import { ChevronDownIcon } from "@/icons";
 type UserEditSelectProps = {
   name: string;
   defaultValue: string;
-  options: string[];
+  options: Array<string | { value: string; label: string }>;
+  placeholder?: string;
 };
 
-export default function UserEditSelect({ name, defaultValue, options }: UserEditSelectProps) {
+export default function UserEditSelect({
+  name,
+  defaultValue,
+  options,
+  placeholder,
+}: UserEditSelectProps) {
   const [value, setValue] = useState(defaultValue);
+  const normalizedOptions = options.map((option) =>
+    typeof option === "string" ? { value: option, label: option } : option
+  );
 
   return (
     <div className="relative">
       <Select
-        options={options.map((option) => ({ value: option, label: option }))}
+        options={normalizedOptions}
         defaultValue={defaultValue}
         onChange={setValue}
+        placeholder={placeholder}
         className="dark:bg-dark-900"
       />
       <input type="hidden" name={name} value={value} />

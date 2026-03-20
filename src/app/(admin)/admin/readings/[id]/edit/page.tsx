@@ -4,6 +4,13 @@ import { ReadingStatus, UserRole } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
+import {
+  translateMeterStatus,
+  translateMeterType,
+  translateReadingSource,
+  translateReadingStatus,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
@@ -27,8 +34,8 @@ function firstValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
-function formatDateTime(value: Date | null) {
-  if (!value) return "N/A";
+function formatDateTime(value: Date | null, fallback: string) {
+  if (!value) return fallback;
   return value.toISOString().slice(0, 19).replace("T", " ");
 }
 
@@ -44,11 +51,12 @@ function decimalToNumber(value: { toString(): string } | null) {
 
 function formatGpsPair(
   latitude: { toString(): string } | null,
-  longitude: { toString(): string } | null
+  longitude: { toString(): string } | null,
+  fallback: string
 ) {
   const lat = decimalToNumber(latitude);
   const lng = decimalToNumber(longitude);
-  if (lat === null || lng === null) return "N/A";
+  if (lat === null || lng === null) return fallback;
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
@@ -60,21 +68,21 @@ function readingStatusBadge(status: ReadingStatus) {
   return "light" as const;
 }
 
-function mapError(code: string) {
+function mapError(code: string, t: (key: string) => string) {
   if (!code) return "";
-  if (code === "invalid_status") return "Invalid status selected.";
-  if (code === "invalid_status_transition") return "This status transition is not allowed.";
-  if (code === "invalid_primary_index") return "Primary index is invalid.";
-  if (code === "invalid_secondary_index") return "Secondary index is invalid.";
-  if (code === "invalid_gps_latitude") return "GPS latitude is invalid.";
-  if (code === "invalid_gps_longitude") return "GPS longitude is invalid.";
-  if (code === "invalid_gps_accuracy") return "GPS accuracy is invalid.";
-  if (code === "invalid_gps_distance") return "GPS distance is invalid.";
-  if (code === "flag_reason_required") return "Select a normalized flag reason when status is Flagged.";
-  if (code === "rejection_reason_required") return "Select a normalized rejection reason when status is Rejected.";
-  if (code === "invalid_flag_reason") return "The selected flag reason is invalid.";
-  if (code === "invalid_rejection_reason") return "The selected rejection reason is invalid.";
-  if (code === "update_failed") return "Update failed. Please try again.";
+  if (code === "invalid_status") return t("readings.errorInvalidStatus");
+  if (code === "invalid_status_transition") return t("readings.errorInvalidStatusTransition");
+  if (code === "invalid_primary_index") return t("readings.errorInvalidPrimaryIndex");
+  if (code === "invalid_secondary_index") return t("readings.errorInvalidSecondaryIndex");
+  if (code === "invalid_gps_latitude") return t("readings.errorInvalidGpsLatitude");
+  if (code === "invalid_gps_longitude") return t("readings.errorInvalidGpsLongitude");
+  if (code === "invalid_gps_accuracy") return t("readings.errorInvalidGpsAccuracy");
+  if (code === "invalid_gps_distance") return t("readings.errorInvalidGpsDistance");
+  if (code === "flag_reason_required") return t("readings.errorFlagReasonRequired");
+  if (code === "rejection_reason_required") return t("readings.errorRejectionReasonRequired");
+  if (code === "invalid_flag_reason") return t("readings.errorInvalidFlagReason");
+  if (code === "invalid_rejection_reason") return t("readings.errorInvalidRejectionReason");
+  if (code === "update_failed") return t("readings.errorUpdateFailed");
   return code.replaceAll("_", " ");
 }
 
@@ -85,12 +93,13 @@ export default async function EditReadingPage({
   params: Promise<{ id: string }>;
   searchParams: SearchParams;
 }) {
+  const { t } = await getAdminTranslator();
   const staff = await getCurrentStaffFromServerAction();
   if (!staff) redirect("/signin");
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-  const error = mapError(firstValue(resolvedSearchParams.error));
+  const error = mapError(firstValue(resolvedSearchParams.error), t);
 
   const reading = await prisma.reading.findFirst({
     where: { id, deletedAt: null },
@@ -169,7 +178,7 @@ export default async function EditReadingPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Review reading" />
+      <PageBreadcrumb pageTitle={t("readings.reviewPageTitle")} />
 
       <form action={submit} className="space-y-6">
         {error ? (
@@ -183,17 +192,16 @@ export default async function EditReadingPage({
             href={`/admin/readings/${reading.id}`}
             className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
           >
-            Back to details
+            {t("readings.backToDetails")}
           </Link>
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <section className="space-y-6 xl:col-span-2">
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Review decision</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.reviewDecision")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Status, decision reasons, and reading indexes can be adjusted here. The rest of the reading stays
-                read-only.
+                {t("readings.reviewDecisionDesc")}
               </p>
 
               <div className="mt-4">
@@ -209,9 +217,9 @@ export default async function EditReadingPage({
 
               <div className="mt-6 border-t border-gray-100 pt-6 dark:border-gray-800">
                 <div className="mb-3">
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">Reading indexes</h4>
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">{t("readings.indexesSectionTitle")}</h4>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    These values can be corrected during review by admins, supervisors, and agents.
+                    {t("readings.indexesSectionDesc")}
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -220,7 +228,7 @@ export default async function EditReadingPage({
                       htmlFor="primaryIndex"
                       className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >
-                      Primary index
+                      {t("readings.primaryIndex")}
                     </label>
                     <input
                       id="primaryIndex"
@@ -240,7 +248,7 @@ export default async function EditReadingPage({
                         htmlFor="secondaryIndex"
                         className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                       >
-                        Secondary index
+                        {t("readings.secondaryIndex")}
                       </label>
                       <input
                         id="secondaryIndex"
@@ -264,16 +272,16 @@ export default async function EditReadingPage({
                   : "border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
               }`}
             >
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">GPS & location</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.gpsLocation")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {canEditGps
-                  ? "Supervisors and admins can correct GPS values directly in this block when needed."
-                  : "GPS correction is restricted to supervisors and admins."}
+                  ? t("readings.gpsEditable")
+                  : t("readings.gpsRestricted")}
               </p>
               {gpsExceeded ? (
                 <div className="mt-4 rounded-xl border border-warning-200 bg-white/70 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-200">
-                  GPS distance exceeds the configured threshold ({gpsThreshold} m).
-                  {gpsDistance !== null ? ` Current value: ${gpsDistance.toFixed(1)} m.` : ""}
+                  {t("readings.gpsExceededWarning", { threshold: gpsThreshold })}
+                  {gpsDistance !== null ? ` ${t("readings.gpsCurrentValue", { value: gpsDistance.toFixed(1) })}` : ""}
                 </div>
               ) : null}
 
@@ -284,9 +292,9 @@ export default async function EditReadingPage({
                     : "border border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-white/[0.02]"
                 }`}
               >
-                <p className="text-xs text-gray-500 dark:text-gray-400">Meter coordinates</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("readings.meterCoordinates")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-white/90">
-                  {formatGpsPair(reading.meter.latitude, reading.meter.longitude)}
+                  {formatGpsPair(reading.meter.latitude, reading.meter.longitude, t("common.notAvailable"))}
                 </p>
               </div>
 
@@ -298,7 +306,7 @@ export default async function EditReadingPage({
                         htmlFor="gpsLatitude"
                         className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                       >
-                        GPS latitude
+                        {t("readings.gpsLatitude")}
                       </label>
                       <input
                         id="gpsLatitude"
@@ -314,7 +322,7 @@ export default async function EditReadingPage({
                         htmlFor="gpsLongitude"
                         className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                       >
-                        GPS longitude
+                        {t("readings.gpsLongitude")}
                       </label>
                       <input
                         id="gpsLongitude"
@@ -330,7 +338,7 @@ export default async function EditReadingPage({
                         htmlFor="gpsAccuracyMeters"
                         className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                       >
-                        GPS accuracy (m)
+                        {t("readings.gpsAccuracyMeters")}
                       </label>
                       <input
                         id="gpsAccuracyMeters"
@@ -347,7 +355,7 @@ export default async function EditReadingPage({
                         htmlFor="gpsDistanceMeters"
                         className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                       >
-                        GPS distance (m)
+                        {t("readings.gpsDistance")}
                       </label>
                       <input
                         id="gpsDistanceMeters"
@@ -362,28 +370,28 @@ export default async function EditReadingPage({
                   </>
                 ) : (
                   <>
-                    <Info label="Reading coordinates" value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude)} />
-                    <Info label="GPS accuracy (m)" value={reading.gpsAccuracyMeters?.toString() || "N/A"} />
-                    <Info label="GPS distance (m)" value={reading.gpsDistanceMeters?.toString() || "N/A"} />
+                    <Info label={t("readings.readingCoordinates")} value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude, t("common.notAvailable"))} />
+                    <Info label={t("readings.gpsAccuracyMeters")} value={reading.gpsAccuracyMeters?.toString() || t("common.notAvailable")} />
+                    <Info label={t("readings.gpsDistance")} value={reading.gpsDistanceMeters?.toString() || t("common.notAvailable")} />
                   </>
                 )}
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Scoring & analysis</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.scoringAnalysis")}</h3>
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Info label="Confidence score" value={reading.confidenceScore?.toString() || "N/A"} />
-                <Info label="Anomaly score" value={reading.anomalyScore?.toString() || "N/A"} />
+                <Info label={t("readings.confidenceScore")} value={reading.confidenceScore?.toString() || t("common.notAvailable")} />
+                <Info label={t("readings.anomalyScore")} value={reading.anomalyScore?.toString() || t("common.notAvailable")} />
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Evidence</h3>
+                  <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.evidence")}</h3>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    The uploaded image stays attached to the reading. Admin edits do not replace the evidence file here.
+                    {t("readings.evidenceDesc")}
                   </p>
                 </div>
               </div>
@@ -401,55 +409,55 @@ export default async function EditReadingPage({
           <aside className="space-y-6">
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
               <div className="mb-4 flex items-start justify-between gap-3">
-                <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading summary</h3>
+                <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.readingSummary")}</h3>
                 <Badge size="sm" color={readingStatusBadge(reading.status)}>
-                  {reading.status}
+                  {translateReadingStatus(reading.status, t)}
                 </Badge>
               </div>
               <div className="space-y-3">
-                <Info label="Reading ID" value={reading.id} breakAll />
+                <Info label={t("readings.readingId")} value={reading.id} breakAll />
                 <Info
-                  label="Serial / Reference"
-                  value={`${reading.meter.serialNumber} / ${reading.meter.meterReference || "N/A"}`}
+                  label={t("readings.serialReference")}
+                  value={`${reading.meter.serialNumber} / ${reading.meter.meterReference || t("common.notAvailable")}`}
                 />
-                <Info label="Reading date" value={formatDateTime(reading.readingAt)} />
-                <Info label="Source" value={reading.source} />
-                <Info label="Meter type" value={reading.meter.type} />
+                <Info label={t("readings.readingDate")} value={formatDateTime(reading.readingAt, t("common.notAvailable"))} />
+                <Info label={t("readings.source")} value={translateReadingSource(reading.source, t)} />
+                <Info label={t("readings.meterType")} value={translateMeterType(reading.meter.type, t)} />
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Actors</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.actors")}</h3>
               <div className="mt-4 space-y-3">
-                <Info label="Submitted by" value={personLabel(reading.submittedBy)} />
-                <Info label="Reviewed by" value={personLabel(reading.reviewedBy)} />
-                <Info label="Customer" value={personLabel(reading.meter.customer)} />
-                <Info label="Assigned agent" value={personLabel(reading.meter.assignedAgent)} />
+                <Info label={t("readings.submittedBy")} value={personLabel(reading.submittedBy) || t("common.notAvailable")} />
+                <Info label={t("readings.reviewedBy")} value={personLabel(reading.reviewedBy) || t("common.notAvailable")} />
+                <Info label={t("common.customer")} value={personLabel(reading.meter.customer) || t("common.notAvailable")} />
+                <Info label={t("readings.assignedAgent")} value={personLabel(reading.meter.assignedAgent) || t("common.notAvailable")} />
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Meter details</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.meterDetails")}</h3>
               <div className="mt-4 space-y-3">
-                <Info label="Serial" value={reading.meter.serialNumber} />
-                <Info label="Reference" value={reading.meter.meterReference || "N/A"} />
-                <Info label="Type" value={reading.meter.type} />
-                <Info label="Status" value={reading.meter.status} />
-                <Info label="City / Zone" value={`${reading.meter.city || "-"} / ${reading.meter.zone || "-"}`} />
+                <Info label={t("readings.serial")} value={reading.meter.serialNumber} />
+                <Info label={t("meters.reference")} value={reading.meter.meterReference || t("common.notAvailable")} />
+                <Info label={t("common.type")} value={translateMeterType(reading.meter.type, t)} />
+                <Info label={t("common.status")} value={translateMeterStatus(reading.meter.status, t)} />
+                <Info label={t("readings.cityZone")} value={`${reading.meter.city || "-"} / ${reading.meter.zone || "-"}`} />
                 <Info
-                  label="Address"
-                  value={[reading.meter.addressLine1, reading.meter.addressLine2].filter(Boolean).join(", ") || "N/A"}
+                  label={t("readings.address")}
+                  value={[reading.meter.addressLine1, reading.meter.addressLine2].filter(Boolean).join(", ") || t("common.notAvailable")}
                 />
-                <Info label="Meter coordinates" value={formatGpsPair(reading.meter.latitude, reading.meter.longitude)} />
+                <Info label={t("readings.meterCoordinates")} value={formatGpsPair(reading.meter.latitude, reading.meter.longitude, t("common.notAvailable"))} />
               </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">System context</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.systemContext")}</h3>
               <div className="mt-4 space-y-3">
-                <Info label="Source" value={reading.source} />
-                <Info label="Reviewed at" value={formatDateTime(reading.reviewedAt)} />
-                <Info label="Updated at" value={formatDateTime(reading.updatedAt)} />
+                <Info label={t("readings.source")} value={translateReadingSource(reading.source, t)} />
+                <Info label={t("readings.reviewedAt")} value={formatDateTime(reading.reviewedAt, t("common.notAvailable"))} />
+                <Info label={t("readings.updatedAt")} value={formatDateTime(reading.updatedAt, t("common.notAvailable"))} />
               </div>
             </div>
           </aside>
@@ -461,13 +469,13 @@ export default async function EditReadingPage({
               href={`/admin/readings/${reading.id}`}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Cancel
+              {t("common.cancel")}
             </Link>
             <button
               type="submit"
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
             >
-              Save changes
+              {t("common.save")}
             </button>
           </div>
         </div>
@@ -483,12 +491,13 @@ function personLabel(person?: {
   email?: string | null;
   phone: string;
 } | null) {
-  if (!person) return "N/A";
+  if (!person) return null;
   return (
     [person.firstName, person.lastName].filter(Boolean).join(" ").trim() ||
     person.username ||
     person.email ||
-    person.phone
+    person.phone ||
+    null
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 type ReadingsFiltersProps = {
   initialQ: string;
@@ -22,6 +23,7 @@ export default function ReadingsFilters({
   statusOptions,
   pageSizeOptions,
 }: ReadingsFiltersProps) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -92,7 +94,7 @@ export default function ReadingsFilters({
           type="text"
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="Search by meter, reference, submitter"
+          placeholder={t("readingFilters.searchPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -107,10 +109,18 @@ export default function ReadingsFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All status</option>
+          <option value="">{t("readingFilters.allStatuses")}</option>
           {statusOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {item === "PENDING"
+                ? t("overview.pending")
+                : item === "VALIDATED"
+                  ? t("overview.validated")
+                  : item === "FLAGGED"
+                    ? t("overview.flagged")
+                    : item === "REJECTED"
+                      ? t("overview.rejected")
+                      : item}
             </option>
           ))}
         </select>
@@ -154,7 +164,7 @@ export default function ReadingsFilters({
         >
           {pageSizeOptions.map((option) => (
             <option key={option} value={option}>
-              {option} / page
+              {option} {t("readingFilters.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -172,8 +182,8 @@ export default function ReadingsFilters({
             router.replace(pathname, { scroll: false });
           }}
           className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-          aria-label="Reset filters"
-          title="Reset filters"
+          aria-label={t("readingFilters.reset")}
+          title={t("readingFilters.reset")}
         >
           ↺
         </button>

@@ -6,6 +6,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { translateMeterStatus } from "@/lib/admin-i18n/labels";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -28,6 +30,7 @@ function statusBadge(status: MeterStatus) {
 }
 
 export default async function MetersPage({ searchParams }: { searchParams: SearchParams }) {
+  const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const q = firstValue(resolved.q).trim();
   const status = firstValue(resolved.status).trim() as MeterStatus | "";
@@ -70,23 +73,23 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Meters" />
+      <PageBreadcrumb pageTitle={t("meters.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total meters" value={total} />
-        <StatCard label="Active" value={active} />
-        <StatCard label="Maintenance" value={maintenance} />
-        <StatCard label="Replaced" value={replaced} />
+        <StatCard label={t("meters.totalMeters")} value={total} />
+        <StatCard label={t("meters.activeMeters")} value={active} />
+        <StatCard label={t("meters.maintenanceMeters")} value={maintenance} />
+        <StatCard label={t("meters.replacedMeters")} value={replaced} />
       </div>
 
-      <ComponentCard title="Meters list" desc="Etat du parc de compteurs et affectations terrain.">
+      <ComponentCard title={t("meters.listTitle")} desc={t("meters.listDesc")}>
         <form method="GET" className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <input
               type="text"
               name="q"
               defaultValue={q}
-              placeholder="Search by serial, reference, city, zone"
+              placeholder={t("meters.searchPlaceholder")}
               className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
             />
           </div>
@@ -96,10 +99,10 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
               defaultValue={status}
               className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
             >
-              <option value="">All status</option>
+              <option value="">{t("meters.allStatuses")}</option>
               {Object.values(MeterStatus).map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {translateMeterStatus(item, t)}
                 </option>
               ))}
             </select>
@@ -109,7 +112,7 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
               href="/admin/meters"
               className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Reset
+              {t("common.reset")}
             </Link>
           </div>
         </form>
@@ -119,20 +122,20 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
             <Table>
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meter</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Customer</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Agent</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Location</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Last state</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("meters.meterColumn")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("meters.statusColumn")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("meters.customerColumn")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("meters.agentColumn")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("meters.locationColumn")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("meters.lastStateColumn")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.actions")}</TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {meters.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No meter found.
+                      {t("meters.noMetersFound")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -145,17 +148,19 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
                       [meter.assignedAgent?.firstName, meter.assignedAgent?.lastName]
                         .filter(Boolean)
                         .join(" ")
-                        .trim() || "Unassigned";
+                        .trim() || t("meters.unassigned");
 
                     return (
                       <TableRow key={meter.id}>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <p className="font-medium">{meter.serialNumber}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{meter.meterReference || "N/A"}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {meter.meterReference || t("meters.noReference")}
+                          </p>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm">
                           <Badge size="sm" color={statusBadge(meter.status)}>
-                            {meter.status}
+                            {translateMeterStatus(meter.status, t)}
                           </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{customerName}</TableCell>
@@ -165,25 +170,26 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {lastState
-                            ? `${lastState.currentPrimary?.toString() || "-"}${
-                                lastState.currentSecondary ? ` | ${lastState.currentSecondary.toString()}` : ""
-                              }`
-                            : "N/A"}
+                            ? t("meters.lastStateFormat", {
+                                primary: lastState.currentPrimary?.toString() || "-",
+                                secondary: lastState.currentSecondary?.toString() || "-",
+                              })
+                            : t("common.notAvailable")}
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <div className="flex items-center gap-2">
                             <Link
                               href={`/admin/meters/${meter.id}`}
-                              title="View meter"
-                              aria-label="View meter"
+                              title={t("common.view")}
+                              aria-label={t("common.view")}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                             >
                               <EyeIcon className="h-4 w-4 fill-current" />
                             </Link>
                             <Link
                               href={`/admin/meters/${meter.id}/edit`}
-                              title="Edit meter"
-                              aria-label="Edit meter"
+                              title={t("common.edit")}
+                              aria-label={t("common.edit")}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                             >
                               <PencilIcon className="h-4 w-4 fill-current" />

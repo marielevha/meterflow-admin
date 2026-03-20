@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CloseLineIcon } from "@/icons";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
+import { translateUserRole } from "@/lib/admin-i18n/labels";
 
 type PermissionsFiltersProps = {
   initialPermQ: string;
@@ -31,6 +33,7 @@ export default function PermissionsFilters({
 }: PermissionsFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useAdminI18n();
 
   const [permQ, setPermQ] = useState(initialPermQ);
   const [permRole, setPermRole] = useState(initialPermRole);
@@ -87,7 +90,7 @@ export default function PermissionsFilters({
           type="text"
           value={permQ}
           onChange={(event) => setPermQ(event.target.value)}
-          placeholder="Search permission by code/name/resource/action"
+          placeholder={t("permissionFilters.searchPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -101,10 +104,10 @@ export default function PermissionsFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All roles</option>
+          <option value="">{t("permissionFilters.allRoles")}</option>
           {roleOptions.map((roleCode) => (
             <option key={roleCode} value={roleCode}>
-              {roleCode}
+              {translateUserRole(roleCode, t)}
             </option>
           ))}
         </select>
@@ -119,7 +122,7 @@ export default function PermissionsFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All resources</option>
+          <option value="">{t("permissionFilters.allResources")}</option>
           {resourceOptions.map((resource) => (
             <option key={resource} value={resource}>
               {resource}
@@ -139,7 +142,7 @@ export default function PermissionsFilters({
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
-              {size} / page
+              {size} {t("permissionFilters.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -161,8 +164,8 @@ export default function PermissionsFilters({
               permPage: 1,
             });
           }}
-          title="Reset permissions filters"
-          aria-label="Reset permissions filters"
+          title={t("permissionFilters.reset")}
+          aria-label={t("permissionFilters.reset")}
           className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
         >
           <CloseLineIcon />

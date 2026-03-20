@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -49,6 +50,7 @@ export default function OperationsKpisSection({
   submittedVolume,
   visibility,
 }: OperationsKpisSectionProps) {
+  const { t } = useAdminI18n();
   const [mode, setMode] = useState<Mode>("monthly");
   const hasVisibleKpi =
     visibility.delay || visibility.backlog || visibility.anomaly || visibility.volume;
@@ -141,9 +143,9 @@ export default function OperationsKpisSection({
     <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">KPIs Opérationnels</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{t("overview.operationalKpis")}</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Delai moyen, backlog, anomalies et volume soumis.
+            {t("overview.pageDescription")}
           </p>
         </div>
         <div className="inline-flex rounded-lg border border-gray-200 p-1 dark:border-gray-800">
@@ -156,7 +158,7 @@ export default function OperationsKpisSection({
                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.04]"
             }`}
           >
-            Monthly
+            {t("overview.monthly")}
           </button>
           <button
             type="button"
@@ -167,7 +169,7 @@ export default function OperationsKpisSection({
                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.04]"
             }`}
           >
-            Quarterly
+            {t("overview.quarterly")}
           </button>
           <button
             type="button"
@@ -178,7 +180,7 @@ export default function OperationsKpisSection({
                 : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.04]"
             }`}
           >
-            Annual
+            {t("overview.annual")}
           </button>
         </div>
       </div>
@@ -186,16 +188,16 @@ export default function OperationsKpisSection({
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {visibility.delay ? (
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm font-medium text-gray-800 dark:text-white/90">Delai moyen de traitement (h)</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-white/90">{t("overview.delayTitle")}</p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Temps moyen entre reading_at et reviewed_at.
+              {t("overview.delayDescription")}
             </p>
             <div className="mt-4">
               <Chart
                 type="area"
                 height={240}
                 options={baseLineOptions(delaySeries.labels, "#0EA5E9")}
-                series={[{ name: "Delay (hours)", data: delaySeries.values }]}
+                series={[{ name: t("overview.delayTitle"), data: delaySeries.values }]}
               />
             </div>
           </div>
@@ -203,16 +205,16 @@ export default function OperationsKpisSection({
 
         {visibility.backlog ? (
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm font-medium text-gray-800 dark:text-white/90">Backlog releves en attente</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-white/90">{t("overview.backlogTitle")}</p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Nombre de releves en statut PENDING dans le temps.
+              {t("overview.backlogDescription")}
             </p>
             <div className="mt-4">
               <Chart
                 type="area"
                 height={240}
                 options={baseLineOptions(backlogSeries.labels, "#6366F1")}
-                series={[{ name: "Pending", data: backlogSeries.values }]}
+                series={[{ name: t("overview.pending"), data: backlogSeries.values }]}
               />
             </div>
           </div>
@@ -221,17 +223,17 @@ export default function OperationsKpisSection({
         {visibility.anomaly ? (
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-              Taux d&apos;anomalies / suspicions
+              {t("overview.anomalyTitle")}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              % (flagged + rejected + GPS suspect) / total soumis.
+              {t("overview.anomalyDescription")}
             </p>
             <div className="mt-4">
               <Chart
                 type="area"
                 height={240}
                 options={baseLineOptions(anomalySeries.labels, "#EF4444", true)}
-                series={[{ name: "Anomaly rate", data: anomalySeries.values }]}
+                series={[{ name: t("overview.anomalyTitle"), data: anomalySeries.values }]}
               />
             </div>
           </div>
@@ -239,14 +241,14 @@ export default function OperationsKpisSection({
 
         {visibility.volume ? (
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm font-medium text-gray-800 dark:text-white/90">Volume de releves soumis</p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Nombre de releves soumis par periode.</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-white/90">{t("overview.volumeTitle")}</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("overview.volumeDescription")}</p>
             <div className="mt-4">
               <Chart
                 type="bar"
                 height={240}
                 options={volumeOptions}
-                series={[{ name: "Submitted", data: volumeSeries.values }]}
+                series={[{ name: t("overview.volumeTitle"), data: volumeSeries.values }]}
               />
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 type TasksFiltersProps = {
   initialQ: string;
@@ -36,6 +37,7 @@ export default function TasksFilters({
   assigneeOptions,
   pageSizeOptions,
 }: TasksFiltersProps) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -51,6 +53,53 @@ export default function TasksFilters({
   const [pageSize, setPageSize] = useState(String(initialPageSize));
 
   const isFirstRender = useRef(true);
+
+  const formatStatusOption = (value: string) => {
+    switch (value) {
+      case "OPEN":
+        return t("tasks.open");
+      case "IN_PROGRESS":
+        return t("tasks.inProgress");
+      case "BLOCKED":
+        return t("tasks.blocked");
+      case "DONE":
+        return t("tasks.done");
+      case "CANCELED":
+        return t("tasks.canceled");
+      default:
+        return value;
+    }
+  };
+
+  const formatPriorityOption = (value: string) => {
+    switch (value) {
+      case "LOW":
+        return t("tasks.priorityLow");
+      case "MEDIUM":
+        return t("tasks.priorityMedium");
+      case "HIGH":
+        return t("tasks.priorityHigh");
+      case "CRITICAL":
+        return t("tasks.priorityCritical");
+      default:
+        return value;
+    }
+  };
+
+  const formatTypeOption = (value: string) => {
+    switch (value) {
+      case "FIELD_RECHECK":
+        return t("tasks.typeFieldRecheck");
+      case "FRAUD_INVESTIGATION":
+        return t("tasks.typeFraudInvestigation");
+      case "METER_VERIFICATION":
+        return t("tasks.typeMeterVerification");
+      case "GENERAL":
+        return t("tasks.typeGeneral");
+      default:
+        return value;
+    }
+  };
 
   const pushFilters = (overrides?: {
     q?: string;
@@ -130,7 +179,7 @@ export default function TasksFilters({
           type="text"
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="Search by title, meter serial, reference"
+          placeholder={t("taskFilters.searchPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -145,10 +194,10 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All statuses</option>
+          <option value="">{t("taskFilters.allStatuses")}</option>
           {statusOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {formatStatusOption(item)}
             </option>
           ))}
         </select>
@@ -164,10 +213,10 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All priorities</option>
+          <option value="">{t("taskFilters.allPriorities")}</option>
           {priorityOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {formatPriorityOption(item)}
             </option>
           ))}
         </select>
@@ -183,10 +232,10 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All types</option>
+          <option value="">{t("taskFilters.allTypes")}</option>
           {typeOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {formatTypeOption(item)}
             </option>
           ))}
         </select>
@@ -202,7 +251,7 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All assignees</option>
+          <option value="">{t("taskFilters.allAssignees")}</option>
           {assigneeOptions.map((item) => (
             <option key={item.id} value={item.id}>
               {item.label}
@@ -223,9 +272,9 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All assignments</option>
-          <option value="assigned">Assigned only</option>
-          <option value="unassigned">Unassigned only</option>
+          <option value="">{t("taskFilters.allAssignments")}</option>
+          <option value="assigned">{t("taskFilters.assignedOnly")}</option>
+          <option value="unassigned">{t("taskFilters.unassignedOnly")}</option>
         </select>
       </div>
 
@@ -239,10 +288,10 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All due dates</option>
-          <option value="overdue">Overdue</option>
-          <option value="today">Due today</option>
-          <option value="upcoming">Upcoming</option>
+          <option value="">{t("taskFilters.allDueDates")}</option>
+          <option value="overdue">{t("taskFilters.overdue")}</option>
+          <option value="today">{t("taskFilters.dueToday")}</option>
+          <option value="upcoming">{t("taskFilters.upcoming")}</option>
         </select>
       </div>
 
@@ -256,9 +305,9 @@ export default function TasksFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All field reports</option>
-          <option value="with_report">With report</option>
-          <option value="without_report">Without report</option>
+          <option value="">{t("taskFilters.allFieldReports")}</option>
+          <option value="with_report">{t("taskFilters.withReport")}</option>
+          <option value="without_report">{t("taskFilters.withoutReport")}</option>
         </select>
       </div>
 
@@ -274,7 +323,7 @@ export default function TasksFilters({
         >
           {pageSizeOptions.map((option) => (
             <option key={option} value={option}>
-              {option} / page
+              {option} {t("taskFilters.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -296,8 +345,8 @@ export default function TasksFilters({
             router.replace(pathname, { scroll: false });
           }}
           className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-          aria-label="Reset filters"
-          title="Reset filters"
+          aria-label={t("taskFilters.reset")}
+          title={t("taskFilters.reset")}
         >
           ↺
         </button>

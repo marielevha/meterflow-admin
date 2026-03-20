@@ -10,6 +10,8 @@ import Input from "@/components/form/input/InputField";
 import UserEditSelect from "@/components/users/UserEditSelect";
 import UserPhoneInput from "@/components/users/UserPhoneInput";
 import { EnvelopeIcon, MailIcon, UserIcon } from "@/icons";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
 import { prisma } from "@/lib/prisma";
 import { updateUserAction } from "./actions";
 
@@ -18,14 +20,14 @@ export const metadata: Metadata = {
   description: "Edit user page",
 };
 
-function messageFromError(errorCode: string) {
-  if (errorCode === "phone_required") return "Phone is required.";
-  if (errorCode === "invalid_status") return "Invalid status selected.";
-  if (errorCode === "at_least_one_role_required") return "At least one role must be assigned.";
-  if (errorCode === "invalid_role_ids") return "Invalid role selection.";
-  if (errorCode === "user_not_found") return "User not found.";
-  if (errorCode === "unique_violation") return "Username, email or phone already exists.";
-  if (errorCode === "update_failed") return "Update failed. Please try again.";
+function messageFromError(errorCode: string, t: (key: string) => string) {
+  if (errorCode === "phone_required") return t("users.errorPhoneRequired");
+  if (errorCode === "invalid_status") return t("users.errorInvalidStatus");
+  if (errorCode === "at_least_one_role_required") return t("users.errorAtLeastOneRole");
+  if (errorCode === "invalid_role_ids") return t("users.errorInvalidRoleIds");
+  if (errorCode === "user_not_found") return t("users.errorUserNotFound");
+  if (errorCode === "unique_violation") return t("users.errorUniqueViolation");
+  if (errorCode === "update_failed") return t("users.errorUpdateFailed");
   return "";
 }
 
@@ -36,6 +38,7 @@ export default async function EditUserPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const errorCode = Array.isArray(resolvedSearchParams.error)
@@ -56,9 +59,10 @@ export default async function EditUserPage({
     notFound();
   }
 
-  const errorMessage = messageFromError(errorCode);
+  const errorMessage = messageFromError(errorCode, t);
   const submit = updateUserAction.bind(null, user.id);
-  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || "N/A";
+  const fullName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || t("users.notAvailableShort");
   const availableRoles = await prisma.role.findMany({
     where: { deletedAt: null },
     orderBy: { code: "asc" },
@@ -68,7 +72,7 @@ export default async function EditUserPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Edit user" />
+      <PageBreadcrumb pageTitle={t("users.editPageTitle")} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <form action={submit} className="xl:col-span-8 space-y-6">
@@ -80,33 +84,33 @@ export default async function EditUserPage({
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Identity</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("users.identity")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Informations publiques et contacts principaux.
+                {t("users.identityDescription")}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormInput
-                label="First name"
+                label={t("users.firstName")}
                 name="firstName"
                 defaultValue={user.firstName || ""}
                 icon={<UserIcon />}
               />
               <FormInput
-                label="Last name"
+                label={t("users.lastName")}
                 name="lastName"
                 defaultValue={user.lastName || ""}
                 icon={<UserIcon />}
               />
               <FormInput
-                label="Username"
+                label={t("users.username")}
                 name="username"
                 defaultValue={user.username || ""}
-                hint="Unique, sans espaces."
+                hint={t("users.uniqueHint")}
                 icon={<MailIcon />}
               />
               <FormInput
-                label="Email"
+                label={t("users.email")}
                 name="email"
                 defaultValue={user.email || ""}
                 type="email"
@@ -114,31 +118,35 @@ export default async function EditUserPage({
               />
 
               <div className="md:col-span-2">
-                <Label>Phone</Label>
+                <Label>{t("users.phone")}</Label>
                 <UserPhoneInput name="phone" defaultValue={user.phone} />
-                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">Champ obligatoire.</span>
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{t("users.phoneRequired")}</span>
               </div>
             </div>
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Access control</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("users.accessControl")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Role et statut du compte pour les autorisations applicatives.
+                {t("users.accessControlDescription")}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormSelect
-                label="Status"
+                label={t("users.statusLabel")}
                 name="status"
                 defaultValue={user.status}
-                options={Object.values(UserStatus)}
+                options={Object.values(UserStatus).map((status) => ({
+                  value: status,
+                  label: translateUserStatus(status, t),
+                }))}
+                placeholder={t("userFilters.allStatuses")}
               />
             </div>
 
             <div className="mt-5">
-              <Label>Assigned roles</Label>
+              <Label>{t("users.assignedRoles")}</Label>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {availableRoles.map((role) => (
                   <label
@@ -153,7 +161,7 @@ export default async function EditUserPage({
                       className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/30 dark:border-gray-700"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">{role.code}</span> - {role.name}
+                      <span className="font-medium">{translateUserRole(role.code, t)}</span> - {role.name}
                     </span>
                   </label>
                 ))}
@@ -163,15 +171,15 @@ export default async function EditUserPage({
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Location</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.location")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Zone geographique d’affectation ou de residence.
+                {t("users.locationDescription")}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <FormInput label="Region" name="region" defaultValue={user.region || ""} />
-              <FormInput label="City" name="city" defaultValue={user.city || ""} icon={<UserIcon />} />
-              <FormInput label="Zone" name="zone" defaultValue={user.zone || ""} icon={<UserIcon />} />
+              <FormInput label={t("users.region")} name="region" defaultValue={user.region || ""} />
+              <FormInput label={t("users.city")} name="city" defaultValue={user.city || ""} icon={<UserIcon />} />
+              <FormInput label={t("users.zone")} name="zone" defaultValue={user.zone || ""} icon={<UserIcon />} />
             </div>
           </section>
 
@@ -181,13 +189,13 @@ export default async function EditUserPage({
                 href={`/admin/users/${user.id}`}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               >
-                Cancel
+                {t("common.cancel")}
               </Link>
               <button
                 type="submit"
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
               >
-                Save changes
+                {t("users.saveChanges")}
               </button>
             </div>
           </div>
@@ -197,7 +205,7 @@ export default async function EditUserPage({
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] xl:sticky xl:top-24">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Editing user</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("users.editingUser")}</p>
                 <h3 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">{fullName}</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{user.email || user.phone}</p>
               </div>
@@ -208,18 +216,18 @@ export default async function EditUserPage({
 
             <div className="mt-4 flex items-center gap-2">
               <Badge size="sm" color={badgeForRole(user.role)}>
-                {user.role}
+                {translateUserRole(user.role, t)}
               </Badge>
               <Badge size="sm" color={badgeForStatus(user.status)}>
-                {user.status}
+                {translateUserStatus(user.status, t)}
               </Badge>
             </div>
 
             <div className="mt-6 space-y-3">
-              <InfoRow label="User ID" value={user.id} breakAll />
-              <InfoRow label="Created at" value={formatDate(user.createdAt)} />
-              <InfoRow label="Activated at" value={formatDate(user.activatedAt)} />
-              <InfoRow label="Last login" value={formatDate(user.lastLoginAt)} />
+              <InfoRow label={t("users.userId")} value={user.id} breakAll />
+              <InfoRow label={t("users.createdColumn")} value={formatDate(user.createdAt, t("users.notAvailableShort"))} />
+              <InfoRow label={t("users.activatedAt")} value={formatDate(user.activatedAt, t("users.notAvailableShort"))} />
+              <InfoRow label={t("users.lastLoginAt")} value={formatDate(user.lastLoginAt, t("users.notAvailableShort"))} />
             </div>
           </div>
         </aside>
@@ -248,8 +256,8 @@ function badgeForStatus(status: UserStatus) {
   return "warning" as const;
 }
 
-function formatDate(value: Date | null) {
-  if (!value) return "N/A";
+function formatDate(value: Date | null, fallback: string) {
+  if (!value) return fallback;
   return value.toISOString().slice(0, 19).replace("T", " ");
 }
 
@@ -302,12 +310,13 @@ function FormSelect({
   label: string;
   name: string;
   defaultValue: string;
-  options: string[];
+  options: Array<string | { value: string; label: string }>;
+  placeholder?: string;
 }) {
   return (
     <div>
       <Label>{label}</Label>
-      <UserEditSelect name={name} defaultValue={defaultValue} options={options} />
+      <UserEditSelect name={name} defaultValue={defaultValue} options={options} placeholder={placeholder} />
     </div>
   );
 }

@@ -1,11 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import React from "react";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 interface BreadcrumbProps {
   pageTitle: string;
 }
 
 const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle }) => {
+  const { t } = useAdminI18n();
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
       <h2
@@ -21,7 +26,7 @@ const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle }) => {
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
               href="/admin"
             >
-              Home
+              {t("common.home")}
               <svg
                 className="stroke-current"
                 width="17"

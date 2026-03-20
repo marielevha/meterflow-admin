@@ -7,6 +7,9 @@ import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import UsersFilters from "@/components/users/UsersFilters";
 import ImportUsersModal from "@/components/users/ImportUsersModal";
+import { EyeIcon, PencilIcon } from "@/icons";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -74,6 +77,7 @@ export default async function UsersPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
 
   const q = firstValue(resolvedSearchParams.q).trim();
@@ -158,23 +162,23 @@ export default async function UsersPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Users" />
+      <PageBreadcrumb pageTitle={t("users.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total users</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("users.totalUsers")}</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{totalUsers}</h3>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Active users</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("users.activeUsers")}</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{totalActiveUsers}</h3>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Pending users</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("users.pendingUsers")}</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{totalPendingUsers}</h3>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Staff users</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("users.staffUsers")}</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{totalStaffUsers}</h3>
         </div>
       </div>
@@ -184,8 +188,8 @@ export default async function UsersPage({
       </div>
 
       <ComponentCard
-        title="User directory"
-        desc="Recherche, filtrage et suivi des comptes utilisateurs."
+        title={t("users.directoryTitle")}
+        desc={t("users.directoryDesc")}
       >
         <UsersFilters
           initialQ={q}
@@ -203,28 +207,28 @@ export default async function UsersPage({
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    User
+                    {t("users.userColumn")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Contact
+                    {t("users.contactColumn")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Role
+                    {t("users.roleColumn")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Status
+                    {t("common.status")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Location
+                    {t("users.locationColumn")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Created
+                    {t("users.createdColumn")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Last login
+                    {t("users.lastLoginColumn")}
                   </TableCell>
                   <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Actions
+                    {t("common.actions")}
                   </TableCell>
                 </TableRow>
               </TableHeader>
@@ -232,7 +236,7 @@ export default async function UsersPage({
                 {users.length === 0 ? (
                   <TableRow>
                     <TableCell className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400" colSpan={8}>
-                      No users found for current filters.
+                      {t("users.noUsersFound")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -253,47 +257,53 @@ export default async function UsersPage({
                                 {displayName(user)}
                               </p>
                               <p className="text-theme-xs text-gray-500 dark:text-gray-400">
-                                {user.username ? `@${user.username}` : "No username"}
+                                {user.username ? `@${user.username}` : t("users.noUsername")}
                               </p>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-600 dark:text-gray-300">
-                          <p>{user.email || "No email"}</p>
+                          <p>{user.email || t("users.noEmail")}</p>
                           <p className="text-theme-xs text-gray-500 dark:text-gray-400">{user.phone}</p>
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start">
                           <Badge size="sm" color={roleBadge.color}>
-                            {roleBadge.label}
+                            {translateUserRole(user.role, t)}
                           </Badge>
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start">
                           <Badge size="sm" color={statusBadge.color}>
-                            {statusBadge.label}
+                            {translateUserStatus(user.status, t)}
                           </Badge>
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-600 dark:text-gray-300">
-                          {user.city || user.zone ? `${user.city || "-"} / ${user.zone || "-"}` : "N/A"}
+                          {user.city || user.zone
+                            ? `${user.city || "-"} / ${user.zone || "-"}`
+                            : t("users.notAvailableShort")}
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-600 dark:text-gray-300">
                           {formatDate(user.createdAt)}
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-600 dark:text-gray-300">
-                          {user.lastLoginAt ? formatDate(user.lastLoginAt) : "Never"}
+                          {user.lastLoginAt ? formatDate(user.lastLoginAt) : t("users.never")}
                         </TableCell>
                         <TableCell className="px-5 py-4 text-start">
                           <div className="flex items-center gap-2">
                             <Link
                               href={`/admin/users/${user.id}`}
-                              className="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                              title={t("common.view")}
+                              aria-label={t("common.view")}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                             >
-                              View
+                              <EyeIcon className="h-4 w-4 fill-current" />
                             </Link>
                             <Link
                               href={`/admin/users/${user.id}/edit`}
-                              className="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                              title={t("common.edit")}
+                              aria-label={t("common.edit")}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                             >
-                              Edit
+                              <PencilIcon className="h-4 w-4 fill-current" />
                             </Link>
                           </div>
                         </TableCell>
@@ -308,8 +318,11 @@ export default async function UsersPage({
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {users.length === 0 ? 0 : skip + 1} - {Math.min(skip + users.length, totalFiltered)} of{" "}
-            {totalFiltered} users
+            {t("users.showingSummary", {
+              start: users.length === 0 ? 0 : skip + 1,
+              end: Math.min(skip + users.length, totalFiltered),
+              total: totalFiltered,
+            })}
           </p>
           <div className="flex items-center gap-2">
             <Link
@@ -321,7 +334,7 @@ export default async function UsersPage({
                   : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               }`}
             >
-              Previous
+              {t("common.previous")}
             </Link>
 
             {visiblePages.map((pageNumber) => (
@@ -347,7 +360,7 @@ export default async function UsersPage({
                   : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               }`}
             >
-              Next
+              {t("common.next")}
             </Link>
           </div>
         </div>

@@ -7,6 +7,8 @@ import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import RolesFilters from "@/components/rbac/RolesFilters";
 import PermissionsFilters from "@/components/rbac/PermissionsFilters";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { translateUserRole } from "@/lib/admin-i18n/labels";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -36,6 +38,7 @@ export default async function RulesPermissionsPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
 
   const rolesQ = firstValue(resolvedSearchParams.rolesQ).trim();
@@ -213,19 +216,19 @@ export default async function RulesPermissionsPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Rules & Permissions" />
+      <PageBreadcrumb pageTitle={t("rbac.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Roles" value={allRolesCount} />
-        <StatCard title="Permissions" value={allPermissionsCount} />
-        <StatCard title="Role-Permission links" value={allMappingsCount} />
-        <StatCard title="User-Role assignments" value={allAssignmentsCount} />
+        <StatCard title={t("rbac.rolesCount")} value={allRolesCount} />
+        <StatCard title={t("rbac.permissionsCount")} value={allPermissionsCount} />
+        <StatCard title={t("rbac.rolePermissionLinks")} value={allMappingsCount} />
+        <StatCard title={t("rbac.userRoleAssignments")} value={allAssignmentsCount} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-5">
         <ComponentCard
-          title="Roles"
-          desc="Recherche et pagination dediees au tableau des roles."
+          title={t("rbac.rolesTitle")}
+          desc={t("rbac.rolesDesc")}
           className="2xl:col-span-2"
         >
           <RolesFilters
@@ -245,19 +248,19 @@ export default async function RulesPermissionsPage({
                 <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                   <TableRow>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Role
+                      {t("rbac.roleColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Name
+                      {t("rbac.nameColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Users
+                      {t("rbac.usersColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Permissions
+                      {t("rbac.permissionsColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Actions
+                      {t("common.actions")}
                     </TableCell>
                   </TableRow>
                 </TableHeader>
@@ -265,7 +268,7 @@ export default async function RulesPermissionsPage({
                   {roles.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No roles found.
+                        {t("rbac.noRolesFound")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -273,7 +276,7 @@ export default async function RulesPermissionsPage({
                       <TableRow key={role.id}>
                         <TableCell className="px-4 py-3 text-start">
                           <Badge size="sm" color={badgeForRoleCode(role.code)}>
-                            {role.code}
+                            {translateUserRole(role.code, t)}
                           </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-start text-sm text-gray-700 dark:text-gray-300">
@@ -290,7 +293,7 @@ export default async function RulesPermissionsPage({
                             href={`/admin/rules-permissions/roles/${role.id}`}
                             className="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                           >
-                            Manage
+                            {t("common.manage")}
                           </Link>
                         </TableCell>
                       </TableRow>
@@ -303,8 +306,11 @@ export default async function RulesPermissionsPage({
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {roles.length === 0 ? 0 : (rolesPage - 1) * rolesPageSize + 1} -{" "}
-              {Math.min((rolesPage - 1) * rolesPageSize + roles.length, rolesFilteredCount)} of {rolesFilteredCount} roles
+              {t("rbac.showingRolesSummary", {
+                start: roles.length === 0 ? 0 : (rolesPage - 1) * rolesPageSize + 1,
+                end: Math.min((rolesPage - 1) * rolesPageSize + roles.length, rolesFilteredCount),
+                total: rolesFilteredCount,
+              })}
             </p>
             <div className="flex items-center gap-2">
               <Link
@@ -316,7 +322,7 @@ export default async function RulesPermissionsPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Previous
+                {t("common.previous")}
               </Link>
               {visibleRolesPages.map((pageNumber) => (
                 <Link
@@ -340,15 +346,15 @@ export default async function RulesPermissionsPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Next
+                {t("common.next")}
               </Link>
             </div>
           </div>
         </ComponentCard>
 
         <ComponentCard
-          title="Permission Matrix"
-          desc="Recherche et pagination dediees au tableau des permissions."
+          title={t("rbac.permissionMatrixTitle")}
+          desc={t("rbac.permissionMatrixDesc")}
           className="2xl:col-span-3"
         >
           <PermissionsFilters
@@ -370,16 +376,16 @@ export default async function RulesPermissionsPage({
                 <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                   <TableRow>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Permission
+                      {t("rbac.permissionColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Resource
+                      {t("rbac.resourceColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Action
+                      {t("rbac.actionColumn")}
                     </TableCell>
                     <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                      Roles
+                      {t("rbac.rolesCount")}
                     </TableCell>
                   </TableRow>
                 </TableHeader>
@@ -387,7 +393,7 @@ export default async function RulesPermissionsPage({
                   {permissions.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No permissions found.
+                        {t("rbac.noPermissionsFound")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -405,11 +411,11 @@ export default async function RulesPermissionsPage({
                         <TableCell className="px-4 py-3 text-start">
                           <div className="flex flex-wrap gap-2">
                             {permission.rolePermissions.length === 0 ? (
-                              <span className="text-xs text-gray-400 dark:text-gray-500">No role</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">{t("rbac.noRole")}</span>
                             ) : (
                               permission.rolePermissions.map((rp) => (
                                 <Badge key={rp.id} size="sm" color={badgeForRoleCode(rp.role.code)}>
-                                  {rp.role.code}
+                                  {translateUserRole(rp.role.code, t)}
                                 </Badge>
                               ))
                             )}
@@ -425,9 +431,11 @@ export default async function RulesPermissionsPage({
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {permissions.length === 0 ? 0 : (permPage - 1) * permPageSize + 1} -{" "}
-              {Math.min((permPage - 1) * permPageSize + permissions.length, permissionsFilteredCount)} of {" "}
-              {permissionsFilteredCount} permissions
+              {t("rbac.showingPermissionsSummary", {
+                start: permissions.length === 0 ? 0 : (permPage - 1) * permPageSize + 1,
+                end: Math.min((permPage - 1) * permPageSize + permissions.length, permissionsFilteredCount),
+                total: permissionsFilteredCount,
+              })}
             </p>
             <div className="flex items-center gap-2">
               <Link
@@ -439,7 +447,7 @@ export default async function RulesPermissionsPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Previous
+                {t("common.previous")}
               </Link>
 
               {visiblePermPages.map((pageNumber) => (
@@ -465,7 +473,7 @@ export default async function RulesPermissionsPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Next
+                {t("common.next")}
               </Link>
             </div>
           </div>

@@ -2,11 +2,13 @@
 import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import { AuthUser, clearSession, getAuthUser, getRefreshToken } from "@/lib/auth/clientSession";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 
 export default function UserDropdown() {
+  const { t } = useAdminI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -22,10 +24,10 @@ export default function UserDropdown() {
     if (first || last) return `${first} ${last}`.trim();
     if (authUser?.username) return authUser.username;
     if (authUser?.email) return authUser.email;
-    return "User";
-  }, [authUser]);
+    return t("header.user");
+  }, [authUser, t]);
 
-  const displayEmail = authUser?.email || authUser?.phone || "Not available";
+  const displayEmail = authUser?.email || authUser?.phone || t("common.notAvailable");
 
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     e.stopPropagation();
@@ -130,7 +132,7 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Edit profile
+              {t("header.editProfile")}
             </DropdownItem>
           </li>
           <li>
@@ -155,7 +157,7 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Account settings
+              {t("header.accountSettings")}
             </DropdownItem>
           </li>
           <li>
@@ -180,7 +182,7 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Support
+              {t("header.support")}
             </DropdownItem>
           </li>
         </ul>
@@ -205,7 +207,7 @@ export default function UserDropdown() {
               fill=""
             />
           </svg>
-          {isLoggingOut ? "Signing out..." : "Sign out"}
+          {isLoggingOut ? t("header.signingOut") : t("header.signOut")}
         </DropdownItem>
       </Dropdown>
     </div>

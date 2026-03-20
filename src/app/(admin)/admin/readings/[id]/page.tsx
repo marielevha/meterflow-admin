@@ -1,28 +1,39 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
-import { ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
+import { ReadingEventType, ReadingStatus, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
+import {
+  translateMeterStatus,
+  translateMeterType,
+  translateReadingEventType,
+  translateReadingSource,
+  translateReadingStatus,
+  translateReviewReasonCode,
+  translateTaskPriority,
+  translateTaskResolutionCode,
+  translateTaskStatus,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { staffHasAnyPermissionFromServerComponent } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
-import { getReviewReasonLabel } from "@/lib/readings/reviewReasons";
 
 export const metadata: Metadata = {
   title: "Reading details",
   description: "Reading details and audit trail",
 };
 
-function formatDate(value: Date | null) {
-  if (!value) return "N/A";
+function formatDate(value: Date | null, fallback: string) {
+  if (!value) return fallback;
   return value.toISOString().slice(0, 19).replace("T", " ");
 }
 
-function decimalToString(value: { toString(): string } | null) {
-  if (!value) return "N/A";
+function decimalToString(value: { toString(): string } | null, fallback: string) {
+  if (!value) return fallback;
   return value.toString();
 }
 
@@ -34,11 +45,12 @@ function decimalToNumber(value: { toString(): string } | null) {
 
 function formatGpsPair(
   latitude: { toString(): string } | null,
-  longitude: { toString(): string } | null
+  longitude: { toString(): string } | null,
+  fallback: string
 ) {
   const lat = decimalToNumber(latitude);
   const lng = decimalToNumber(longitude);
-  if (lat === null || lng === null) return "N/A";
+  if (lat === null || lng === null) return fallback;
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
@@ -66,12 +78,13 @@ function personLabel(person?: {
   email: string | null;
   phone: string;
 } | null) {
-  if (!person) return "N/A";
+  if (!person) return null;
   return (
     [person.firstName, person.lastName].filter(Boolean).join(" ").trim() ||
     person.username ||
     person.email ||
-    person.phone
+    person.phone ||
+    null
   );
 }
 
@@ -93,22 +106,22 @@ function isIsoDateString(value: string) {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
 }
 
-function formatPayloadValue(value: Prisma.JsonValue): string {
-  if (value === null) return "N/A";
+function formatPayloadValue(value: Prisma.JsonValue, t: (key: string) => string): string {
+  if (value === null) return t("common.notAvailable");
   if (typeof value === "string") {
     if (isIsoDateString(value)) {
       const date = new Date(value);
-      if (!Number.isNaN(date.getTime())) return formatDate(date);
+      if (!Number.isNaN(date.getTime())) return formatDate(date, t("common.notAvailable"));
     }
     return value;
   }
   if (typeof value === "number") return value.toString();
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
-    return value.map((item) => formatPayloadValue(item as Prisma.JsonValue)).join(", ");
+    return value.map((item) => formatPayloadValue(item as Prisma.JsonValue, t)).join(", ");
   }
-  return "Object";
+  return t("common.object");
 }
 
 function flattenPayload(
@@ -142,6 +155,7 @@ export default async function ReadingDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getAdminTranslator();
   const staff = await getCurrentStaffFromServerAction();
   if (!staff) redirect("/signin");
   const canViewReadingEventsAuditTrail = await staffHasAnyPermissionFromServerComponent(staff, [
@@ -263,21 +277,21 @@ export default async function ReadingDetailPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Reading details" />
+      <PageBreadcrumb pageTitle={t("readings.detailPageTitle")} />
 
       <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
         <Link
           href="/admin/readings"
           className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
         >
-          Back
+          {t("common.back")}
         </Link>
         {canEdit(staff.role) ? (
           <Link
             href={`/admin/readings/${reading.id}/edit`}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
           >
-            Edit reading
+            {t("readings.editReading")}
           </Link>
         ) : null}
       </div>
@@ -287,32 +301,32 @@ export default async function ReadingDetailPage({
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Reading ID</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("readings.readingId")}</p>
                 <p className="mt-1 break-all text-sm text-gray-800 dark:text-white/90">{reading.id}</p>
               </div>
               <Badge size="sm" color={readingStatusBadge(reading.status)}>
-                {reading.status}
+                {translateReadingStatus(reading.status, t)}
               </Badge>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Info label="Source" value={reading.source} />
-              <Info label="Reading at" value={formatDate(reading.readingAt)} />
-              <Info label="Reviewed at" value={formatDate(reading.reviewedAt)} />
-              <Info label="Primary index" value={decimalToString(reading.primaryIndex)} />
-              <Info label="Secondary index" value={decimalToString(reading.secondaryIndex)} />
-              <Info label="Confidence score" value={decimalToString(reading.confidenceScore)} />
-              <Info label="Anomaly score" value={decimalToString(reading.anomalyScore)} />
-              <Info label="GPS accuracy (m)" value={decimalToString(reading.gpsAccuracyMeters)} />
-              <Info label="GPS distance (m)" value={decimalToString(reading.gpsDistanceMeters)} />
+              <Info label={t("readings.source")} value={translateReadingSource(reading.source, t)} />
+              <Info label={t("readings.readingDate")} value={formatDate(reading.readingAt, t("common.notAvailable"))} />
+              <Info label={t("readings.reviewedAt")} value={formatDate(reading.reviewedAt, t("common.notAvailable"))} />
+              <Info label={t("readings.primaryIndex")} value={decimalToString(reading.primaryIndex, t("common.notAvailable"))} />
+              <Info label={t("readings.secondaryIndex")} value={decimalToString(reading.secondaryIndex, t("common.notAvailable"))} />
+              <Info label={t("readings.confidenceScore")} value={decimalToString(reading.confidenceScore, t("common.notAvailable"))} />
+              <Info label={t("readings.anomalyScore")} value={decimalToString(reading.anomalyScore, t("common.notAvailable"))} />
+              <Info label={t("readings.gpsAccuracyMeters")} value={decimalToString(reading.gpsAccuracyMeters, t("common.notAvailable"))} />
+              <Info label={t("readings.gpsDistance")} value={decimalToString(reading.gpsDistanceMeters, t("common.notAvailable"))} />
             </div>
 
             {(reading.flagReason || reading.rejectionReason) ? (
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Info label="Flag reason" value={getReviewReasonLabel(reading.flagReason) || "N/A"} />
+                <Info label={t("readings.flagReason")} value={translateReviewReasonCode(reading.flagReason, t)} />
                 <Info
-                  label="Rejection reason"
-                  value={getReviewReasonLabel(reading.rejectionReason) || "N/A"}
+                  label={t("readings.rejectionReason")}
+                  value={translateReviewReasonCode(reading.rejectionReason, t)}
                 />
               </div>
             ) : null}
@@ -325,52 +339,57 @@ export default async function ReadingDetailPage({
               }`}
             >
               <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                GPS proximity check
+                {t("readings.gpsProximityCheck")}
               </p>
               <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">
                 {gpsDistance === null
-                  ? "Distance non calculable"
-                  : `${gpsDistance.toFixed(1)} m par rapport au compteur`}
+                  ? t("readings.distanceUnavailable")
+                  : t("readings.distanceFromMeter", { value: gpsDistance.toFixed(1) })}
               </p>
               <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
                 {gpsDistance === null
-                  ? "Les coordonnées du compteur ou du relevé sont incomplètes."
+                  ? t("readings.gpsIncomplete")
                   : gpsWithinThreshold
-                    ? `Position cohérente avec le seuil configuré (${gpsThreshold} m).`
-                    : `Distance supérieure au seuil configuré (${gpsThreshold} m). Contrôle recommandé.`}
+                    ? t("readings.gpsWithinThreshold", { threshold: gpsThreshold })
+                    : t("readings.gpsOverThreshold", { threshold: gpsThreshold })}
               </p>
             </div>
 
             {reading.ocrText ? (
               <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">OCR text</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("readings.ocrText")}</p>
                 <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{reading.ocrText}</p>
               </div>
             ) : null}
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">GPS snapshot</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("readings.gpsSnapshot")}</p>
                 <div className="mt-3 grid grid-cols-1 gap-3">
-                  <Info label="Meter coordinates" value={formatGpsPair(reading.meter.latitude, reading.meter.longitude)} />
-                  <Info label="Reading coordinates" value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude)} />
-                  <Info label="GPS accuracy" value={decimalToString(reading.gpsAccuracyMeters)} />
+                  <Info label={t("readings.meterCoordinates")} value={formatGpsPair(reading.meter.latitude, reading.meter.longitude, t("common.notAvailable"))} />
+                  <Info label={t("readings.readingCoordinates")} value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude, t("common.notAvailable"))} />
+                  <Info label={t("readings.gpsAccuracyMeters")} value={decimalToString(reading.gpsAccuracyMeters, t("common.notAvailable"))} />
                 </div>
               </div>
 
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Resubmission history</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("readings.resubmissionHistory")}</p>
                 <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">
-                  {resubmissionEvents.length} resubmission{resubmissionEvents.length > 1 ? "s" : ""}
+                  {t("readings.resubmissionCount", {
+                    count: resubmissionEvents.length,
+                    suffix: resubmissionEvents.length > 1 ? "s" : "",
+                  })}
                 </p>
                 {resubmissionEvents.length === 0 ? (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">This reading has not been resubmitted.</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("readings.notResubmitted")}</p>
                 ) : (
                   <div className="mt-3 space-y-2">
                     {resubmissionEvents.map((event) => (
                       <div key={event.id} className="rounded-lg border border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-white/[0.03]">
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-200">{formatDate(event.createdAt)}</p>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">By {personLabel(event.user)}</p>
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-200">{formatDate(event.createdAt, t("common.notAvailable"))}</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {t("readings.byUser", { user: personLabel(event.user) || t("common.notAvailable") })}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -380,7 +399,7 @@ export default async function ReadingDetailPage({
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Evidence</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.evidence")}</h3>
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
               <img
                 src={`/api/v1/readings/${reading.id}/image`}
@@ -394,10 +413,10 @@ export default async function ReadingDetailPage({
 
           {canViewReadingEventsAuditTrail ? (
             <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading events audit trail</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.auditTrail")}</h3>
               <div className="mt-4 space-y-3">
                 {auditTrailEvents.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No event found.</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t("readings.noEventFound")}</p>
                 ) : (
                   auditTrailEvents.map((event) => {
                     const payloadEntries = flattenPayload(event.payload as Prisma.JsonValue);
@@ -405,16 +424,16 @@ export default async function ReadingDetailPage({
                       <div key={event.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <Badge size="sm" color={eventBadge(event.type)}>
-                            {event.type}
+                            {translateReadingEventType(event.type, t)}
                           </Badge>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.createdAt)}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.createdAt, t("common.notAvailable"))}</p>
                         </div>
                         <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                          By: {personLabel(event.user)}
+                          {t("readings.byUser", { user: personLabel(event.user) || t("common.notAvailable") })}
                         </p>
                         <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
                           {payloadEntries.length === 0 ? (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">No additional details.</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("readings.noAdditionalDetails")}</p>
                           ) : (
                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                               {payloadEntries.map((item) => (
@@ -426,7 +445,7 @@ export default async function ReadingDetailPage({
                                     {humanizeKey(item.key)}
                                   </p>
                                   <p className="mt-1 break-words text-xs font-medium text-gray-700 dark:text-gray-200">
-                                    {formatPayloadValue(item.value)}
+                                    {formatPayloadValue(item.value, t)}
                                   </p>
                                 </div>
                               ))}
@@ -444,35 +463,35 @@ export default async function ReadingDetailPage({
 
         <aside className="space-y-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Actors</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.actors")}</h3>
             <div className="mt-4 space-y-3">
-              <Info label="Submitted by" value={personLabel(reading.submittedBy)} />
-              <Info label="Reviewed by" value={personLabel(reading.reviewedBy)} />
-              <Info label="Customer" value={personLabel(reading.meter.customer)} />
-              <Info label="Assigned agent" value={personLabel(reading.meter.assignedAgent)} />
+              <Info label={t("readings.submittedBy")} value={personLabel(reading.submittedBy) || t("common.notAvailable")} />
+              <Info label={t("readings.reviewedBy")} value={personLabel(reading.reviewedBy) || t("common.notAvailable")} />
+              <Info label={t("common.customer")} value={personLabel(reading.meter.customer) || t("common.notAvailable")} />
+              <Info label={t("readings.assignedAgent")} value={personLabel(reading.meter.assignedAgent) || t("common.notAvailable")} />
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Meter details</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.meterDetails")}</h3>
             <div className="mt-4 space-y-3">
-              <Info label="Serial" value={reading.meter.serialNumber} />
-              <Info label="Reference" value={reading.meter.meterReference || "N/A"} />
-              <Info label="Type" value={reading.meter.type} />
-              <Info label="Status" value={reading.meter.status} />
-              <Info label="City / Zone" value={`${reading.meter.city || "-"} / ${reading.meter.zone || "-"}`} />
-              <Info label="Meter coordinates" value={formatGpsPair(reading.meter.latitude, reading.meter.longitude)} />
-              <Info label="Reading coordinates" value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude)} />
+              <Info label={t("readings.serial")} value={reading.meter.serialNumber} />
+              <Info label={t("meters.reference")} value={reading.meter.meterReference || t("common.notAvailable")} />
+              <Info label={t("readings.meterType")} value={translateMeterType(reading.meter.type, t)} />
+              <Info label={t("common.status")} value={translateMeterStatus(reading.meter.status, t)} />
+              <Info label={t("readings.cityZone")} value={`${reading.meter.city || "-"} / ${reading.meter.zone || "-"}`} />
+              <Info label={t("readings.meterCoordinates")} value={formatGpsPair(reading.meter.latitude, reading.meter.longitude, t("common.notAvailable"))} />
+              <Info label={t("readings.readingCoordinates")} value={formatGpsPair(reading.gpsLatitude, reading.gpsLongitude, t("common.notAvailable"))} />
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Linked tasks</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("readings.linkedTasks")}</h3>
               <span className="text-xs text-gray-500 dark:text-gray-400">{linkedTasks.length}</span>
             </div>
             {linkedTasks.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No task linked to this reading.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("readings.noLinkedTask")}</p>
             ) : (
               <div className="space-y-2">
                 {linkedTasks.map((task) => (
@@ -484,15 +503,15 @@ export default async function ReadingDetailPage({
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-medium text-gray-800 dark:text-white/90">{task.title}</p>
                       <Badge size="sm" color={task.relation === "MISSION_OUTPUT" ? "success" : "info"}>
-                        {task.relation === "MISSION_OUTPUT" ? "MISSION OUTPUT" : "SOURCE TASK"}
+                        {task.relation === "MISSION_OUTPUT" ? t("readings.missionOutput") : t("readings.sourceTask")}
                       </Badge>
                     </div>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {task.status} - {task.priority} - {formatDate(task.createdAt)}
+                      {translateTaskStatus(task.status as TaskStatus, t)} - {translateTaskPriority(task.priority as TaskPriority, t)} - {formatDate(task.createdAt, t("common.notAvailable"))}
                     </p>
                     {"resolutionCode" in task && task.resolutionCode ? (
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Outcome: {task.resolutionCode}
+                        {t("readings.taskOutcome")}: {translateTaskResolutionCode(task.resolutionCode, t)}
                       </p>
                     ) : null}
                   </Link>

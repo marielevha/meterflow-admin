@@ -1,10 +1,21 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Prisma, TaskEventType, TaskItemStatus, TaskPriority, TaskStatus } from "@prisma/client";
+import { Prisma, ReadingStatus, TaskEventType, TaskItemStatus, TaskPriority, TaskStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import {
+  translateMeterType,
+  translateReadingStatus,
+  translateTaskEventType,
+  translateTaskItemStatus,
+  translateTaskPriority,
+  translateTaskResolutionCode,
+  translateTaskStatus,
+  translateTaskType,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
 import {
   addTaskAttachmentAction,
@@ -49,8 +60,8 @@ function itemStatusBadge(status: TaskItemStatus) {
   return "light" as const;
 }
 
-function formatDate(value: Date | null) {
-  if (!value) return "-";
+function formatDate(value: Date | null, fallback: string) {
+  if (!value) return fallback;
   return value.toISOString().slice(0, 16).replace("T", " ");
 }
 
@@ -64,30 +75,44 @@ function personLabel(
       }
     | null
 ) {
-  if (!person) return "N/A";
+  if (!person) return null;
   return (
     [person.firstName, person.lastName].filter(Boolean).join(" ").trim() ||
     person.username ||
     person.phone ||
-    "User"
+    null
   );
 }
 
 function messageFromParams(search: Record<string, string | string[] | undefined>) {
   const error = Array.isArray(search.error) ? search.error[0] : search.error;
-  if (error) return { type: "error" as const, text: error.replaceAll("_", " ") };
+  if (error) return { type: "error" as const, text: error };
 
   const successKeys = ["created", "updated", "commented", "attachment", "item", "item_updated", "status_updated"];
   const anySuccess = successKeys.some((key) => {
     const val = search[key];
     return (Array.isArray(val) ? val[0] : val) === "1";
   });
-  if (anySuccess) return { type: "success" as const, text: "Action completed successfully." };
+  if (anySuccess) return { type: "success" as const, text: "task_action_completed" };
   return null;
 }
 
+function mapTaskMessage(code: string, t: (key: string) => string) {
+  if (!code) return "";
+  if (code === "invalid_status") return t("tasks.errorInvalidStatus");
+  if (code === "invalid_status_transition") return t("tasks.errorInvalidStatusTransition");
+  if (code === "invalid_priority") return t("tasks.errorInvalidPriority");
+  if (code === "invalid_type") return t("tasks.errorInvalidType");
+  if (code === "invalid_due_at") return t("tasks.errorInvalidDueAt");
+  if (code === "invalid_sort_order") return t("tasks.errorInvalidSortOrder");
+  if (code === "invalid_item_status") return t("tasks.errorInvalidItemStatus");
+  if (code === "task_load_failed") return t("tasks.errorTaskLoadFailed");
+  if (code === "update_failed") return t("tasks.errorUpdateFailed");
+  return code.replaceAll("_", " ");
+}
+
 function decimalToString(value: { toString(): string } | null | undefined) {
-  if (!value) return "N/A";
+  if (!value) return null;
   return value.toString();
 }
 
@@ -103,13 +128,8 @@ function formatGps(
 ) {
   const lat = decimalToNumber(latitude);
   const lng = decimalToNumber(longitude);
-  if (lat === null || lng === null) return "N/A";
+  if (lat === null || lng === null) return null;
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-}
-
-function resolutionLabel(value: string | null) {
-  if (!value) return "N/A";
-  return value.replaceAll("_", " ");
 }
 
 function humanizeKey(key: string) {
@@ -122,13 +142,13 @@ function humanizeKey(key: string) {
     .replace(/^./, (char) => char.toUpperCase());
 }
 
-function formatPayloadValue(value: Prisma.JsonValue): string {
-  if (value === null) return "N/A";
+function formatPayloadValue(value: Prisma.JsonValue, t: (key: string) => string): string {
+  if (value === null) return t("common.notAvailable");
   if (typeof value === "string") return value;
   if (typeof value === "number") return value.toString();
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (Array.isArray(value)) return value.length === 0 ? "[]" : value.map((item) => formatPayloadValue(item as Prisma.JsonValue)).join(", ");
-  return "Object";
+  if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
+  if (Array.isArray(value)) return value.length === 0 ? "[]" : value.map((item) => formatPayloadValue(item as Prisma.JsonValue, t)).join(", ");
+  return t("common.object");
 }
 
 function flattenPayload(
@@ -165,14 +185,14 @@ function addressLabel(task: {
     zone: string | null;
   } | null;
 }) {
-  if (!task.meter) return "N/A";
+  if (!task.meter) return null;
   const parts = [
     task.meter.addressLine1,
     task.meter.addressLine2,
     task.meter.city,
     task.meter.zone,
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "N/A";
+  return parts.length > 0 ? parts.join(", ") : null;
 }
 
 export default async function TaskDetailPage({
@@ -182,6 +202,7 @@ export default async function TaskDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getAdminTranslator();
   const staff = await getCurrentStaffFromServerAction();
   if (!staff) redirect("/signin");
 
@@ -201,10 +222,16 @@ export default async function TaskDetailPage({
   const addAttachment = addTaskAttachmentAction.bind(null, task.id);
   const addItem = addTaskItemAction.bind(null, task.id);
   const infoMessage = messageFromParams(resolvedSearchParams);
+  const feedbackText =
+    infoMessage?.type === "success"
+      ? infoMessage.text === "task_action_completed"
+        ? t("tasks.eventCompleted")
+        : infoMessage.text
+      : mapTaskMessage(infoMessage?.text ?? "", t);
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Task detail" />
+      <PageBreadcrumb pageTitle={t("tasks.detailPageTitle")} />
 
       {infoMessage ? (
         <div
@@ -214,22 +241,22 @@ export default async function TaskDetailPage({
               : "border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300"
           }`}
         >
-          {infoMessage.text}
+          {feedbackText}
         </div>
       ) : null}
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">{task.title}</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{task.description || "No description"}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{task.description || t("common.noDescription")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge size="sm" color={statusBadge(task.status)}>{task.status}</Badge>
+          <Badge size="sm" color={statusBadge(task.status)}>{translateTaskStatus(task.status, t)}</Badge>
           <Link
             href={`/admin/tasks/${task.id}/edit`}
             className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
           >
-            Edit
+            {t("common.edit")}
           </Link>
         </div>
       </div>
@@ -237,7 +264,7 @@ export default async function TaskDetailPage({
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <section className="space-y-6 xl:col-span-2">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Quick status actions</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.quickStatusActions")}</h3>
             <div className="mt-3 flex flex-wrap gap-2">
               {[TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.DONE].map((status) => {
                 const action = quickUpdateTaskStatusAction.bind(null, task.id, status);
@@ -247,7 +274,7 @@ export default async function TaskDetailPage({
                       type="submit"
                       className="inline-flex h-9 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                     >
-                      {status}
+                      {translateTaskStatus(status, t)}
                     </button>
                   </form>
                 );
@@ -258,39 +285,39 @@ export default async function TaskDetailPage({
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Field report</h3>
+                <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.fieldReportTitle")}</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Everything the agent submitted from the field.
+                  {t("tasks.fieldReportDesc")}
                 </p>
               </div>
               {task.fieldSubmittedAt ? (
-                <Badge size="sm" color="success">SUBMITTED</Badge>
+                <Badge size="sm" color="success">{t("tasks.fieldReportSubmitted")}</Badge>
               ) : (
-                <Badge size="sm" color="light">AWAITING REPORT</Badge>
+                <Badge size="sm" color="light">{t("tasks.fieldReportAwaiting")}</Badge>
               )}
             </div>
 
             {task.fieldSubmittedAt ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  <Info label="Submitted at" value={formatDate(task.fieldSubmittedAt)} />
-                  <Info label="Outcome" value={resolutionLabel(task.resolutionCode)} />
-                  <Info label="Started at" value={formatDate(task.startedAt)} />
-                  <Info label="Field primary index" value={decimalToString(task.fieldPrimaryIndex)} />
-                  <Info label="Field secondary index" value={decimalToString(task.fieldSecondaryIndex)} />
-                  <Info label="GPS accuracy (m)" value={decimalToString(task.fieldGpsAccuracyMeters)} />
-                  <Info label="Field coordinates" value={formatGps(task.fieldGpsLatitude, task.fieldGpsLongitude)} />
-                  <Info label="Image mime" value={task.fieldImageMimeType || "N/A"} />
+                  <Info label={t("tasks.submittedAt")} value={formatDate(task.fieldSubmittedAt, t("common.notAvailable"))} />
+                  <Info label={t("tasks.outcome")} value={translateTaskResolutionCode(task.resolutionCode, t)} />
+                  <Info label={t("tasks.startedAt")} value={formatDate(task.startedAt, t("common.notAvailable"))} />
+                  <Info label={t("tasks.fieldPrimaryIndex")} value={decimalToString(task.fieldPrimaryIndex) || t("common.notAvailable")} />
+                  <Info label={t("tasks.fieldSecondaryIndex")} value={decimalToString(task.fieldSecondaryIndex) || t("common.notAvailable")} />
+                  <Info label={t("tasks.gpsAccuracyMeters")} value={decimalToString(task.fieldGpsAccuracyMeters) || t("common.notAvailable")} />
+                  <Info label={t("tasks.fieldCoordinates")} value={formatGps(task.fieldGpsLatitude, task.fieldGpsLongitude) || t("common.notAvailable")} />
+                  <Info label={t("tasks.imageMime")} value={task.fieldImageMimeType || t("common.notAvailable")} />
                   <Info
-                    label="Image size bytes"
-                    value={task.fieldImageSizeBytes ? String(task.fieldImageSizeBytes) : "N/A"}
+                    label={t("tasks.imageSizeBytes")}
+                    value={task.fieldImageSizeBytes ? String(task.fieldImageSizeBytes) : t("common.notAvailable")}
                   />
                 </div>
 
                 {task.resolutionComment ? (
                   <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
                     <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Agent comment
+                      {t("tasks.agentComment")}
                     </p>
                     <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{task.resolutionComment}</p>
                   </div>
@@ -307,34 +334,36 @@ export default async function TaskDetailPage({
                 ) : null}
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <LinkedReadingCard
-                    title="Source reading"
+                    <LinkedReadingCard
+                    title={t("tasks.sourceReadingTitle")}
                     reading={task.reading}
                     href={task.reading ? `/admin/readings/${task.reading.id}` : null}
+                    t={t}
                   />
                   <LinkedReadingCard
-                    title="Reported reading"
+                    title={t("tasks.reportedReadingTitle")}
                     reading={task.reportedReading}
                     href={task.reportedReading ? `/admin/readings/${task.reportedReading.id}` : null}
+                    t={t}
                   />
                 </div>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                No field report has been submitted yet.
+                {t("tasks.noFieldReportSubmitted")}
               </div>
             )}
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Checklist</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{task.items.length} items</span>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.checklist")}</h3>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{t("tasks.checklistItems", { count: task.items.length })}</span>
             </div>
 
             <div className="space-y-3">
               {task.items.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No checklist item.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("tasks.noChecklistItem")}</p>
               ) : (
                 task.items.map((item) => {
                   const nextStatus = item.status === TaskItemStatus.DONE ? TaskItemStatus.TODO : TaskItemStatus.DONE;
@@ -344,9 +373,9 @@ export default async function TaskDetailPage({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-gray-800 dark:text-white/90">{item.title}</p>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{item.details || "No details"}</p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{item.details || t("tasks.noDetails")}</p>
                         </div>
-                        <Badge size="sm" color={itemStatusBadge(item.status)}>{item.status}</Badge>
+                        <Badge size="sm" color={itemStatusBadge(item.status)}>{translateTaskItemStatus(item.status, t)}</Badge>
                       </div>
                       <div className="mt-3 flex items-center gap-2">
                         <form action={toggleAction}>
@@ -354,7 +383,7 @@ export default async function TaskDetailPage({
                             type="submit"
                             className="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                           >
-                            Mark as {nextStatus}
+                            {t("tasks.markAs", { status: translateTaskItemStatus(nextStatus, t) })}
                           </button>
                         </form>
                       </div>
@@ -367,13 +396,13 @@ export default async function TaskDetailPage({
             <form action={addItem} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
               <input
                 name="title"
-                placeholder="Checklist item title"
+                placeholder={t("tasks.checklistTitlePlaceholder")}
                 className="h-11 rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-5"
                 required
               />
               <input
                 name="details"
-                placeholder="Details"
+                placeholder={t("tasks.checklistDetailsPlaceholder")}
                 className="h-11 rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-5"
               />
               <input
@@ -383,22 +412,22 @@ export default async function TaskDetailPage({
                 className="h-11 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-1"
               />
               <button type="submit" className="h-11 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 md:col-span-1">
-                Add
+                {t("tasks.addItem")}
               </button>
             </form>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Comments</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.comments")}</h3>
             <div className="mt-3 space-y-3">
               {task.comments.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No comment yet.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("tasks.noCommentYet")}</p>
               ) : (
                 task.comments.map((comment) => (
                   <div key={comment.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-800 dark:text-white/90">{personLabel(comment.user)}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(comment.createdAt)}</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-white/90">{personLabel(comment.user) || t("common.unknown")}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(comment.createdAt, t("common.notAvailable"))}</p>
                     </div>
                     <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{comment.comment}</p>
                   </div>
@@ -410,25 +439,25 @@ export default async function TaskDetailPage({
               <textarea
                 name="comment"
                 rows={3}
-                placeholder="Write a comment"
+                placeholder={t("tasks.writeComment")}
                 className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 required
               />
               <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <input type="checkbox" name="isInternal" value="1" defaultChecked className="h-3.5 w-3.5" />
-                Internal comment
+                {t("tasks.internalComment")}
               </label>
               <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
-                Add comment
+                {t("tasks.addComment")}
               </button>
             </form>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Attachments</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.attachments")}</h3>
             <div className="mt-3 space-y-2">
               {task.attachments.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No attachment.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("tasks.noAttachment")}</p>
               ) : (
                 task.attachments.map((attachment) => (
                   <a
@@ -439,7 +468,7 @@ export default async function TaskDetailPage({
                     className="block rounded-lg border border-gray-200 p-3 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
                   >
                     <p className="font-medium">{attachment.fileName}</p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatDate(attachment.createdAt)}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatDate(attachment.createdAt, t("common.notAvailable"))}</p>
                   </a>
                 ))
               )}
@@ -448,36 +477,36 @@ export default async function TaskDetailPage({
             <form action={addAttachment} className="mt-4 space-y-2">
               <input
                 name="fileUrl"
-                placeholder="https://..."
+                placeholder={t("tasks.fileUrlPlaceholder")}
                 className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 required
               />
               <input
                 name="fileName"
-                placeholder="file name"
+                placeholder={t("tasks.fileNamePlaceholder")}
                 className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 required
               />
               <div className="grid grid-cols-2 gap-2">
                 <input
                   name="mimeType"
-                  placeholder="mime type"
+                  placeholder={t("tasks.mimeTypePlaceholder")}
                   className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 />
                 <input
                   name="fileSizeBytes"
                   type="number"
-                  placeholder="size bytes"
+                  placeholder={t("tasks.fileSizeBytesPlaceholder")}
                   className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 />
               </div>
               <input
                 name="fileHash"
-                placeholder="file hash (optional)"
+                placeholder={t("tasks.fileHashPlaceholder")}
                 className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               />
               <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
-                Add attachment
+                {t("tasks.addAttachment")}
               </button>
             </form>
           </div>
@@ -485,45 +514,45 @@ export default async function TaskDetailPage({
 
         <aside className="space-y-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Mission overview</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.missionOverview")}</h3>
             <div className="mt-4 grid grid-cols-1 gap-3">
-              <Info label="Task ID" value={task.id.slice(0, 8)} />
-              <Info label="Type" value={task.type} />
-              <Info label="Status" value={task.status} />
-              <Info label="Priority" value={task.priority} />
-              <Info label="Outcome" value={resolutionLabel(task.resolutionCode)} />
-              <Info label="Assigned to" value={personLabel(task.assignedTo)} />
-              <Info label="Started by" value={personLabel(task.startedBy)} />
-              <Info label="Created by" value={personLabel(task.createdBy)} />
-              <Info label="Closed by" value={personLabel(task.closedBy)} />
-              <Info label="Created at" value={formatDate(task.createdAt)} />
-              <Info label="Due at" value={formatDate(task.dueAt)} />
-              <Info label="Closed at" value={formatDate(task.closedAt)} />
+              <Info label={t("tasks.taskId")} value={task.id.slice(0, 8)} />
+              <Info label={t("common.type")} value={translateTaskType(task.type, t)} />
+              <Info label={t("tasks.statusLabel")} value={translateTaskStatus(task.status, t)} />
+              <Info label={t("common.priority")} value={translateTaskPriority(task.priority, t)} />
+              <Info label={t("tasks.outcome")} value={translateTaskResolutionCode(task.resolutionCode, t)} />
+              <Info label={t("tasks.tableAssignee")} value={personLabel(task.assignedTo) || t("tasks.unassigned")} />
+              <Info label={t("tasks.startedBy")} value={personLabel(task.startedBy) || t("common.notAvailable")} />
+              <Info label={t("tasks.createdBy")} value={personLabel(task.createdBy) || t("common.notAvailable")} />
+              <Info label={t("tasks.closedBy")} value={personLabel(task.closedBy) || t("common.notAvailable")} />
+              <Info label={t("meters.createdAt")} value={formatDate(task.createdAt, t("common.notAvailable"))} />
+              <Info label={t("tasks.dueAt")} value={formatDate(task.dueAt, "-")} />
+              <Info label={t("tasks.closedAt")} value={formatDate(task.closedAt, "-")} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Badge size="sm" color={statusBadge(task.status)}>{task.status}</Badge>
-              <Badge size="sm" color={priorityBadge(task.priority)}>{task.priority}</Badge>
+              <Badge size="sm" color={statusBadge(task.status)}>{translateTaskStatus(task.status, t)}</Badge>
+              <Badge size="sm" color={priorityBadge(task.priority)}>{translateTaskPriority(task.priority, t)}</Badge>
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Context</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.context")}</h3>
             <div className="mt-4 grid grid-cols-1 gap-3">
-              <Info label="Customer" value={personLabel(task.meter?.customer)} />
-              <Info label="Meter serial" value={task.meter?.serialNumber || "N/A"} />
-              <Info label="Meter reference" value={task.meter?.meterReference || "N/A"} />
-              <Info label="Meter type" value={task.meter?.type || "N/A"} />
-              <Info label="Address / zone" value={addressLabel(task)} />
+              <Info label={t("common.customer")} value={personLabel(task.meter?.customer) || t("common.notAvailable")} />
+              <Info label={t("tasks.meterSerial")} value={task.meter?.serialNumber || t("common.notAvailable")} />
+              <Info label={t("tasks.meterReference")} value={task.meter?.meterReference || t("common.notAvailable")} />
+              <Info label={t("tasks.meterTypeLabel")} value={task.meter?.type ? translateMeterType(task.meter.type, t) : t("common.notAvailable")} />
+              <Info label={t("tasks.addressZone")} value={addressLabel(task) || t("common.notAvailable")} />
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Mission events</h3>
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.missionEvents")}</h3>
               <span className="text-xs text-gray-500 dark:text-gray-400">{task.events.length}</span>
             </div>
             {task.events.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No mission event found.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("tasks.noMissionEventFound")}</p>
             ) : (
               <div className="space-y-3">
                 {task.events.map((event) => {
@@ -531,14 +560,14 @@ export default async function TaskDetailPage({
                   return (
                     <div key={event.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Badge size="sm" color={eventBadge(event.type)}>{event.type}</Badge>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.createdAt)}</p>
+                        <Badge size="sm" color={eventBadge(event.type)}>{translateTaskEventType(event.type, t)}</Badge>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.createdAt, t("common.notAvailable"))}</p>
                       </div>
                       <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                        By: {personLabel(event.actorUser)}
+                        {t("readings.byUser", { user: personLabel(event.actorUser) || t("common.unknown") })}
                       </p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Recipient: {personLabel(event.recipientUser)}
+                        {t("tasks.recipient")}: {personLabel(event.recipientUser) || t("common.notAvailable")}
                       </p>
 
                       {payloadEntries.length > 0 ? (
@@ -552,7 +581,7 @@ export default async function TaskDetailPage({
                                 {humanizeKey(item.key)}
                               </p>
                               <p className="mt-1 break-words text-xs font-medium text-gray-700 dark:text-gray-200">
-                                {formatPayloadValue(item.value)}
+                                {formatPayloadValue(item.value, t)}
                               </p>
                             </div>
                           ))}
@@ -566,13 +595,13 @@ export default async function TaskDetailPage({
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Timeline</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.timeline")}</h3>
             <div className="mt-3 space-y-2">
               {task.timeline.map((event) => (
                 <div key={event.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                   <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{event.type}</p>
                   <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{event.label}</p>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatDate(event.at)}</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{formatDate(event.at, t("common.notAvailable"))}</p>
                 </div>
               ))}
             </div>
@@ -614,24 +643,29 @@ function LinkedReadingCard({
       }
     | null;
   href: string | null;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }) {
   return (
     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
       <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{title}</p>
       {!reading ? (
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No linked reading.</p>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t("tasks.noLinkedReading")}</p>
       ) : (
         <div className="mt-2 space-y-2">
           <p className="text-sm font-medium text-gray-800 dark:text-white/90">{reading.id.slice(0, 8)}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Status: {reading.status}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Reading at: {formatDate(reading.readingAt)}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Index: {reading.primaryIndex.toString()}
+            {t("tasks.statusLabel")}: {translateReadingStatus(reading.status as ReadingStatus, t)}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t("tasks.readingAt")}: {formatDate(reading.readingAt, t("common.notAvailable"))}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t("common.index")}: {reading.primaryIndex.toString()}
             {reading.secondaryIndex ? ` | ${reading.secondaryIndex.toString()}` : ""}
           </p>
           {href ? (
             <Link href={href} className="inline-flex text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
-              Open reading detail
+              {t("tasks.openReadingDetail")}
             </Link>
           ) : null}
         </div>

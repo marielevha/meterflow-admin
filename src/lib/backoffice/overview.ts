@@ -20,15 +20,15 @@ function weekStart(d: Date) {
   return copy;
 }
 
-function formatMonthShort(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+function formatMonthShort(d: Date, locale: string) {
+  return d.toLocaleDateString(locale, { month: "short", day: "2-digit" });
 }
 
-function formatMonthYear(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+function formatMonthYear(d: Date, locale: string) {
+  return d.toLocaleDateString(locale, { month: "short", year: "2-digit" });
 }
 
-async function computeOverviewDashboardData() {
+async function computeOverviewDashboardData(locale = "en-US") {
   const appSettingsPromise = getAppSettings();
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -364,7 +364,7 @@ async function computeOverviewDashboardData() {
   for (let i = 11; i >= 0; i -= 1) annualDates.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
 
   const monthlyDelay = {
-    labels: monthlyDates.map((d) => formatMonthShort(d)),
+    labels: monthlyDates.map((d) => formatMonthShort(d, locale)),
     values: monthlyDates.map((d) => {
       const row = monthlyRows.get(d.toISOString().slice(0, 10));
       if (!row || row.reviewedCount === 0) return 0;
@@ -375,7 +375,7 @@ async function computeOverviewDashboardData() {
     labels: quarterlyDates.map((d) => {
       const end = new Date(d);
       end.setDate(end.getDate() + 6);
-      return `${formatMonthShort(d)}-${formatMonthShort(end)}`;
+      return `${formatMonthShort(d, locale)}-${formatMonthShort(end, locale)}`;
     }),
     values: quarterlyDates.map((d) => {
       const row = quarterlyRows.get(d.toISOString().slice(0, 10));
@@ -384,7 +384,7 @@ async function computeOverviewDashboardData() {
     }),
   };
   const annualDelay = {
-    labels: annualDates.map((d) => formatMonthYear(d)),
+    labels: annualDates.map((d) => formatMonthYear(d, locale)),
     values: annualDates.map((d) => {
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       const row = annualRows.get(key);
@@ -394,19 +394,19 @@ async function computeOverviewDashboardData() {
   };
 
   const monthlyBacklog = {
-    labels: monthlyDates.map((d) => formatMonthShort(d)),
+    labels: monthlyDates.map((d) => formatMonthShort(d, locale)),
     values: monthlyDates.map((d) => monthlyRows.get(d.toISOString().slice(0, 10))?.pending || 0),
   };
   const quarterlyBacklog = {
     labels: quarterlyDates.map((d) => {
       const end = new Date(d);
       end.setDate(end.getDate() + 6);
-      return `${formatMonthShort(d)}-${formatMonthShort(end)}`;
+      return `${formatMonthShort(d, locale)}-${formatMonthShort(end, locale)}`;
     }),
     values: quarterlyDates.map((d) => quarterlyRows.get(d.toISOString().slice(0, 10))?.pending || 0),
   };
   const annualBacklog = {
-    labels: annualDates.map((d) => formatMonthYear(d)),
+    labels: annualDates.map((d) => formatMonthYear(d, locale)),
     values: annualDates.map((d) => {
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       return annualRows.get(key)?.pending || 0;
@@ -414,7 +414,7 @@ async function computeOverviewDashboardData() {
   };
 
   const monthlyAnomaly = {
-    labels: monthlyDates.map((d) => formatMonthShort(d)),
+    labels: monthlyDates.map((d) => formatMonthShort(d, locale)),
     values: monthlyDates.map((d) => {
       const row = monthlyRows.get(d.toISOString().slice(0, 10));
       if (!row || row.submitted === 0) return 0;
@@ -425,7 +425,7 @@ async function computeOverviewDashboardData() {
     labels: quarterlyDates.map((d) => {
       const end = new Date(d);
       end.setDate(end.getDate() + 6);
-      return `${formatMonthShort(d)}-${formatMonthShort(end)}`;
+      return `${formatMonthShort(d, locale)}-${formatMonthShort(end, locale)}`;
     }),
     values: quarterlyDates.map((d) => {
       const row = quarterlyRows.get(d.toISOString().slice(0, 10));
@@ -434,7 +434,7 @@ async function computeOverviewDashboardData() {
     }),
   };
   const annualAnomaly = {
-    labels: annualDates.map((d) => formatMonthYear(d)),
+    labels: annualDates.map((d) => formatMonthYear(d, locale)),
     values: annualDates.map((d) => {
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       const row = annualRows.get(key);
@@ -444,19 +444,19 @@ async function computeOverviewDashboardData() {
   };
 
   const monthlyVolume = {
-    labels: monthlyDates.map((d) => formatMonthShort(d)),
+    labels: monthlyDates.map((d) => formatMonthShort(d, locale)),
     values: monthlyDates.map((d) => monthlyRows.get(d.toISOString().slice(0, 10))?.submitted || 0),
   };
   const quarterlyVolume = {
     labels: quarterlyDates.map((d) => {
       const end = new Date(d);
       end.setDate(end.getDate() + 6);
-      return `${formatMonthShort(d)}-${formatMonthShort(end)}`;
+      return `${formatMonthShort(d, locale)}-${formatMonthShort(end, locale)}`;
     }),
     values: quarterlyDates.map((d) => quarterlyRows.get(d.toISOString().slice(0, 10))?.submitted || 0),
   };
   const annualVolume = {
-    labels: annualDates.map((d) => formatMonthYear(d)),
+    labels: annualDates.map((d) => formatMonthYear(d, locale)),
     values: annualDates.map((d) => {
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       return annualRows.get(key)?.submitted || 0;
@@ -499,8 +499,8 @@ async function computeOverviewDashboardData() {
   });
 
   const toRate = (decisions: number, validated: number) => (decisions > 0 ? Number(((validated / decisions) * 100).toFixed(2)) : 0);
-  const monthShort = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-  const monthLabel = (d: Date) => d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+  const monthShort = (d: Date) => d.toLocaleDateString(locale, { month: "short", day: "2-digit" });
+  const monthLabel = (d: Date) => d.toLocaleDateString(locale, { month: "short", year: "2-digit" });
 
   const validationRateMonthly = {
     labels: validationMonthlyDates.map((d) => monthShort(d)),
@@ -624,6 +624,6 @@ async function computeOverviewDashboardData() {
 
 export const getOverviewDashboardData = unstable_cache(
   computeOverviewDashboardData,
-  ["overview-dashboard-v2"],
+  ["overview-dashboard-v3"],
   { revalidate: 60, tags: ["overview-dashboard"] },
 );

@@ -7,6 +7,7 @@ import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import ReadingsFilters from "@/components/readings/ReadingsFilters";
 import { EyeIcon, PencilIcon } from "@/icons";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -34,11 +35,31 @@ function statusBadge(status: ReadingStatus) {
   return "light" as const;
 }
 
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 19).replace("T", " ");
+function formatDate(date: Date, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function readingStatusLabel(
+  status: ReadingStatus,
+  t: (key: string, values?: Record<string, string | number>) => string
+) {
+  if (status === ReadingStatus.PENDING) return t("overview.pending");
+  if (status === ReadingStatus.VALIDATED) return t("overview.validated");
+  if (status === ReadingStatus.FLAGGED) return t("overview.flagged");
+  if (status === ReadingStatus.REJECTED) return t("overview.rejected");
+  return status;
 }
 
 export default async function ReadingsPage({ searchParams }: { searchParams: SearchParams }) {
+  const { locale, t } = await getAdminTranslator();
+  const localeCode = locale === "fr" ? "fr-FR" : locale === "ln" ? "ln-CG" : "en-US";
   const resolved = await searchParams;
   const q = firstValue(resolved.q).trim();
   const status = normalizeStatus(firstValue(resolved.status).trim());
@@ -123,17 +144,17 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Readings" />
+      <PageBreadcrumb pageTitle={t("readings.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total" value={total} />
-        <StatCard label="Pending" value={pending} />
-        <StatCard label="Validated" value={validated} />
-        <StatCard label="Flagged" value={flagged} />
-        <StatCard label="Rejected" value={rejected} />
+        <StatCard label={t("readings.totalReadings")} value={total} />
+        <StatCard label={t("overview.pending")} value={pending} />
+        <StatCard label={t("overview.validated")} value={validated} />
+        <StatCard label={t("overview.flagged")} value={flagged} />
+        <StatCard label={t("overview.rejected")} value={rejected} />
       </div>
 
-      <ComponentCard title="Readings queue" desc="Suivi des relevés et décisions de validation.">
+      <ComponentCard title={t("readings.queueTitle")} desc={t("readings.queueDesc")}>
         <ReadingsFilters
           initialQ={q}
           initialStatus={status}
@@ -149,21 +170,21 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
             <Table>
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Reading date</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meter</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Index</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Submitted by</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Reviewed by</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">GPS distance</TableCell>
-                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("readings.readingDate")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.meter")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.index")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.status")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("readings.submittedBy")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("readings.reviewedBy")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("readings.gpsDistance")}</TableCell>
+                  <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.actions")}</TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {readings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No reading found.
+                      {t("readings.noReadingsFound")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -177,14 +198,14 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                       [reading.reviewedBy?.firstName, reading.reviewedBy?.lastName]
                         .filter(Boolean)
                         .join(" ")
-                        .trim() || "N/A";
+                        .trim() || t("readings.noReviewer");
 
                     return (
                       <TableRow key={reading.id}>
-                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatDate(reading.readingAt)}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatDate(reading.readingAt, localeCode)}</TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <p className="font-medium">{reading.meter.serialNumber}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{reading.meter.meterReference || "N/A"}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{reading.meter.meterReference || t("common.notAvailable")}</p>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {reading.primaryIndex.toString()}
@@ -192,18 +213,22 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm">
                           <Badge size="sm" color={statusBadge(reading.status)}>
-                            {reading.status}
+                            {readingStatusLabel(reading.status, t)}
                           </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{submittedBy}</TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{reviewedBy}</TableCell>
-                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{reading.gpsDistanceMeters?.toString() || "N/A"}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          {reading.gpsDistanceMeters !== null && reading.gpsDistanceMeters !== undefined
+                            ? t("readings.distanceMeters", { value: reading.gpsDistanceMeters.toString() })
+                            : t("common.notAvailable")}
+                        </TableCell>
                         <TableCell className="px-4 py-3 text-sm">
                           <div className="flex items-center gap-2">
-                            <Link href={`/admin/readings/${reading.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title="View reading" aria-label="View reading">
+                            <Link href={`/admin/readings/${reading.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title={t("readings.viewReading")} aria-label={t("readings.viewReading")}>
                               <EyeIcon className="h-4 w-4" />
                             </Link>
-                            <Link href={`/admin/readings/${reading.id}/edit`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title="Edit reading" aria-label="Edit reading">
+                            <Link href={`/admin/readings/${reading.id}/edit`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title={t("readings.editReading")} aria-label={t("readings.editReading")}>
                               <PencilIcon className="h-4 w-4" />
                             </Link>
                           </div>
@@ -219,7 +244,11 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {readings.length === 0 ? 0 : skip + 1} - {Math.min(skip + readings.length, totalFiltered)} of {totalFiltered}
+            {t("readings.showingSummary", {
+              start: readings.length === 0 ? 0 : skip + 1,
+              end: Math.min(skip + readings.length, totalFiltered),
+              total: totalFiltered,
+            })}
           </p>
           <div className="flex items-center gap-2">
             <Link
@@ -231,7 +260,7 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                   : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               }`}
             >
-              Previous
+              {t("common.previous")}
             </Link>
 
             {visiblePages.map((pageNumber) => (
@@ -257,7 +286,7 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                   : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               }`}
             >
-              Next
+              {t("common.next")}
             </Link>
           </div>
         </div>

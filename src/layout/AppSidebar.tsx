@@ -3,6 +3,7 @@ import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BoxCubeIcon,
@@ -164,6 +165,7 @@ const demoOtherItems: NavItem[] = [
 const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes = [] }) => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const { t } = useAdminI18n();
   const hasAnyPermission = useCallback(
     (requiredPermissions?: string[]) => {
       if (!requiredPermissions || requiredPermissions.length === 0) return true;
@@ -218,7 +220,7 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
                 {nav.icon}
               </span>
               {(isExpanded || isHovered || isMobileOpen) && (
-                <span className={`menu-item-text`}>{nav.name}</span>
+                <span className={`menu-item-text`}>{translateNavLabel(t, nav.name)}</span>
               )}
               {(isExpanded || isHovered || isMobileOpen) && (
                 <ChevronDownIcon
@@ -278,7 +280,7 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
                           : "menu-dropdown-item-inactive"
                       }`}
                     >
-                      {subItem.name}
+                      {translateNavLabel(t, subItem.name)}
                       <span className="flex items-center gap-1 ml-auto">
                         {subItem.new && (
                           <span
@@ -455,7 +457,7 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
+                  t("layout.menu")
                 ) : (
                   <HorizontaLDots />
                 )}
@@ -473,7 +475,7 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
                   }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
-                    "Others"
+                    t("layout.others")
                   ) : (
                     <HorizontaLDots />
                   )}
@@ -489,3 +491,54 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
 };
 
 export default AppSidebar;
+
+function translateNavLabel(t: (key: string) => string, label: string) {
+  const map: Record<string, string> = {
+    Dashboard: "nav.dashboard",
+    Ecommerce: "nav.ecommerce",
+    Overview: "nav.overview",
+    "User management": "nav.userManagement",
+    Users: "nav.users",
+    "Rules & Permissions": "nav.rulesPermissions",
+    "Reading management": "nav.readingManagement",
+    Readings: "nav.readings",
+    History: "nav.history",
+    Consumption: "nav.consumption",
+    "Meter management": "nav.meterManagement",
+    Meters: "nav.meters",
+    "Add meter": "nav.addMeter",
+    "Import meters": "nav.importMeters",
+    "Tasks management": "nav.tasksManagement",
+    Tasks: "nav.tasks",
+    "Add task": "nav.addTask",
+    Billing: "nav.billing",
+    Tariffs: "nav.tariffs",
+    Campaigns: "nav.campaigns",
+    Invoices: "nav.invoices",
+    Calendar: "nav.calendar",
+    "User Profile": "nav.profile",
+    Settings: "nav.settings",
+    Forms: "nav.forms",
+    "Form Elements": "nav.formElements",
+    Tables: "nav.tables",
+    "Basic Tables": "nav.basicTables",
+    Pages: "nav.pages",
+    "Blank Page": "nav.blankPage",
+    "404 Error": "nav.error404",
+    Charts: "nav.charts",
+    "Line Chart": "nav.lineChart",
+    "Bar Chart": "nav.barChart",
+    "UI Elements": "nav.uiElements",
+    Alerts: "nav.alerts",
+    Avatar: "nav.avatars",
+    Badge: "nav.badge",
+    Buttons: "nav.buttons",
+    Images: "nav.images",
+    Videos: "nav.videos",
+    Authentication: "nav.authentication",
+    "Sign In": "nav.signIn",
+    "Sign Up": "nav.signUp",
+  };
+
+  return t(map[label] || label);
+}

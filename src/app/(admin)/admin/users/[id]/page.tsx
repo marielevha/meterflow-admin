@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { UserRole, UserStatus } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -11,8 +13,8 @@ export const metadata: Metadata = {
   description: "User details page",
 };
 
-function formatDate(value: Date | null) {
-  if (!value) return "N/A";
+function formatDate(value: Date | null, fallback: string) {
+  if (!value) return fallback;
   return value.toISOString().slice(0, 19).replace("T", " ");
 }
 
@@ -34,6 +36,7 @@ export default async function UserDetailsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getAdminTranslator();
   const { id } = await params;
   const user = await prisma.user.findFirst({
     where: { id, deletedAt: null },
@@ -43,60 +46,60 @@ export default async function UserDetailsPage({
     notFound();
   }
 
-  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || "N/A";
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || t("users.notAvailableShort");
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="User details" />
+      <PageBreadcrumb pageTitle={t("users.detailsPageTitle")} />
 
       <div className="mb-6 flex items-center justify-end gap-2">
         <Link
           href="/admin/users"
           className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
         >
-          Back
+          {t("common.back")}
         </Link>
         <Link
           href={`/admin/users/${user.id}/edit`}
           className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
         >
-          Edit user
+          {t("common.edit")}
         </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">User ID</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("users.userId")}</p>
           <p className="mt-2 break-all text-sm text-gray-800 dark:text-white/90">{user.id}</p>
           <div className="mt-4 flex items-center gap-2">
             <Badge size="sm" color={roleBadge(user.role)}>
-              {user.role}
+              {translateUserRole(user.role, t)}
             </Badge>
             <Badge size="sm" color={statusBadge(user.status)}>
-              {user.status}
+              {translateUserStatus(user.status, t)}
             </Badge>
           </div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-2">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Identity</h3>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("users.identity")}</h3>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Full name" value={fullName} />
-            <Field label="Username" value={user.username || "N/A"} />
-            <Field label="Email" value={user.email || "N/A"} />
-            <Field label="Phone" value={user.phone} />
+            <Field label={t("users.fullName")} value={fullName} />
+            <Field label={t("users.username")} value={user.username || t("users.notAvailableShort")} />
+            <Field label={t("users.email")} value={user.email || t("users.notAvailableShort")} />
+            <Field label={t("users.phone")} value={user.phone} />
           </div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-3">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Location & timeline</h3>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("users.locationTimeline")}</h3>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <Field label="Region" value={user.region || "N/A"} />
-            <Field label="City" value={user.city || "N/A"} />
-            <Field label="Zone" value={user.zone || "N/A"} />
-            <Field label="Activated at" value={formatDate(user.activatedAt)} />
-            <Field label="Last login at" value={formatDate(user.lastLoginAt)} />
-            <Field label="Created at" value={formatDate(user.createdAt)} />
+            <Field label={t("users.region")} value={user.region || t("users.notAvailableShort")} />
+            <Field label={t("users.city")} value={user.city || t("users.notAvailableShort")} />
+            <Field label={t("users.zone")} value={user.zone || t("users.notAvailableShort")} />
+            <Field label={t("users.activatedAt")} value={formatDate(user.activatedAt, t("users.notAvailableShort"))} />
+            <Field label={t("users.lastLoginAt")} value={formatDate(user.lastLoginAt, t("users.notAvailableShort"))} />
+            <Field label={t("users.createdColumn")} value={formatDate(user.createdAt, t("users.notAvailableShort"))} />
           </div>
         </div>
       </div>

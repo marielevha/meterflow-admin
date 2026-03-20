@@ -1,6 +1,8 @@
 import React from "react";
 import { redirect } from "next/navigation";
+import AdminI18nProvider from "@/components/admin-i18n/AdminI18nProvider";
 import AdminShell from "@/layout/AdminShell";
+import { getAdminLocale, getAdminMessages } from "@/lib/admin-i18n/server";
 import {
   getCurrentStaffFromServerComponent,
   getCurrentStaffPermissionCodes,
@@ -17,6 +19,12 @@ export default async function AdminLayout({
   }
 
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const locale = await getAdminLocale();
+  const messages = await getAdminMessages();
 
-  return <AdminShell permissionCodes={permissionCodes}>{children}</AdminShell>;
+  return (
+    <AdminI18nProvider locale={locale} messages={messages}>
+      <AdminShell permissionCodes={permissionCodes}>{children}</AdminShell>
+    </AdminI18nProvider>
+  );
 }

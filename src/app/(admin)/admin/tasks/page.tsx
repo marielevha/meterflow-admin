@@ -9,6 +9,7 @@ import TaskPulseChartCard from "@/components/tasks/TaskPulseChartCard";
 import TasksFilters from "@/components/tasks/TasksFilters";
 import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { listTasks } from "@/lib/backoffice/tasks";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +23,10 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 const ACTIVE_TASK_STATUSES = [TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED] as const;
+type AdminTranslatorFn = (
+  key: string,
+  values?: Record<string, string | number>
+) => string;
 
 function firstValue(input: string | string[] | undefined): string {
   if (Array.isArray(input)) return input[0] ?? "";
@@ -47,9 +52,15 @@ function statusBadge(status: TaskStatus) {
   return "light" as const;
 }
 
-function formatDate(value: Date | null) {
-  if (!value) return "-";
-  return value.toISOString().slice(0, 16).replace("T", " ");
+function formatDate(value: Date | null, locale: string, fallback: string) {
+  if (!value) return fallback;
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(value);
 }
 
 function formatCustomer(customer?: {
@@ -57,8 +68,8 @@ function formatCustomer(customer?: {
   lastName: string | null;
   username: string | null;
   phone: string;
-} | null) {
-  if (!customer) return "N/A";
+} | null, fallback = "N/A") {
+  if (!customer) return fallback;
   return (
     [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() ||
     customer.username ||
@@ -70,13 +81,40 @@ function assigneeLabel(assignee?: {
   firstName: string | null;
   lastName: string | null;
   username: string | null;
-} | null) {
-  if (!assignee) return "Unassigned";
+} | null, unassignedFallback = "Unassigned", agentFallback = "Agent") {
+  if (!assignee) return unassignedFallback;
   const name = [assignee.firstName, assignee.lastName].filter(Boolean).join(" ").trim();
-  return name || assignee.username || "Agent";
+  return name || assignee.username || agentFallback;
+}
+
+function taskStatusLabel(status: TaskStatus, t: AdminTranslatorFn) {
+  if (status === TaskStatus.OPEN) return t("tasks.open");
+  if (status === TaskStatus.IN_PROGRESS) return t("tasks.inProgress");
+  if (status === TaskStatus.BLOCKED) return t("tasks.blocked");
+  if (status === TaskStatus.DONE) return t("tasks.done");
+  if (status === TaskStatus.CANCELED) return t("tasks.canceled");
+  return status;
+}
+
+function taskPriorityLabel(priority: TaskPriority, t: AdminTranslatorFn) {
+  if (priority === TaskPriority.LOW) return t("tasks.priorityLow");
+  if (priority === TaskPriority.MEDIUM) return t("tasks.priorityMedium");
+  if (priority === TaskPriority.HIGH) return t("tasks.priorityHigh");
+  if (priority === TaskPriority.CRITICAL) return t("tasks.priorityCritical");
+  return priority;
+}
+
+function taskTypeLabel(type: TaskType, t: AdminTranslatorFn) {
+  if (type === TaskType.FIELD_RECHECK) return t("tasks.typeFieldRecheck");
+  if (type === TaskType.FRAUD_INVESTIGATION) return t("tasks.typeFraudInvestigation");
+  if (type === TaskType.METER_VERIFICATION) return t("tasks.typeMeterVerification");
+  if (type === TaskType.GENERAL) return t("tasks.typeGeneral");
+  return type;
 }
 
 export default async function TasksPage({ searchParams }: { searchParams: SearchParams }) {
+  const { locale, t } = await getAdminTranslator();
+  const localeCode = locale === "fr" ? "fr-FR" : locale === "ln" ? "ln-CG" : "en-US";
   const authUser = await getCurrentStaffFromServerAction();
   if (!authUser) redirect("/signin");
 
@@ -171,9 +209,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
   if (tasksResult.status !== 200) {
     return (
       <div>
-        <PageBreadcrumb pageTitle="Tasks" />
-        <ComponentCard title="Tasks" desc="Unable to load tasks.">
-          <p className="text-sm text-error-600 dark:text-error-400">{tasksResult.body.error || "load_failed"}</p>
+        <PageBreadcrumb pageTitle={t("tasks.pageTitle")} />
+        <ComponentCard title={t("tasks.pageTitle")} desc={t("tasks.queueDesc")}>
+          <p className="text-sm text-error-600 dark:text-error-400">
+            {tasksResult.body.error || "load_failed"}
+          </p>
         </ComponentCard>
       </div>
     );
@@ -184,8 +224,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
   if (!pagination) {
     return (
       <div>
-        <PageBreadcrumb pageTitle="Tasks" />
-        <ComponentCard title="Tasks" desc="Unable to load tasks.">
+        <PageBreadcrumb pageTitle={t("tasks.pageTitle")} />
+        <ComponentCard title={t("tasks.pageTitle")} desc={t("tasks.queueDesc")}>
           <p className="text-sm text-error-600 dark:text-error-400">invalid_tasks_pagination</p>
         </ComponentCard>
       </div>
@@ -239,7 +279,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Tasks" />
+      <PageBreadcrumb pageTitle={t("tasks.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <TaskPulseChartCard counts={counts} />
@@ -248,6 +288,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
           dueToday={counts.dueToday}
           unassigned={counts.unassigned}
           withReport={counts.withReport}
+          t={t}
         />
       </div>
 
@@ -256,11 +297,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
           href="/admin/tasks/create"
           className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 sm:h-10 sm:w-auto"
         >
-          Create task
+          {t("tasks.createTask")}
         </Link>
       </div>
 
-      <ComponentCard title="Task queue" desc="Planification et suivi des actions terrain.">
+      <ComponentCard title={t("tasks.queueTitle")} desc={t("tasks.queueDesc")}>
         <TasksFilters
           initialQ={q}
           initialStatus={status}
@@ -279,7 +320,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
             label:
               [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim() ||
               agent.username ||
-              "Agent",
+              t("common.unknown"),
           }))}
           pageSizeOptions={PAGE_SIZE_OPTIONS}
         />
@@ -287,7 +328,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
         <div className="space-y-4 lg:hidden">
           {tasks.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-white/[0.05] dark:bg-white/[0.03] dark:text-gray-400">
-              No tasks found.
+              {t("tasks.noTasksFound")}
             </div>
           ) : (
             tasks.map((task) => (
@@ -296,6 +337,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                 task={task}
                 todayStart={todayStart}
                 tomorrowStart={tomorrowStart}
+                locale={localeCode}
+                t={t}
               />
             ))
           )}
@@ -306,23 +349,23 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
             <Table>
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Title</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Follow-up</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Type</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Priority</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Assignee</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meter / client</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Field report</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Due</TableCell>
-                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableTitle")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableFollowUp")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableType")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableStatus")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tablePriority")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableAssignee")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableMeterClient")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableFieldReport")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableDue")}</TableCell>
+                  <TableCell isHeader className="px-5 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("tasks.tableActions")}</TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {tasks.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No tasks found.
+                      {t("tasks.noTasksFound")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -330,82 +373,82 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                     <TableRow key={task.id}>
                       <TableCell className="px-5 py-4 text-start">
                         <p className="text-sm font-medium text-gray-800 dark:text-white/90">{task.title}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{task.description || "No description"}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{task.description || t("common.noDescription")}</p>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                         <div className="flex flex-col gap-2">
                           {task.status !== TaskStatus.DONE && task.status !== TaskStatus.CANCELED && task.dueAt && task.dueAt < todayStart ? (
-                            <Badge size="sm" color="error">OVERDUE</Badge>
+                            <Badge size="sm" color="error">{t("tasks.overdue")}</Badge>
                           ) : null}
                           {task.dueAt && task.dueAt >= todayStart && task.dueAt < tomorrowStart ? (
-                            <Badge size="sm" color="warning">DUE TODAY</Badge>
+                            <Badge size="sm" color="warning">{t("tasks.dueToday")}</Badge>
                           ) : null}
                           {task.startedAt ? (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Started {formatDate(task.startedAt)}
+                              {t("tasks.mobileStarted")} {formatDate(task.startedAt, localeCode, "-")}
                             </p>
                           ) : (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Not started</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("tasks.notStarted")}</p>
                           )}
                           {task.reading ? (
                             <Link href={`/admin/readings/${task.reading.id}`} className="text-xs text-brand-600 hover:underline dark:text-brand-400">
-                              Source reading: {task.reading.status}
+                              {t("tasks.sourceReading")}: {task.reading.status}
                             </Link>
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{task.type}</TableCell>
-                      <TableCell className="px-5 py-4"><Badge size="sm" color={statusBadge(task.status)}>{task.status}</Badge></TableCell>
-                      <TableCell className="px-5 py-4"><Badge size="sm" color={priorityBadge(task.priority)}>{task.priority}</Badge></TableCell>
+                      <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{taskTypeLabel(task.type, t)}</TableCell>
+                      <TableCell className="px-5 py-4"><Badge size="sm" color={statusBadge(task.status)}>{taskStatusLabel(task.status, t)}</Badge></TableCell>
+                      <TableCell className="px-5 py-4"><Badge size="sm" color={priorityBadge(task.priority)}>{taskPriorityLabel(task.priority, t)}</Badge></TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
-                        <p>{assigneeLabel(task.assignedTo)}</p>
+                        <p>{assigneeLabel(task.assignedTo, t("tasks.unassigned"), t("common.unknown"))}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {task.assignedTo ? "Assigned" : "Needs assignment"}
+                          {task.assignedTo ? t("tasks.assigned") : t("tasks.needsAssignment")}
                         </p>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
-                        {task.meter?.serialNumber || "N/A"}
+                        {task.meter?.serialNumber || t("common.notAvailable")}
                         <p className="text-xs text-gray-500 dark:text-gray-400">{task.meter?.meterReference || "-"}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatCustomer(task.meter?.customer)}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatCustomer(task.meter?.customer, t("common.notAvailable"))}</p>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                         {task.fieldSubmittedAt ? (
                           <div className="flex flex-col gap-1">
-                            <Badge size="sm" color="success">REPORT RECEIVED</Badge>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(task.fieldSubmittedAt)}</p>
+                            <Badge size="sm" color="success">{t("tasks.reportReceived")}</Badge>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(task.fieldSubmittedAt, localeCode, "-")}</p>
                             {task.resolutionCode ? (
                               <p className="text-xs text-gray-500 dark:text-gray-400">{task.resolutionCode}</p>
                             ) : null}
                             {task.reportedReading ? (
                               <Link href={`/admin/readings/${task.reportedReading.id}`} className="text-xs text-brand-600 hover:underline dark:text-brand-400">
-                                Reported reading: {task.reportedReading.status}
+                                {t("tasks.reportedReading")}: {task.reportedReading.status}
                               </Link>
                             ) : null}
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
-                            <Badge size="sm" color="light">AWAITING REPORT</Badge>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">No field report yet</p>
+                            <Badge size="sm" color="light">{t("tasks.awaitingReport")}</Badge>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("tasks.noFieldReport")}</p>
                           </div>
                         )}
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
-                        {formatDate(task.dueAt)}
+                        {formatDate(task.dueAt, localeCode, "-")}
                       </TableCell>
                       <TableCell className="px-5 py-4">
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/admin/tasks/${task.id}`}
-                            title="View task"
-                            aria-label="View task"
+                            title={t("tasks.viewTask")}
+                            aria-label={t("tasks.viewTask")}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                           >
                             <EyeIcon className="h-4 w-4 fill-current" />
                           </Link>
                           <Link
                             href={`/admin/tasks/${task.id}/edit`}
-                            title="Edit task"
-                            aria-label="Edit task"
+                            title={t("tasks.editTask")}
+                            aria-label={t("tasks.editTask")}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                           >
                             <PencilIcon className="h-4 w-4 fill-current" />
@@ -422,7 +465,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 sm:text-left">
-            Showing {tasks.length === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1} - {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total}
+            {t("tasks.showingSummary", {
+              start: tasks.length === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1,
+              end: Math.min(pagination.page * pagination.pageSize, pagination.total),
+              total: pagination.total,
+            })}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
             <Link
@@ -434,7 +481,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                   : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               }`}
             >
-              Previous
+              {t("common.previous")}
             </Link>
 
             {visiblePages.map((pageNumber) => (
@@ -460,7 +507,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                   : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
               }`}
             >
-              Next
+              {t("common.next")}
             </Link>
           </div>
         </div>
@@ -473,6 +520,8 @@ function TaskMobileCard({
   task,
   todayStart,
   tomorrowStart,
+  locale,
+  t,
 }: {
   task: {
     id: string;
@@ -505,6 +554,8 @@ function TaskMobileCard({
   };
   todayStart: Date;
   tomorrowStart: Date;
+  locale: string;
+  t: AdminTranslatorFn;
 }) {
   const isOverdue =
     task.status !== TaskStatus.DONE &&
@@ -520,22 +571,22 @@ function TaskMobileCard({
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{task.title}</p>
           <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
-            {task.description || "No description"}
+            {task.description || t("common.noDescription")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/admin/tasks/${task.id}`}
-            title="View task"
-            aria-label="View task"
+            title={t("tasks.viewTask")}
+            aria-label={t("tasks.viewTask")}
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
           >
             <EyeIcon className="h-4 w-4 fill-current" />
           </Link>
           <Link
             href={`/admin/tasks/${task.id}/edit`}
-            title="Edit task"
-            aria-label="Edit task"
+            title={t("tasks.editTask")}
+            aria-label={t("tasks.editTask")}
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
           >
             <PencilIcon className="h-4 w-4 fill-current" />
@@ -544,32 +595,32 @@ function TaskMobileCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Badge size="sm" color={statusBadge(task.status)}>{task.status}</Badge>
-        <Badge size="sm" color={priorityBadge(task.priority)}>{task.priority}</Badge>
-        {isOverdue ? <Badge size="sm" color="error">OVERDUE</Badge> : null}
-        {isDueToday ? <Badge size="sm" color="warning">DUE TODAY</Badge> : null}
-        {task.fieldSubmittedAt ? <Badge size="sm" color="success">REPORT RECEIVED</Badge> : null}
+        <Badge size="sm" color={statusBadge(task.status)}>{taskStatusLabel(task.status, t)}</Badge>
+        <Badge size="sm" color={priorityBadge(task.priority)}>{taskPriorityLabel(task.priority, t)}</Badge>
+        {isOverdue ? <Badge size="sm" color="error">{t("tasks.overdue")}</Badge> : null}
+        {isDueToday ? <Badge size="sm" color="warning">{t("tasks.dueToday")}</Badge> : null}
+        {task.fieldSubmittedAt ? <Badge size="sm" color="success">{t("tasks.reportReceived")}</Badge> : null}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <MobileInfo label="Assignee" value={assigneeLabel(task.assignedTo)} />
-        <MobileInfo label="Type" value={task.type} />
-        <MobileInfo label="Due" value={formatDate(task.dueAt)} />
+        <MobileInfo label={t("tasks.mobileAssignee")} value={assigneeLabel(task.assignedTo, t("tasks.unassigned"), t("common.unknown"))} />
+        <MobileInfo label={t("tasks.mobileType")} value={taskTypeLabel(task.type, t)} />
+        <MobileInfo label={t("tasks.mobileDue")} value={formatDate(task.dueAt, locale, "-")} />
         <MobileInfo
-          label="Started"
-          value={task.startedAt ? formatDate(task.startedAt) : "Not started"}
+          label={t("tasks.mobileStarted")}
+          value={task.startedAt ? formatDate(task.startedAt, locale, "-") : t("tasks.notStarted")}
         />
-        <MobileInfo label="Meter" value={task.meter?.serialNumber || "N/A"} />
-        <MobileInfo label="Client" value={formatCustomer(task.meter?.customer)} />
+        <MobileInfo label={t("tasks.mobileMeter")} value={task.meter?.serialNumber || t("common.notAvailable")} />
+        <MobileInfo label={t("tasks.mobileClient")} value={formatCustomer(task.meter?.customer, t("common.notAvailable"))} />
       </div>
 
       {(task.reading || task.reportedReading || task.resolutionCode) ? (
         <div className="mt-4 rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Field follow-up</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("tasks.mobileFieldFollowUp")}</p>
           <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
             {task.reading ? (
               <p>
-                Source reading:{" "}
+                {t("tasks.sourceReading")}:{" "}
                 <Link href={`/admin/readings/${task.reading.id}`} className="text-brand-600 hover:underline dark:text-brand-400">
                   {task.reading.status}
                 </Link>
@@ -577,13 +628,13 @@ function TaskMobileCard({
             ) : null}
             {task.reportedReading ? (
               <p>
-                Reported reading:{" "}
+                {t("tasks.reportedReading")}:{" "}
                 <Link href={`/admin/readings/${task.reportedReading.id}`} className="text-brand-600 hover:underline dark:text-brand-400">
                   {task.reportedReading.status}
                 </Link>
               </p>
             ) : null}
-            {task.resolutionCode ? <p>Resolution: {task.resolutionCode}</p> : null}
+            {task.resolutionCode ? <p>{t("tasks.mobileResolution")}: {task.resolutionCode}</p> : null}
           </div>
         </div>
       ) : null}
@@ -605,38 +656,40 @@ function TaskAttentionCard({
   dueToday,
   unassigned,
   withReport,
+  t,
 }: {
   overdue: number;
   dueToday: number;
   unassigned: number;
   withReport: number;
+  t: AdminTranslatorFn;
 }) {
   const items = [
     {
-      label: "Overdue",
+      label: t("tasks.overdue"),
       value: overdue,
-      hint: "Need immediate follow-up",
+      hint: t("tasks.overdueHint"),
       valueClassName: "text-error-600 dark:text-error-400",
       borderClassName: "border-error-200 dark:border-error-500/20",
     },
     {
-      label: "Due today",
+      label: t("tasks.dueToday"),
       value: dueToday,
-      hint: "Tasks landing today",
+      hint: t("tasks.dueTodayHint"),
       valueClassName: "text-warning-600 dark:text-warning-400",
       borderClassName: "border-warning-200 dark:border-warning-500/20",
     },
     {
-      label: "Unassigned",
+      label: t("tasks.unassigned"),
       value: unassigned,
-      hint: "Still waiting for owner",
+      hint: t("tasks.unassignedHint"),
       valueClassName: "text-gray-800 dark:text-white/90",
       borderClassName: "border-gray-200 dark:border-gray-800",
     },
     {
-      label: "Reports received",
+      label: t("tasks.reportsReceived"),
       value: withReport,
-      hint: "Field submissions already in",
+      hint: t("tasks.reportHint"),
       valueClassName: "text-success-600 dark:text-success-400",
       borderClassName: "border-success-200 dark:border-success-500/20",
     },
@@ -645,8 +698,8 @@ function TaskAttentionCard({
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
       <div>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Operational alerts</p>
-        <h3 className="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90">What needs attention first</h3>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("tasks.operationalAlerts")}</p>
+        <h3 className="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90">{t("tasks.whatNeedsAttention")}</h3>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">

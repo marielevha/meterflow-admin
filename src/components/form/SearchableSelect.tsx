@@ -16,6 +16,7 @@ type SearchableSelectProps = {
   placeholder?: string;
   required?: boolean;
   emptyLabel?: string;
+  noResultsLabel?: string;
 };
 
 export default function SearchableSelect({
@@ -26,6 +27,7 @@ export default function SearchableSelect({
   placeholder = "Search...",
   required = false,
   emptyLabel,
+  noResultsLabel = "No results",
 }: SearchableSelectProps) {
   const formatDisplay = (option: SearchableOption) =>
     option.hint ? `${option.label} - ${option.hint}` : option.label;
@@ -74,7 +76,7 @@ export default function SearchableSelect({
       {open ? (
         <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-900">
           {filtered.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No results</p>
+            <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">{noResultsLabel}</p>
           ) : (
             filtered.map((option) => (
               <button

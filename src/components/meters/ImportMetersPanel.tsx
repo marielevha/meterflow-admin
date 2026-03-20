@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import { getAccessToken } from "@/lib/auth/clientSession";
 
 type PreviewRow = {
@@ -44,6 +45,7 @@ function formatError(code: string) {
 }
 
 export default function ImportMetersPanel() {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -58,7 +60,7 @@ export default function ImportMetersPanel() {
     [preview]
   );
 
-  async function handlePreview(fileToPreview: File) {
+  const handlePreview = useCallback(async (fileToPreview: File) => {
     setError("");
     setSuccess("");
     setIsPreviewing(true);
@@ -79,9 +81,9 @@ export default function ImportMetersPanel() {
 
       if (!response.ok) {
         if (Array.isArray(data?.missingHeaders)) {
-          setError(`Missing columns: ${data.missingHeaders.join(", ")}`);
+          setError(t("meterImport.missingColumns", { columns: data.missingHeaders.join(", ") }));
         } else {
-          setError(data?.error || "Preview failed.");
+          setError(data?.error || t("meterImport.previewFailed"));
         }
         return;
       }
@@ -89,23 +91,23 @@ export default function ImportMetersPanel() {
       setPreview(data as PreviewResponse);
     } catch {
       if (latestRequestRef.current !== requestId) return;
-      setError("Network error while previewing the file.");
+      setError(t("meterImport.networkPreview"));
     } finally {
       if (latestRequestRef.current === requestId) {
         setIsPreviewing(false);
       }
     }
-  }
+  }, [t]);
 
   useEffect(() => {
     if (!file) return;
     setPreview(null);
     void handlePreview(file);
-  }, [file]);
+  }, [file, handlePreview]);
 
   async function handleImport() {
     if (!preview || preview.validRows.length === 0) {
-      setError("No valid rows available for import.");
+      setError(t("meterImport.noValidRows"));
       return;
     }
 
@@ -124,16 +126,16 @@ export default function ImportMetersPanel() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data?.error || "Import failed.");
+        setError(data?.error || t("meterImport.importFailed"));
         return;
       }
 
-      setSuccess(`${data.importedCount} meter(s) imported successfully.`);
+      setSuccess(t("meterImport.importSuccess", { count: data.importedCount }));
       setPreview(null);
       setFile(null);
       router.refresh();
     } catch {
-      setError("Network error while importing rows.");
+      setError(t("meterImport.networkImport"));
     } finally {
       setIsImporting(false);
     }
@@ -157,7 +159,7 @@ export default function ImportMetersPanel() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        setError(data?.error || "Unable to download the CSV file.");
+        setError(data?.error || t("meterImport.unableToDownload"));
         return;
       }
 
@@ -171,7 +173,7 @@ export default function ImportMetersPanel() {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
     } catch {
-      setError("Network error while downloading the CSV file.");
+      setError(t("meterImport.networkDownload"));
     }
   }
 
@@ -180,9 +182,9 @@ export default function ImportMetersPanel() {
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">CSV import</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meterImport.csvImportTitle")}</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Upload a CSV file, preview the rows, then import only the valid meters.
+              {t("meterImport.csvImportDescription")}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -191,21 +193,21 @@ export default function ImportMetersPanel() {
               onClick={handleDownloadTemplate}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Download template
+              {t("meterImport.downloadTemplate")}
             </button>
             <button
               type="button"
               onClick={handleDownloadDemo}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-4 text-sm font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
             >
-              Download demo CSV
+              {t("meterImport.downloadDemoCsv")}
             </button>
           </div>
         </div>
 
         <div className="mt-5 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Meter CSV file
+            {t("meterImport.meterCsvFile")}
           </label>
           <input
             type="file"
@@ -224,15 +226,15 @@ export default function ImportMetersPanel() {
 
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <HintCard
-            title="Required columns"
+            title={t("meterImport.requiredColumns")}
             value="serial_number, type, customer_phone"
           />
           <HintCard
-            title="Optional assignment"
+            title={t("meterImport.optionalAssignment")}
             value="assigned_agent_username"
           />
           <HintCard
-            title="Optional metadata"
+            title={t("meterImport.optionalMetadata")}
             value="reference, status, location, dates"
           />
         </div>
@@ -252,21 +254,21 @@ export default function ImportMetersPanel() {
 
       {isPreviewing ? (
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
-          Previewing file...
+          {t("meterImport.previewingFile")}
         </div>
       ) : null}
 
       {preview ? (
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <SummaryCard label="Total rows" value={preview.summary.totalRows} />
-            <SummaryCard label="Valid rows" value={preview.summary.validRows} />
-            <SummaryCard label="Invalid rows" value={preview.summary.invalidRows} />
+            <SummaryCard label={t("meterImport.totalRows")} value={preview.summary.totalRows} />
+            <SummaryCard label={t("meterImport.validRows")} value={preview.summary.validRows} />
+            <SummaryCard label={t("meterImport.invalidRows")} value={preview.summary.invalidRows} />
           </div>
 
           {invalidRows.length > 0 ? (
             <div className="mt-5 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-              {invalidRows.length} invalid row(s) detected. Only valid rows will be imported.
+              {t("meterImport.invalidRowsDetected", { count: invalidRows.length })}
             </div>
           ) : null}
 
@@ -276,17 +278,17 @@ export default function ImportMetersPanel() {
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900">
                   <tr>
                     {[
-                      "Row",
-                      "Serial",
-                      "Reference",
-                      "Type",
-                      "Status",
-                      "Customer",
-                      "Assigned agent",
-                      "Location",
-                      "GPS",
-                      "Dates",
-                      "Errors",
+                      t("meterImport.row"),
+                      t("meterImport.serial"),
+                      t("meterImport.reference"),
+                      t("meterImport.type"),
+                      t("meterImport.status"),
+                      t("meterImport.customer"),
+                      t("meterImport.assignedAgent"),
+                      t("meterImport.location"),
+                      t("meterImport.gps"),
+                      t("meterImport.dates"),
+                      t("meterImport.errors"),
                     ].map((head) => (
                       <th key={head} className="px-3 py-2 text-left text-xs font-medium text-gray-500">
                         {head}
@@ -320,7 +322,7 @@ export default function ImportMetersPanel() {
                         {row.normalized.installedAt || "-"}
                       </td>
                       <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
-                        {row.errors.length > 0 ? row.errors.map(formatError).join(", ") : "OK"}
+                        {row.errors.length > 0 ? row.errors.map(formatError).join(", ") : t("meterImport.ok")}
                       </td>
                     </tr>
                   ))}
@@ -340,7 +342,7 @@ export default function ImportMetersPanel() {
               }}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Reset
+              {t("common.reset")}
             </button>
             <button
               type="button"
@@ -348,10 +350,14 @@ export default function ImportMetersPanel() {
               disabled={isImporting || preview.validRows.length === 0}
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isImporting ? "Importing..." : "Import valid rows"}
+              {isImporting ? t("meterImport.importing") : t("meterImport.importValidRows")}
             </button>
           </div>
         </section>
+      ) : file === null ? (
+        <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400">
+          {t("meterImport.noPreviewYet")}
+        </div>
       ) : null}
     </div>
   );

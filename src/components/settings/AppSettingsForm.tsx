@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import {
   DEFAULT_APP_SETTINGS,
   type AppSettings,
@@ -14,6 +15,7 @@ type AppSettingsFormProps = {
 };
 
 export default function AppSettingsForm({ initialSettings }: AppSettingsFormProps) {
+  const { locale, t } = useAdminI18n();
   const [settings, setSettings] = useState<AppSettings>(initialSettings);
   const [baseline, setBaseline] = useState<AppSettings>(initialSettings);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -23,6 +25,17 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
   const isDirty = useMemo(() => {
     return JSON.stringify(baseline) !== JSON.stringify(settings);
   }, [baseline, settings]);
+
+  const localeCode = locale === "fr" ? "fr-FR" : locale === "ln" ? "ln-CG" : "en-US";
+
+  const saveErrorLabel = useMemo(() => {
+    if (!saveError) return null;
+    if (saveError === "network_error") return t("settingsForm.errorNetwork");
+    if (saveError === "save_failed") return t("settingsForm.errorSaveFailed");
+    if (saveError === "invalid_request") return t("settingsForm.errorInvalidRequest");
+    if (saveError === "admin_only_endpoint") return t("settingsForm.errorAdminOnly");
+    return saveError;
+  }, [saveError, t]);
 
   const saveSettings = async () => {
     setSaveError(null);
@@ -61,18 +74,18 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">General</h3>
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.generalTitle")}</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Parametres globaux de l&apos;application et du contexte regional.
+          {t("settingsForm.generalDescription")}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Company name">
+          <Field label={t("settingsForm.companyName")}>
             <Input
               value={settings.companyName}
               onChange={(e) => setSettings((prev) => ({ ...prev, companyName: e.target.value }))}
             />
           </Field>
-          <Field label="Default country code (ISO)">
+          <Field label={t("settingsForm.defaultCountryCode")}>
             <Input
               value={settings.defaultCountryCode}
               onChange={(e) =>
@@ -80,13 +93,13 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="Timezone">
+          <Field label={t("settingsForm.timezone")}>
             <Input
               value={settings.timezone}
               onChange={(e) => setSettings((prev) => ({ ...prev, timezone: e.target.value }))}
             />
           </Field>
-          <Field label="Locale">
+          <Field label={t("settingsForm.locale")}>
             <Input
               value={settings.locale}
               onChange={(e) => setSettings((prev) => ({ ...prev, locale: e.target.value }))}
@@ -96,19 +109,19 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Reading workflow</h3>
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.readingWorkflowTitle")}</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Toggle
-            label="Require GPS for reading"
+            label={t("settingsForm.requireGpsForReading")}
             checked={settings.requireGpsForReading}
             onChange={(checked) => setSettings((prev) => ({ ...prev, requireGpsForReading: checked }))}
           />
           <Toggle
-            label="Allow client resubmission"
+            label={t("settingsForm.allowClientResubmission")}
             checked={settings.allowClientResubmission}
             onChange={(checked) => setSettings((prev) => ({ ...prev, allowClientResubmission: checked }))}
           />
-          <Field label="Max GPS distance (meters)">
+          <Field label={t("settingsForm.maxGpsDistanceMeters")}>
             <Input
               type="number"
               value={settings.maxGpsDistanceMeters}
@@ -117,10 +130,10 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Utilise pour l&apos;alerte mobile et pour le controle officiel backend/admin.
+              {t("settingsForm.maxGpsDistanceHint")}
             </p>
           </Field>
-          <Field label="Review SLA (hours)">
+          <Field label={t("settingsForm.reviewSlaHours")}>
             <Input
               type="number"
               value={settings.reviewSlaHours}
@@ -132,24 +145,24 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-          Reading reminder window
+          {t("settingsForm.reminderWindowTitle")}
         </h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Configure la periode mensuelle de relance client pour l&apos;auto-releve (ex: du 20 au 5).
+          {t("settingsForm.reminderWindowDescription")}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Toggle
-            label="Enable client reminders"
+            label={t("settingsForm.readingReminderEnabled")}
             checked={settings.readingReminderEnabled}
             onChange={(checked) => setSettings((prev) => ({ ...prev, readingReminderEnabled: checked }))}
           />
-          <Field label="Reminder timezone">
+          <Field label={t("settingsForm.readingReminderTimezone")}>
             <Input
               value={settings.readingReminderTimezone}
               onChange={(e) => setSettings((prev) => ({ ...prev, readingReminderTimezone: e.target.value }))}
             />
           </Field>
-          <Field label="Window start day (1-31)">
+          <Field label={t("settingsForm.readingWindowStartDay")}>
             <Input
               type="number"
               value={settings.readingWindowStartDay}
@@ -158,7 +171,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="Window end day (1-31)">
+          <Field label={t("settingsForm.readingWindowEndDay")}>
             <Input
               type="number"
               value={settings.readingWindowEndDay}
@@ -167,7 +180,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="Reminder hour (0-23)">
+          <Field label={t("settingsForm.readingReminderHour")}>
             <Input
               type="number"
               value={settings.readingReminderHour}
@@ -176,7 +189,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="Reminder cadence">
+          <Field label={t("settingsForm.readingReminderCadence")}>
             <select
               value={settings.readingReminderCadence}
               onChange={(e) =>
@@ -187,12 +200,12 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
               className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
             >
-              <option value="DAILY">Daily</option>
-              <option value="EVERY_2_DAYS">Every 2 days</option>
-              <option value="EVERY_3_DAYS">Every 3 days</option>
+              <option value="DAILY">{t("settingsForm.cadenceDaily")}</option>
+              <option value="EVERY_2_DAYS">{t("settingsForm.cadenceEvery2Days")}</option>
+              <option value="EVERY_3_DAYS">{t("settingsForm.cadenceEvery3Days")}</option>
             </select>
           </Field>
-          <Field label="Min interval between reminders (hours)">
+          <Field label={t("settingsForm.readingReminderMinIntervalHours")}>
             <Input
               type="number"
               value={settings.readingReminderMinIntervalHours}
@@ -204,7 +217,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="Max reminders per window">
+          <Field label={t("settingsForm.readingReminderMaxPerWindow")}>
             <Input
               type="number"
               value={settings.readingReminderMaxPerWindow}
@@ -217,19 +230,19 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
             />
           </Field>
           <Toggle
-            label="Use WhatsApp channel"
+            label={t("settingsForm.readingReminderUseWhatsapp")}
             checked={settings.readingReminderUseWhatsapp}
             onChange={(checked) =>
               setSettings((prev) => ({ ...prev, readingReminderUseWhatsapp: checked }))
             }
           />
           <Toggle
-            label="Use Email channel"
+            label={t("settingsForm.readingReminderUseEmail")}
             checked={settings.readingReminderUseEmail}
             onChange={(checked) => setSettings((prev) => ({ ...prev, readingReminderUseEmail: checked }))}
           />
           <Toggle
-            label="Use Push channel"
+            label={t("settingsForm.readingReminderUsePush")}
             checked={settings.readingReminderUsePush}
             onChange={(checked) => setSettings((prev) => ({ ...prev, readingReminderUsePush: checked }))}
           />
@@ -237,24 +250,24 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Anti-fraud</h3>
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.antiFraudTitle")}</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Toggle
-            label="Enable anomaly scoring"
+            label={t("settingsForm.enableAnomalyScoring")}
             checked={settings.enableAnomalyScoring}
             onChange={(checked) => setSettings((prev) => ({ ...prev, enableAnomalyScoring: checked }))}
           />
           <Toggle
-            label="Strict monotonic index check"
+            label={t("settingsForm.strictMonotonicIndex")}
             checked={settings.strictMonotonicIndex}
             onChange={(checked) => setSettings((prev) => ({ ...prev, strictMonotonicIndex: checked }))}
           />
           <Toggle
-            label="Require photo hash validation"
+            label={t("settingsForm.requirePhotoHash")}
             checked={settings.requirePhotoHash}
             onChange={(checked) => setSettings((prev) => ({ ...prev, requirePhotoHash: checked }))}
           />
-          <Field label="Anomaly threshold (0-100)">
+          <Field label={t("settingsForm.anomalyThreshold")}>
             <Input
               type="number"
               value={settings.anomalyThreshold}
@@ -265,9 +278,9 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Notifications & storage</h3>
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.notificationsTitle")}</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Email API provider">
+          <Field label={t("settingsForm.emailApiProvider")}>
             <div className="flex flex-wrap items-center gap-6 rounded-lg border border-gray-300 px-4 py-3 dark:border-gray-700">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input
@@ -278,7 +291,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
                   onChange={() => setSettings((prev) => ({ ...prev, emailApiProvider: "RESEND" }))}
                   className="h-4 w-4 text-brand-500 focus:ring-brand-500"
                 />
-                Resend
+                {t("settingsForm.emailProviderResend")}
               </label>
               <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input
@@ -289,49 +302,49 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
                   onChange={() => setSettings((prev) => ({ ...prev, emailApiProvider: "MAILTRAP" }))}
                   className="h-4 w-4 text-brand-500 focus:ring-brand-500"
                 />
-                Mailtrap
+                {t("settingsForm.emailProviderMailtrap")}
               </label>
             </div>
           </Field>
           <Toggle
-            label="Email notifications"
+            label={t("settingsForm.emailNotificationsEnabled")}
             checked={settings.emailNotificationsEnabled}
             onChange={(checked) => setSettings((prev) => ({ ...prev, emailNotificationsEnabled: checked }))}
           />
           <Toggle
-            label="WhatsApp notifications"
+            label={t("settingsForm.whatsappNotificationsEnabled")}
             checked={settings.whatsappNotificationsEnabled}
             onChange={(checked) =>
               setSettings((prev) => ({ ...prev, whatsappNotificationsEnabled: checked }))
             }
           />
           <Toggle
-            label="Push notifications"
+            label={t("settingsForm.pushNotificationsEnabled")}
             checked={settings.pushNotificationsEnabled}
             onChange={(checked) => setSettings((prev) => ({ ...prev, pushNotificationsEnabled: checked }))}
           />
-          <Field label="Daily digest hour (0-23)">
+          <Field label={t("settingsForm.dailyDigestHour")}>
             <Input
               type="number"
               value={settings.dailyDigestHour}
               onChange={(e) => setSettings((prev) => ({ ...prev, dailyDigestHour: Number(e.target.value || "0") }))}
             />
           </Field>
-          <Field label="Max image size (MB)">
+          <Field label={t("settingsForm.maxImageSizeMb")}>
             <Input
               type="number"
               value={settings.maxImageSizeMb}
               onChange={(e) => setSettings((prev) => ({ ...prev, maxImageSizeMb: Number(e.target.value || "0") }))}
             />
           </Field>
-          <Field label="Retention days">
+          <Field label={t("settingsForm.retentionDays")}>
             <Input
               type="number"
               value={settings.retentionDays}
               onChange={(e) => setSettings((prev) => ({ ...prev, retentionDays: Number(e.target.value || "0") }))}
             />
           </Field>
-          <Field label="Allowed MIME types (comma-separated)">
+          <Field label={t("settingsForm.allowedMimeTypes")}>
             <Input
               value={settings.allowedMimeTypes}
               onChange={(e) => setSettings((prev) => ({ ...prev, allowedMimeTypes: e.target.value }))}
@@ -341,63 +354,63 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Overview charts visibility</h3>
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.overviewChartsTitle")}</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Choisissez les graphiques a afficher sur la page Overview.
+          {t("settingsForm.overviewChartsDescription")}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           <Toggle
-            label="Validation rate trend"
+            label={t("settingsForm.showOverviewValidationRate")}
             checked={settings.showOverviewValidationRate}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewValidationRate: checked }))}
           />
           <Toggle
-            label="Activity trend"
+            label={t("settingsForm.showOverviewActivityTrend")}
             checked={settings.showOverviewActivityTrend}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewActivityTrend: checked }))}
           />
           <Toggle
-            label="Status mix"
+            label={t("settingsForm.showOverviewStatusMix")}
             checked={settings.showOverviewStatusMix}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewStatusMix: checked }))}
           />
           <Toggle
-            label="Tasks by status"
+            label={t("settingsForm.showOverviewTasksByStatus")}
             checked={settings.showOverviewTasksByStatus}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewTasksByStatus: checked }))}
           />
           <Toggle
-            label="Top agents"
+            label={t("settingsForm.showOverviewTopAgents")}
             checked={settings.showOverviewTopAgents}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewTopAgents: checked }))}
           />
           <Toggle
-            label="Riskiest zones"
+            label={t("settingsForm.showOverviewRiskiestZones")}
             checked={settings.showOverviewRiskiestZones}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewRiskiestZones: checked }))}
           />
           <Toggle
-            label="User distribution"
+            label={t("settingsForm.showOverviewUserDistribution")}
             checked={settings.showOverviewUserDistribution}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewUserDistribution: checked }))}
           />
           <Toggle
-            label="Ops KPI - delay"
+            label={t("settingsForm.showOverviewOpsDelay")}
             checked={settings.showOverviewOpsDelay}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewOpsDelay: checked }))}
           />
           <Toggle
-            label="Ops KPI - backlog"
+            label={t("settingsForm.showOverviewOpsBacklog")}
             checked={settings.showOverviewOpsBacklog}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewOpsBacklog: checked }))}
           />
           <Toggle
-            label="Ops KPI - anomalies"
+            label={t("settingsForm.showOverviewOpsAnomaly")}
             checked={settings.showOverviewOpsAnomaly}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewOpsAnomaly: checked }))}
           />
           <Toggle
-            label="Ops KPI - volume"
+            label={t("settingsForm.showOverviewOpsVolume")}
             checked={settings.showOverviewOpsVolume}
             onChange={(checked) => setSettings((prev) => ({ ...prev, showOverviewOpsVolume: checked }))}
           />
@@ -405,9 +418,9 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Security</h3>
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.securityTitle")}</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="Access token TTL (minutes)">
+          <Field label={t("settingsForm.accessTokenTtlMinutes")}>
             <Input
               type="number"
               value={settings.accessTokenTtlMinutes}
@@ -416,7 +429,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="Refresh token TTL (days)">
+          <Field label={t("settingsForm.refreshTokenTtlDays")}>
             <Input
               type="number"
               value={settings.refreshTokenTtlDays}
@@ -425,14 +438,14 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               }
             />
           </Field>
-          <Field label="OTP TTL (minutes)">
+          <Field label={t("settingsForm.otpTtlMinutes")}>
             <Input
               type="number"
               value={settings.otpTtlMinutes}
               onChange={(e) => setSettings((prev) => ({ ...prev, otpTtlMinutes: Number(e.target.value || "0") }))}
             />
           </Field>
-          <Field label="Max login attempts">
+          <Field label={t("settingsForm.maxLoginAttempts")}>
             <Input
               type="number"
               value={settings.maxLoginAttempts}
@@ -449,12 +462,12 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {savedAt
-                ? `Saved at ${new Date(savedAt).toLocaleString()}`
-                : "Changes are pending until you save."}
+                ? t("settingsForm.savedAt", { date: new Date(savedAt).toLocaleString(localeCode) })
+                : t("settingsForm.pendingChanges")}
             </p>
             {saveError ? (
               <p className="mt-1 text-xs text-error-600 dark:text-error-400">
-                Save failed: {saveError}
+                {t("settingsForm.saveFailed", { error: saveErrorLabel || saveError })}
               </p>
             ) : null}
           </div>
@@ -464,7 +477,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               onClick={resetSettings}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Reset defaults
+              {t("settingsForm.resetDefaults")}
             </button>
             <button
               type="button"
@@ -472,7 +485,7 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
               disabled={!isDirty || isSaving}
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSaving ? "Saving..." : "Save settings"}
+              {isSaving ? t("settingsForm.saving") : t("settingsForm.saveSettings")}
             </button>
           </div>
         </div>
