@@ -6,7 +6,6 @@ import { AuthFooterLink } from '@/components/auth/auth-footer-link';
 import { AuthInput } from '@/components/auth/auth-input';
 import { AuthLayout } from '@/components/auth/auth-layout';
 import { AuthPrimaryButton } from '@/components/auth/auth-primary-button';
-import { API_BASE_URL } from '@/lib/api/config';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMobileSession } from '@/providers/mobile-session-provider';
@@ -81,11 +80,6 @@ export default function LoginScreen() {
         actionLabel="Creer un compte"
         onPress={() => router.push('/(auth)/register')}
       />
-
-      <View style={[styles.debugBox, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-        <Text style={[styles.debugLabel, { color: palette.muted }]}>API URL</Text>
-        <Text style={[styles.debugValue, { color: palette.headline }]}>{API_BASE_URL}</Text>
-      </View>
     </AuthLayout>
   );
 }
@@ -108,24 +102,6 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     lineHeight: 19,
-    fontWeight: '600',
-  },
-  debugBox: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 6,
-  },
-  debugLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  debugValue: {
-    fontSize: 12,
-    lineHeight: 18,
     fontWeight: '600',
   },
 });
