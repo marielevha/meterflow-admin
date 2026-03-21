@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
+import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
@@ -74,29 +75,48 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
         >
           <form action={createTariffPlanAction} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Input name="code" placeholder="Code (e.g. BT_STD)" required />
-              <Input name="name" placeholder="Plan name" required />
-              <Input name="currency" placeholder="Currency" defaultValue="XAF" />
-              <Input name="fixedCharge" type="number" step="0.01" placeholder="Fixed charge" defaultValue="0" />
-              <Input name="taxPercent" type="number" step="0.01" placeholder="Tax %" defaultValue="0" />
-              <Input name="lateFeePercent" type="number" step="0.01" placeholder="Late fee %" defaultValue="0" />
+              <Field label="Code">
+                <Input name="code" placeholder="BT_STD" required />
+              </Field>
+              <Field label="Plan name">
+                <Input name="name" placeholder="Residential standard" required />
+              </Field>
+              <Field label="Currency">
+                <Input name="currency" placeholder="XAF" defaultValue="XAF" />
+              </Field>
+              <Field label="Fixed charge">
+                <Input name="fixedCharge" type="number" step="0.01" placeholder="0" defaultValue="0" />
+              </Field>
+              <Field label="Tax %">
+                <Input name="taxPercent" type="number" step="0.01" placeholder="0" defaultValue="0" />
+              </Field>
+              <Field label="Late fee %">
+                <Input name="lateFeePercent" type="number" step="0.01" placeholder="0" defaultValue="0" />
+              </Field>
             </div>
-            <textarea
-              name="description"
-              rows={2}
-              placeholder="Description"
-              className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-            />
-            <textarea
-              name="tiers"
-              rows={4}
-              placeholder={"Tiers CSV by line: min,max,unitPrice\\nExample:\\n0,50,86\\n50,150,102\\n150,,130"}
-              className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              required
-            />
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input type="checkbox" name="isDefault" className="h-4 w-4" /> Set as default
-            </label>
+            <Field label="Description">
+              <textarea
+                name="description"
+                rows={2}
+                placeholder="Optional internal description"
+                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              />
+            </Field>
+            <Field label="Tier pricing rules">
+              <textarea
+                name="tiers"
+                rows={4}
+                placeholder={"min,max,unitPrice\\n0,50,86\\n50,150,102\\n150,,130"}
+                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                required
+              />
+            </Field>
+            <div>
+              <Label>Default plan</Label>
+              <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" name="isDefault" className="h-4 w-4" /> Set as default
+              </label>
+            </div>
             <button
               type="submit"
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
@@ -183,5 +203,20 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
     />
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="mt-1.5">{children}</div>
+    </div>
   );
 }

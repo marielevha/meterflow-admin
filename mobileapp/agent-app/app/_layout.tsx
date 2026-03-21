@@ -10,6 +10,7 @@ import { MobilePreferencesProvider } from '@/providers/mobile-preferences-provid
 import { AppThemeProvider, useAppTheme } from '@/providers/app-theme-provider';
 
 export default function RootLayout() {
+  console.log('API BASE URL AGENT=', process.env.EXPO_PUBLIC_API_BASE_URL);
   return (
     <AppThemeProvider>
       <MobilePreferencesProvider>

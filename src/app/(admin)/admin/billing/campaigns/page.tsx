@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { BillingCampaignStatus, Prisma } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { prisma } from "@/lib/prisma";
 import {
@@ -108,35 +109,59 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
         >
           <form action={createBillingCampaignAction} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Input name="code" placeholder="Code (e.g. CAMP-2026-03-BZV)" required />
-              <Input name="name" placeholder="Campaign name" required />
-              <Input name="periodStart" type="datetime-local" required />
-              <Input name="periodEnd" type="datetime-local" required />
-              <Input name="submissionStartAt" type="datetime-local" />
-              <Input name="submissionEndAt" type="datetime-local" />
-              <Input name="cutoffAt" type="datetime-local" />
-              <Input name="frequency" placeholder="MONTHLY or BIMONTHLY" defaultValue="MONTHLY" />
-              <select
-                name="tariffPlanId"
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                required
-              >
-                <option value="">Choose tariff plan</option>
-                {tariffPlans.map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.code} - {plan.name}
-                  </option>
-                ))}
-              </select>
-              <Input name="city" placeholder="City (optional)" />
-              <Input name="zone" placeholder="Zone (optional)" />
+              <Field label="Code">
+                <Input name="code" placeholder="CAMP-2026-03-BZV" required />
+              </Field>
+              <Field label="Campaign name">
+                <Input name="name" placeholder="March 2026 Brazzaville" required />
+              </Field>
+              <Field label="Period start">
+                <Input name="periodStart" type="datetime-local" required />
+              </Field>
+              <Field label="Period end">
+                <Input name="periodEnd" type="datetime-local" required />
+              </Field>
+              <Field label="Submission start">
+                <Input name="submissionStartAt" type="datetime-local" />
+              </Field>
+              <Field label="Submission end">
+                <Input name="submissionEndAt" type="datetime-local" />
+              </Field>
+              <Field label="Cutoff date">
+                <Input name="cutoffAt" type="datetime-local" />
+              </Field>
+              <Field label="Frequency">
+                <Input name="frequency" placeholder="MONTHLY" defaultValue="MONTHLY" />
+              </Field>
+              <Field label="Tariff plan">
+                <select
+                  name="tariffPlanId"
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  required
+                >
+                  <option value="">Choose tariff plan</option>
+                  {tariffPlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.code} - {plan.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="City">
+                <Input name="city" placeholder="Optional" />
+              </Field>
+              <Field label="Zone">
+                <Input name="zone" placeholder="Optional" />
+              </Field>
             </div>
-            <textarea
-              name="notes"
-              rows={2}
-              placeholder="Notes"
-              className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-            />
+            <Field label="Notes">
+              <textarea
+                name="notes"
+                rows={2}
+                placeholder="Optional campaign notes"
+                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              />
+            </Field>
             <button
               type="submit"
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
@@ -231,5 +256,20 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
     />
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="mt-1.5">{children}</div>
+    </div>
   );
 }
