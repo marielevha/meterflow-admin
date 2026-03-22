@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -38,6 +39,7 @@ export default function HomeScreen() {
   const { unreadCount } = useMobileNotifications();
   const { safePush } = useSafePush();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     meters: [],
@@ -45,13 +47,26 @@ export default function HomeScreen() {
   });
   const [activeMeterIndex, setActiveMeterIndex] = useState(0);
 
-  const loadDashboard = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
+  const hasDashboardData =
+    dashboardData.meters.length > 0 || dashboardData.consumptions.length > 0;
+
+  const loadDashboard = useCallback(async (
+      activeRef: { current: boolean } = { current: true },
+      options: { mode?: 'initial' | 'refresh' | 'background' } = {}
+    ) => {
       if (!session?.accessToken) {
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
-      setLoading(true);
+      const mode = options.mode ?? 'initial';
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      } else if (mode === 'initial') {
+        setLoading(true);
+      }
+
       setError(null);
 
       try {
@@ -77,7 +92,11 @@ export default function HomeScreen() {
         }
       } finally {
         if (activeRef.current) {
-          setLoading(false);
+          if (mode === 'refresh') {
+            setRefreshing(false);
+          } else if (mode === 'initial') {
+            setLoading(false);
+          }
         }
       }
     }, [logout, session?.accessToken, t]);
@@ -85,12 +104,12 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       const activeRef = { current: true };
-      void loadDashboard(activeRef);
+      void loadDashboard(activeRef, { mode: hasDashboardData ? 'background' : 'initial' });
 
       return () => {
         activeRef.current = false;
       };
-    }, [loadDashboard])
+    }, [hasDashboardData, loadDashboard])
   );
 
   useEffect(() => {
@@ -116,7 +135,18 @@ export default function HomeScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title={t('common.home')} subtitle={t('home.subtitle')}>
+      <AppPage
+        title={t('common.home')}
+        subtitle={t('home.subtitle')}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadDashboard({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
         {/* <View style={styles.header}>
           <View style={styles.headerTextBlock}>
             <Text style={[styles.eyebrow, { color: palette.accent }]}>Bonjour</Text>
@@ -134,11 +164,11 @@ export default function HomeScreen() {
         </View> */}
 
         <View style={styles.section}>
-          {loading ? (
+          {loading && !hasDashboardData ? (
             <View style={styles.readingsLoadingWrap}>
               <CircularLoading palette={palette} />
             </View>
-          ) : error ? (
+          ) : error && !hasDashboardData ? (
             <AppStateCard
               palette={palette}
               icon="cloud-offline-outline"
@@ -303,11 +333,11 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {loading ? (
+          {loading && !hasDashboardData ? (
             <View style={styles.readingsLoadingWrap}>
               <CircularLoading palette={palette} />
             </View>
-          ) : error ? (
+          ) : error && !hasDashboardData ? (
             <AppStateCard
               palette={palette}
               icon="cloud-offline-outline"

@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AppPage } from '@/components/app/app-page';
+import { AppStateCard } from '@/components/app/app-state-card';
 import { CircularLoading } from '@/components/app/circular-loading';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -21,26 +23,36 @@ export default function MetersScreen() {
   const { safePush } = useSafePush();
   const [meters, setMeters] = useState<MobileMeter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasMetersData = meters.length > 0;
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadMeters() {
+  const loadMeters = useCallback(async (
+      activeRef: { current: boolean } = { current: true },
+      options: { mode?: 'initial' | 'refresh' | 'background' } = {}
+    ) => {
       if (!session?.accessToken) {
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
-      setLoading(true);
+      const mode = options.mode ?? 'initial';
+
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      } else if (mode === 'initial') {
+        setLoading(true);
+      }
+
       setError(null);
 
       try {
         const result = await listClientMeters(session.accessToken);
-        if (!active) return;
+        if (!activeRef.current) return;
         setMeters(result.meters);
       } catch (loadError) {
-        if (!active) return;
+        if (!activeRef.current) return;
         const message = toMobileErrorMessage(loadError, t('meters.unavailableFallback'));
         setError(message);
 
@@ -48,34 +60,64 @@ export default function MetersScreen() {
           await logout();
         }
       } finally {
-        if (active) {
-          setLoading(false);
+        if (activeRef.current) {
+          if (mode === 'refresh') {
+            setRefreshing(false);
+          } else if (mode === 'initial') {
+            setLoading(false);
+          }
         }
       }
-    }
+    }, [logout, session?.accessToken, t]);
 
-    void loadMeters();
+  useFocusEffect(
+    useCallback(() => {
+      const activeRef = { current: true };
+      void loadMeters(activeRef, { mode: hasMetersData ? 'background' : 'initial' });
 
-    return () => {
-      active = false;
-    };
-  }, [logout, session?.accessToken, t]);
+      return () => {
+        activeRef.current = false;
+      };
+    }, [hasMetersData, loadMeters])
+  );
 
   return (
     <RequireMobileAuth>
-      <AppPage title={t('common.meters')} subtitle={t('meters.subtitle')} topBarMode="back" backHref="/(tabs)">
-        {loading ? (
+      <AppPage
+        title={t('common.meters')}
+        subtitle={t('meters.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadMeters({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
+        {loading && !hasMetersData ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
-        ) : error ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.danger }]}>{error}</Text>
-          </View>
+        ) : error && !hasMetersData ? (
+          <AppStateCard
+            palette={palette}
+            icon="cloud-offline-outline"
+            title={t('meters.unavailableTitle')}
+            description={error}
+            tone="danger"
+            actionLabel={t('common.retry')}
+            onActionPress={() => void loadMeters()}
+          />
         ) : meters.length === 0 ? (
-          <View style={[styles.stateCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
-            <Text style={[styles.stateText, { color: palette.muted }]}>{t('meters.emptyDescription')}</Text>
-          </View>
+          <AppStateCard
+            palette={palette}
+            icon="flash-outline"
+            title={t('meters.emptyTitle')}
+            description={t('meters.emptyDescription')}
+          />
         ) : (
           <View style={styles.stack}>
             {meters.map((meter) => {
@@ -144,18 +186,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-  },
-  stateCard: {
-    borderWidth: 1,
-    borderRadius: 24,
-    padding: 22,
-    gap: 10,
-    alignItems: 'center',
-  },
-  stateText: {
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
   },
   card: { borderWidth: 1, borderRadius: 24, padding: 18 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },

@@ -651,6 +651,20 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
     - bouton menu ou retour selon le contexte
   - drawer stabilise sur login/logout et changements de route
 
+- Swipe-to-refresh generalise sur les ecrans clients:
+  - support `refreshControl` partage dans `mobileapp/meterflow/components/app/app-page.tsx`
+  - geste de pull-to-refresh branche sur:
+    - accueil
+    - consommation
+    - releves
+    - notifications
+    - compteurs
+    - profil
+    - parametres
+    - a propos
+  - sur les ecrans avec donnees deja chargees, le refresh manuel ne remplace plus le contenu par un spinner plein ecran
+  - les refresh de retour sur ecran restent discrets pour conserver le contexte utilisateur
+
 - Internationalisation mobile:
   - infrastructure i18n legere ajoutee:
     - `mobileapp/meterflow/lib/i18n/translations.ts`

@@ -153,6 +153,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.footer': '© 2026 MeterFlow. Propulse par E2C.',
 
     'meters.subtitle': 'Vue liste',
+    'meters.unavailableTitle': 'Compteurs indisponibles',
     'meters.unavailableFallback': 'Impossible de charger les compteurs.',
     'meters.emptyTitle': 'Aucun compteur associe',
     'meters.emptyDescription': 'Aucun compteur associe a ce compte.',
@@ -319,6 +320,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.footer': '© 2026 MeterFlow. Powered by E2C.',
 
     'meters.subtitle': 'List view',
+    'meters.unavailableTitle': 'Meters unavailable',
     'meters.unavailableFallback': 'Unable to load meters.',
     'meters.emptyTitle': 'No meter assigned',
     'meters.emptyDescription': 'No meter is linked to this account.',
@@ -485,6 +487,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.footer': '© 2026 MeterFlow. E2C nde ezali kotambwisa yango.',
 
     'meters.subtitle': 'Liste',
+    'meters.unavailableTitle': 'Ba metre ezwami te',
     'meters.unavailableFallback': 'Tokoki te kozwa ba metre.',
     'meters.emptyTitle': 'Metre moko te ekangami',
     'meters.emptyDescription': 'Metre moko te ezali na konte oyo.',

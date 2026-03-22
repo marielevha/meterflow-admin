@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AppPage } from '@/components/app/app-page';
@@ -20,27 +20,42 @@ export default function SettingsScreen() {
   const { logout } = useMobileSession();
   const { preferences, updatePreferences } = useMobilePreferences();
   const [appConfig, setAppConfig] = useState<MobileAppConfig | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    let active = true;
+  const loadConfig = useCallback(
+    async (activeRef: { current: boolean } = { current: true }, options: { mode?: 'initial' | 'refresh' } = {}) => {
+      const mode = options.mode ?? 'initial';
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      }
 
-    async function loadConfig() {
       try {
         const result = await getMobileAppConfig();
-        if (!active) return;
+        if (!activeRef.current) return;
         setAppConfig(result.config);
       } catch {
-        if (!active) return;
-        setAppConfig(null);
+        if (!activeRef.current) return;
+        if (mode === 'initial') {
+          setAppConfig(null);
+        }
+      } finally {
+        if (activeRef.current && mode === 'refresh') {
+          setRefreshing(false);
+        }
       }
-    }
+    },
+    []
+  );
 
-    void loadConfig();
+  useEffect(() => {
+    const activeRef = { current: true };
+
+    void loadConfig(activeRef);
 
     return () => {
-      active = false;
+      activeRef.current = false;
     };
-  }, []);
+  }, [loadConfig]);
 
   async function handleReplayOnboarding() {
     await resetOnboardingCompleted();
@@ -49,7 +64,20 @@ export default function SettingsScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title={t('settings.title')} subtitle={t('settings.subtitle')} topBarMode="back" backHref="/(tabs)">
+      <AppPage
+        title={t('settings.title')}
+        subtitle={t('settings.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadConfig({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
         <View style={styles.container}>
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.appearanceTitle')}</Text>

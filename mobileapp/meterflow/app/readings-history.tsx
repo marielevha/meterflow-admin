@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppPage } from '@/components/app/app-page';
@@ -28,17 +28,30 @@ export default function ReadingsHistoryScreen() {
   const { safePush } = useSafePush();
   const [readings, setReadings] = useState<MobileReading[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>('ALL');
   const [showFilterSelect, setShowFilterSelect] = useState(false);
+  const hasReadingsData = readings.length > 0;
 
-  const loadReadings = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
+  const loadReadings = useCallback(async (
+      activeRef: { current: boolean } = { current: true },
+      options: { mode?: 'initial' | 'refresh' | 'background' } = {}
+    ) => {
       if (!session?.accessToken) {
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
-      setLoading(true);
+      const mode = options.mode ?? 'initial';
+
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      } else if (mode === 'initial') {
+        setLoading(true);
+      }
+
       setError(null);
 
       try {
@@ -55,7 +68,11 @@ export default function ReadingsHistoryScreen() {
         }
       } finally {
         if (activeRef.current) {
-          setLoading(false);
+          if (mode === 'refresh') {
+            setRefreshing(false);
+          } else if (mode === 'initial') {
+            setLoading(false);
+          }
         }
       }
     }, [logout, session?.accessToken]);
@@ -63,12 +80,12 @@ export default function ReadingsHistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       const activeRef = { current: true };
-      void loadReadings(activeRef);
+      void loadReadings(activeRef, { mode: hasReadingsData ? 'background' : 'initial' });
 
       return () => {
         activeRef.current = false;
       };
-    }, [loadReadings])
+    }, [hasReadingsData, loadReadings])
   );
 
   const filteredReadings =
@@ -76,7 +93,20 @@ export default function ReadingsHistoryScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Relevés" subtitle="Historique de soumission" topBarMode="back" backHref="/(tabs)">
+      <AppPage
+        title="Relevés"
+        subtitle="Historique de soumission"
+        topBarMode="back"
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadReadings({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
         <Pressable
           onPress={() => setShowFilterSelect(true)}
           style={[styles.filterSelect, { backgroundColor: palette.surface, borderColor: palette.border }]}>
@@ -92,11 +122,11 @@ export default function ReadingsHistoryScreen() {
           </View>
         </Pressable>
 
-        {loading ? (
+        {loading && !hasReadingsData ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
-        ) : error ? (
+        ) : error && !hasReadingsData ? (
           <AppStateCard
             palette={palette}
             icon="cloud-offline-outline"

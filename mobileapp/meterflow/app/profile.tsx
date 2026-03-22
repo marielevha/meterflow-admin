@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { AppPage } from '@/components/app/app-page';
 import { AppStateCard } from '@/components/app/app-state-card';
@@ -58,6 +58,7 @@ export default function ProfileScreen() {
   const [summary, setSummary] = useState<MobileProfileSummary | null>(null);
   const [form, setForm] = useState<ProfileFormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -77,8 +78,18 @@ export default function ProfileScreen() {
   }, []);
 
   const loadProfile = useCallback(
-    async (activeRef: { current: boolean } = { current: true }) => {
-      setLoading(true);
+    async (
+      activeRef: { current: boolean } = { current: true },
+      options: { mode?: 'initial' | 'refresh' | 'background' } = {}
+    ) => {
+      const mode = options.mode ?? 'initial';
+
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      } else if (mode === 'initial') {
+        setLoading(true);
+      }
+
       setError(null);
 
       try {
@@ -96,7 +107,11 @@ export default function ProfileScreen() {
         }
       } finally {
         if (activeRef.current) {
-          setLoading(false);
+          if (mode === 'refresh') {
+            setRefreshing(false);
+          } else if (mode === 'initial') {
+            setLoading(false);
+          }
         }
       }
     },
@@ -234,8 +249,21 @@ export default function ProfileScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title={t('common.profile')} subtitle={t('profile.subtitle')} topBarMode="back" backHref="/(tabs)">
-        {loading ? (
+      <AppPage
+        title={t('common.profile')}
+        subtitle={t('profile.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadProfile({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
+        {loading && !profile ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
