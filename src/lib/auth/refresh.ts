@@ -13,8 +13,16 @@ type RefreshPayload = {
   platform?: "mobile" | "web" | "agent-mobile";
 };
 
-const WEB_ALLOWED_ROLES = [UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN] as const;
-const AGENT_MOBILE_ALLOWED_ROLES = [UserRole.AGENT, UserRole.SUPERVISOR, UserRole.ADMIN] as const;
+const WEB_ALLOWED_ROLES = new Set<UserRole>([
+  UserRole.AGENT,
+  UserRole.SUPERVISOR,
+  UserRole.ADMIN,
+]);
+const AGENT_MOBILE_ALLOWED_ROLES = new Set<UserRole>([
+  UserRole.AGENT,
+  UserRole.SUPERVISOR,
+  UserRole.ADMIN,
+]);
 
 export async function refreshSession(payload: RefreshPayload) {
   const refreshToken = payload.refreshToken?.trim();
@@ -87,9 +95,9 @@ export async function refreshSession(payload: RefreshPayload) {
   if (
     (platform === "mobile" && user.role !== UserRole.CLIENT) ||
     (platform === "web" &&
-      !WEB_ALLOWED_ROLES.includes(user.role)) ||
+      !WEB_ALLOWED_ROLES.has(user.role)) ||
     (platform === "agent-mobile" &&
-      !AGENT_MOBILE_ALLOWED_ROLES.includes(user.role))
+      !AGENT_MOBILE_ALLOWED_ROLES.has(user.role))
   ) {
     return {
       status: 403,

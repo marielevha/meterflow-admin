@@ -11,21 +11,40 @@ async function postLogin(request: Request) {
     );
     const response = NextResponse.json(result.body, { status: result.status });
 
-    if (result.status === 200) {
+    const accessToken =
+      "accessToken" in result.body && typeof result.body.accessToken === "string"
+        ? result.body.accessToken
+        : null;
+    const refreshToken =
+      "refreshToken" in result.body && typeof result.body.refreshToken === "string"
+        ? result.body.refreshToken
+        : null;
+    const accessTokenExpiresIn =
+      "accessTokenExpiresIn" in result.body &&
+      typeof result.body.accessTokenExpiresIn === "number"
+        ? result.body.accessTokenExpiresIn
+        : undefined;
+    const refreshTokenExpiresIn =
+      "refreshTokenExpiresIn" in result.body &&
+      typeof result.body.refreshTokenExpiresIn === "number"
+        ? result.body.refreshTokenExpiresIn
+        : undefined;
+
+    if (result.status === 200 && accessToken && refreshToken) {
       const isSecure = process.env.NODE_ENV === "production";
-      response.cookies.set("access_token", result.body.accessToken, {
+      response.cookies.set("access_token", accessToken, {
         httpOnly: true,
         secure: isSecure,
         sameSite: "lax",
         path: "/",
-        maxAge: result.body.accessTokenExpiresIn,
+        maxAge: accessTokenExpiresIn,
       });
-      response.cookies.set("refresh_token", result.body.refreshToken, {
+      response.cookies.set("refresh_token", refreshToken, {
         httpOnly: true,
         secure: isSecure,
         sameSite: "lax",
         path: "/",
-        maxAge: result.body.refreshTokenExpiresIn,
+        maxAge: refreshTokenExpiresIn,
       });
     }
 

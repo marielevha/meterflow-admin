@@ -4,6 +4,7 @@ interface InputProps {
   type?: "text" | "number" | "email" | "password" | "date" | "time" | string;
   id?: string;
   name?: string;
+  required?: boolean;
   placeholder?: string;
   value?: string | number;
   defaultValue?: string | number;
@@ -22,6 +23,7 @@ const Input: FC<InputProps> = ({
   type = "text",
   id,
   name,
+  required = false,
   placeholder,
   value,
   defaultValue,
@@ -55,6 +57,7 @@ const Input: FC<InputProps> = ({
         type={type}
         id={id}
         name={name}
+        required={required}
         placeholder={placeholder}
         value={value}
         defaultValue={defaultValue}

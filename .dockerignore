@@ -1,0 +1,16 @@
+.git
+.gitignore
+.idea
+.next
+node_modules
+logs
+mobileapp
+.env
+.env.*
+README.md
+banner.png
+tsconfig.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

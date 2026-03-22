@@ -65,7 +65,7 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
     details: {
       previous: primaryPrevious,
       current: primaryCurrent,
-      referenceEffectiveAt: latestState?.effectiveAt ?? null,
+      referenceEffectiveAt: latestState?.effectiveAt?.toISOString() ?? null,
     },
   });
 
@@ -79,7 +79,7 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
       details: {
         previous: secondaryPrevious,
         current: secondaryCurrent,
-        referenceEffectiveAt: latestState?.effectiveAt ?? null,
+        referenceEffectiveAt: latestState?.effectiveAt?.toISOString() ?? null,
       },
     });
   }
@@ -122,6 +122,10 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
   const flagReason = suspicious
     ? failedChecks.map((c) => c.check).join(", ")
     : null;
+  const anomalyPayload: Prisma.InputJsonObject = {
+    suspicious,
+    checks: checks as unknown as Prisma.InputJsonArray,
+  };
 
   const result = await prisma.$transaction(async (tx) => {
     const updatedReading = await tx.reading.update({
@@ -153,10 +157,7 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
         readingId: reading.id,
         userId: staff.id,
         type: ReadingEventType.ANOMALY_DETECTED,
-        payload: {
-          suspicious,
-          checks,
-        },
+        payload: anomalyPayload,
       },
     });
 

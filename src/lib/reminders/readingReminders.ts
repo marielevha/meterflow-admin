@@ -1,5 +1,6 @@
 import {
   MeterStatus,
+  Prisma,
   ReadingStatus,
   ReminderChannel,
   ReminderStatus,
@@ -381,7 +382,7 @@ async function createLog(
   windowEnd: Date,
   reminderWindowKey: string,
   pendingMeters: number,
-  payload: Record<string, unknown>,
+  payload: Prisma.InputJsonObject,
 ) {
   await prisma.readingReminderLog.create({
     data: {

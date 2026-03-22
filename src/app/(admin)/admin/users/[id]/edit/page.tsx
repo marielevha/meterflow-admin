@@ -306,6 +306,7 @@ function FormSelect({
   name,
   defaultValue,
   options,
+  placeholder,
 }: {
   label: string;
   name: string;

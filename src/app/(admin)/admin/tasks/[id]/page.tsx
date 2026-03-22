@@ -631,6 +631,7 @@ function LinkedReadingCard({
   title,
   reading,
   href,
+  t,
 }: {
   title: string;
   reading:

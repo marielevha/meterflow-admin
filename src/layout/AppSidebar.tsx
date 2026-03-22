@@ -353,33 +353,55 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
         }
       | null = null;
 
-    const inspect = (items: NavItem[], type: "main" | "others") => {
-      items.forEach((nav, index) => {
-        if (!nav.subItems) return;
-        nav.subItems.forEach((subItem) => {
-          if (!isActive(subItem.path)) return;
-          const score = subItem.path.length;
-          if (!best || score > best.score) {
-            best = {
-              key: `${type}-${index}`,
-              submenu: { type, index },
-              score,
-            };
-          }
-        });
-      });
-    };
+    for (const [index, nav] of effectiveMainItems.entries()) {
+      if (!nav.subItems) continue;
 
-    inspect(effectiveMainItems, "main");
-    inspect(effectiveOtherItems, "others");
+      for (const subItem of nav.subItems) {
+        if (!isActive(subItem.path)) continue;
+
+        const score = subItem.path.length;
+        if (!best || score > best.score) {
+          best = {
+            key: `main-${index}`,
+            submenu: { type: "main", index },
+            score,
+          };
+        }
+      }
+    }
+
+    for (const [index, nav] of effectiveOtherItems.entries()) {
+      if (!nav.subItems) continue;
+
+      for (const subItem of nav.subItems) {
+        if (!isActive(subItem.path)) continue;
+
+        const score = subItem.path.length;
+        if (!best || score > best.score) {
+          best = {
+            key: `others-${index}`,
+            submenu: { type: "others", index },
+            score,
+          };
+        }
+      }
+    }
+
     return best;
   })();
 
-  const openSubmenu =
-    manualOpenSubmenu ||
-    (activeSubmenu && activeSubmenu.key !== collapsedActiveSubmenuKey
-      ? activeSubmenu.submenu
-      : null);
+  const activeSubmenuKey = activeSubmenu?.key ?? null;
+  const activeSubmenuState = activeSubmenu?.submenu ?? null;
+
+  let openSubmenu = manualOpenSubmenu;
+  if (
+    !openSubmenu &&
+    activeSubmenuKey &&
+    activeSubmenuKey !== collapsedActiveSubmenuKey &&
+    activeSubmenuState
+  ) {
+    openSubmenu = activeSubmenuState;
+  }
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
     const clickedKey = `${menuType}-${index}`;

@@ -1,0 +1,167 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: meterflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-meterflow}
+      POSTGRES_USER: ${POSTGRES_USER:-meterflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meterflow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meterflow} -d ${POSTGRES_DB:-meterflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  minio:
+    image: minio/minio:latest
+    container_name: meterflow-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: meterflow-minio-init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_BUCKET: ${S3_BUCKET:-meterflow}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
+        echo 'Waiting for MinIO...';
+        sleep 2;
+      done;
+      mc mb -p local/$$S3_BUCKET || true;
+      mc anonymous set download local/$$S3_BUCKET || true;
+      "
+    restart: "no"
+
+  migrate:
+    build:
+      context: .
+      target: builder
+    container_name: meterflow-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-meterflow}:${POSTGRES_PASSWORD:-meterflow}@postgres:5432/${POSTGRES_DB:-meterflow}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-meterflow}:${POSTGRES_PASSWORD:-meterflow}@postgres:5432/${POSTGRES_DB:-meterflow}?schema=public
+      STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/${S3_BUCKET:-meterflow}}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-meterflow}
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+    command:
+      - /bin/sh
+      - -c
+      - >
+        until node -e "const net=require('net'); const socket=net.createConnection({host:'postgres', port:5432}); socket.on('connect',()=>{socket.end(); process.exit(0);}); socket.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1), 2000);";
+        do
+          echo 'Waiting for Postgres...';
+          sleep 2;
+        done;
+        npx prisma migrate deploy
+    restart: on-failure
+
+  app:
+    build:
+      context: .
+      target: runner
+    container_name: meterflow-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-MeterFlow}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_SHOW_DEMO_MENU: ${NEXT_PUBLIC_SHOW_DEMO_MENU:-0}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-meterflow}:${POSTGRES_PASSWORD:-meterflow}@postgres:5432/${POSTGRES_DB:-meterflow}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-meterflow}:${POSTGRES_PASSWORD:-meterflow}@postgres:5432/${POSTGRES_DB:-meterflow}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-super-secret-key}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-60m}
+      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-30d}
+      OTP_CODE_LENGTH: ${OTP_CODE_LENGTH:-6}
+      OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-300}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+      CRON_SECRET: ${CRON_SECRET:-change-me-cron-secret}
+      STORAGE_DRIVER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/${S3_BUCKET:-meterflow}}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-meterflow}
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_DIR: ${LOG_DIR:-logs}
+      LOG_MAX_FILE_SIZE_MB: ${LOG_MAX_FILE_SIZE_MB:-10}
+      LOG_MAX_FILES: ${LOG_MAX_FILES:-10}
+      LOG_TO_CONSOLE: ${LOG_TO_CONSOLE:-1}
+      FEATURE_OCR: ${FEATURE_OCR:-false}
+      FEATURE_ANOMALY_SCORING: ${FEATURE_ANOMALY_SCORING:-false}
+      SMS_PROVIDER: ${SMS_PROVIDER:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-MeterFlow}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_PHONE: ${TWILIO_FROM_PHONE:-}
+      TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAILTRAP_API_KEY: ${MAILTRAP_API_KEY:-}
+      REMINDER_EMAIL_FROM: ${REMINDER_EMAIL_FROM:-noreply@meterflow.local}
+      REMINDER_PUSH_WEBHOOK_URL: ${REMINDER_PUSH_WEBHOOK_URL:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: meterflow-pgadmin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@maeva.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-Maev@123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-8080}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+volumes:
+  postgres_data:
+  minio_data:
+  pgadmin_data:

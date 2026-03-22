@@ -193,7 +193,7 @@ export default function OverviewActivityCharts({
       },
     },
     dataLabels: { enabled: false },
-    xaxis: { min: 0, forceNiceScale: true },
+    xaxis: { min: 0 },
     yaxis: {
       labels: {
         maxWidth: 180,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { prisma } from "@/lib/prisma";
+import { getLocalDemoAsset } from "@/lib/storage/localDemoAsset";
 import { extractObjectKeyFromUrl, getObjectFile } from "@/lib/storage/s3";
 
 export async function GET(
@@ -40,7 +41,19 @@ export async function GET(
 
   const objectKey = extractObjectKeyFromUrl(task.fieldImageUrl);
   if (!objectKey) {
-    return NextResponse.json({ error: "task_field_image_key_invalid" }, { status: 400 });
+    const localAsset = await getLocalDemoAsset(task.fieldImageUrl);
+    if (!localAsset) {
+      return NextResponse.json({ error: "task_field_image_key_invalid" }, { status: 400 });
+    }
+
+    return new NextResponse(localAsset.body, {
+      status: 200,
+      headers: {
+        "Content-Type": localAsset.contentType,
+        "Content-Length": String(localAsset.body.byteLength),
+        "Cache-Control": "private, max-age=300",
+      },
+    });
   }
 
   try {

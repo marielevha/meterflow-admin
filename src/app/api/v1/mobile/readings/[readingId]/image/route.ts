@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentMobileClient } from "@/lib/auth/mobileSession";
 import { prisma } from "@/lib/prisma";
+import { getLocalDemoAsset } from "@/lib/storage/localDemoAsset";
 import { extractObjectKeyFromUrl, getObjectFile } from "@/lib/storage/s3";
 
 export async function GET(
@@ -39,7 +40,19 @@ export async function GET(
 
   const objectKey = extractObjectKeyFromUrl(reading.imageUrl);
   if (!objectKey) {
-    return NextResponse.json({ error: "reading_image_key_invalid" }, { status: 400 });
+    const localAsset = await getLocalDemoAsset(reading.imageUrl);
+    if (!localAsset) {
+      return NextResponse.json({ error: "reading_image_key_invalid" }, { status: 400 });
+    }
+
+    return new NextResponse(localAsset.body, {
+      status: 200,
+      headers: {
+        "Content-Type": localAsset.contentType,
+        "Content-Length": String(localAsset.body.byteLength),
+        "Cache-Control": "private, max-age=300",
+      },
+    });
   }
 
   try {
@@ -49,7 +62,15 @@ export async function GET(
       return NextResponse.json({ error: "reading_image_not_found" }, { status: 404 });
     }
 
-    return new NextResponse(file.body, {
+    const fileBody = file.body;
+    const responseBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(fileBody);
+        controller.close();
+      },
+    });
+
+    return new NextResponse(responseBody, {
       status: 200,
       headers: {
         "Content-Type": file.contentType,

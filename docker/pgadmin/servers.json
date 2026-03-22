@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "MeterFlow Postgres",
+      "Group": "Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "meterflow",
+      "SSLMode": "prefer"
+    }
+  }
+}
