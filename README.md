@@ -890,6 +890,36 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - composant logo mis a jour dans:
     - `mobileapp/meterflow/components/app/brand-mark.tsx`
     - `mobileapp/agent-app/components/app/brand-mark.tsx`
+
+### 28) Push natifs client et diagnostic embarque
+
+- App customer (`E2C Client`) preparee pour les push natifs hors `Expo Go`:
+  - ajout de `expo-dev-client` dans `mobileapp/meterflow/package.json`
+  - scripts de demarrage orientes dev client:
+    - `expo start --dev-client`
+    - `expo start --dev-client --android`
+    - `expo start --dev-client --ios`
+  - ajout du `bundleIdentifier` iOS dans `mobileapp/meterflow/app.json`
+
+- Cote mobile, le provider push a ete enrichi pour exposer un vrai etat de diagnostic:
+  - permission notifications
+  - plateforme
+  - version app
+  - token appareil
+  - confirmation d'enregistrement backend
+  - derniere verification
+  - derniere erreur eventuelle
+
+- L'ecran `Parametres` de l'app client affiche maintenant une carte `Diagnostic push`:
+  - lecture de l'etat push courant
+  - rafraichissement manuel du diagnostic
+  - bouton de resynchronisation forcee vers le backend
+  - utile pour verifier rapidement pourquoi une notification in-app existe alors que le push OS n'arrive pas
+
+- Les libelles de ce diagnostic ont ete ajoutes aux dictionnaires i18n de l'app client:
+  - `fr`
+  - `en`
+  - `ln`
   - assets natifs regeneres pour les deux apps:
     - `icon.png`
     - `favicon.png`

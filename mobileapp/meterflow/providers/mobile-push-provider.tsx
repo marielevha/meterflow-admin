@@ -1,4 +1,13 @@
-import { PropsWithChildren, useEffect, useRef } from 'react';
+import {
+  createContext,
+  PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -8,7 +17,38 @@ import {
   registerMobilePushToken,
   requestExpoPushToken,
 } from '@/lib/api/mobile-push';
+import { readStoredPushToken } from '@/lib/storage/push-token';
 import { useMobileSession } from '@/providers/mobile-session-provider';
+
+type PushPermissionStatus = 'granted' | 'denied' | 'undetermined' | 'unknown';
+
+type MobilePushDiagnostics = {
+  permissionStatus: PushPermissionStatus;
+  platform: string;
+  appVersion: string | null;
+  tokenPreview: string | null;
+  backendRegistered: boolean;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+};
+
+type MobilePushContextValue = {
+  diagnostics: MobilePushDiagnostics;
+  isCheckingPush: boolean;
+  refreshPushDiagnostics: (options?: { forceRegister?: boolean }) => Promise<void>;
+};
+
+const DEFAULT_DIAGNOSTICS: MobilePushDiagnostics = {
+  permissionStatus: 'unknown',
+  platform: Platform.OS,
+  appVersion: getMobileAppVersion(),
+  tokenPreview: null,
+  backendRegistered: false,
+  lastCheckedAt: null,
+  lastError: null,
+};
+
+const MobilePushContext = createContext<MobilePushContextValue | null>(null);
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -20,11 +60,34 @@ Notifications.setNotificationHandler({
   }),
 });
 
+function normalizePermissionStatus(status?: string | null): PushPermissionStatus {
+  if (status === 'granted' || status === 'denied' || status === 'undetermined') {
+    return status;
+  }
+
+  return 'unknown';
+}
+
+function previewPushToken(token: string | null) {
+  if (!token) return null;
+  return token.length > 26 ? `${token.slice(0, 18)}...${token.slice(-6)}` : token;
+}
+
 export function MobilePushProvider({ children }: PropsWithChildren) {
   const { session, isReady } = useMobileSession();
   const { safePush } = useSafePush();
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
   const registeredAccessTokenRef = useRef<string | null>(null);
+  const activeRef = useRef(true);
+  const syncPromiseRef = useRef<Promise<void> | null>(null);
+  const [diagnostics, setDiagnostics] = useState<MobilePushDiagnostics>(DEFAULT_DIAGNOSTICS);
+  const [isCheckingPush, setIsCheckingPush] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      activeRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -43,9 +106,111 @@ export function MobilePushProvider({ children }: PropsWithChildren) {
     };
   }, [safePush]);
 
+  const refreshPushDiagnostics = useCallback(
+    async (options: { forceRegister?: boolean } = {}) => {
+      if (syncPromiseRef.current) {
+        return syncPromiseRef.current;
+      }
+
+      const run = async () => {
+        const forceRegister = options.forceRegister ?? false;
+
+        if (activeRef.current) {
+          setIsCheckingPush(true);
+        }
+
+        try {
+          const currentPermission = await Notifications.getPermissionsAsync();
+          const storedToken = await readStoredPushToken();
+          const checkedAt = new Date().toISOString();
+          const baseDiagnostics: MobilePushDiagnostics = {
+            permissionStatus: normalizePermissionStatus(currentPermission.status),
+            platform: Platform.OS,
+            appVersion: getMobileAppVersion(),
+            tokenPreview: previewPushToken(storedToken),
+            backendRegistered: !!storedToken,
+            lastCheckedAt: checkedAt,
+            lastError: null,
+          };
+
+          if (activeRef.current) {
+            setDiagnostics((previous) => ({
+              ...previous,
+              ...baseDiagnostics,
+            }));
+          }
+
+          if (!isReady || !session?.accessToken) {
+            return;
+          }
+
+          if (!forceRegister) {
+            return;
+          }
+
+          const result = await requestExpoPushToken();
+          if (!result.granted || !result.token) {
+            if (activeRef.current) {
+              setDiagnostics((previous) => ({
+                ...previous,
+                permissionStatus: normalizePermissionStatus(result.status),
+                lastCheckedAt: checkedAt,
+              }));
+            }
+            return;
+          }
+
+          await registerMobilePushToken({
+            expoPushToken: result.token,
+            platform: Platform.OS,
+            appVersion: getMobileAppVersion(),
+          });
+
+          if (!activeRef.current) {
+            return;
+          }
+
+          registeredAccessTokenRef.current = session.accessToken;
+          setDiagnostics({
+            permissionStatus: 'granted',
+            platform: Platform.OS,
+            appVersion: getMobileAppVersion(),
+            tokenPreview: previewPushToken(result.token),
+            backendRegistered: true,
+            lastCheckedAt: checkedAt,
+            lastError: null,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'unknown_error';
+          console.warn('[mobile-push] register_failed', message);
+
+          if (activeRef.current) {
+            setDiagnostics((previous) => ({
+              ...previous,
+              lastCheckedAt: new Date().toISOString(),
+              lastError: message,
+            }));
+          }
+        } finally {
+          if (activeRef.current) {
+            setIsCheckingPush(false);
+          }
+        }
+      };
+
+      syncPromiseRef.current = run().finally(() => {
+        syncPromiseRef.current = null;
+      });
+
+      return syncPromiseRef.current;
+    },
+    [isReady, session?.accessToken]
+  );
+
   useEffect(() => {
     if (!isReady || !session?.accessToken) {
       registeredAccessTokenRef.current = null;
+      void refreshPushDiagnostics();
       return;
     }
 
@@ -53,37 +218,27 @@ export function MobilePushProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    let cancelled = false;
+    void refreshPushDiagnostics({ forceRegister: true });
+  }, [isReady, refreshPushDiagnostics, session?.accessToken]);
 
-    async function registerToken() {
-      try {
-        const result = await requestExpoPushToken();
-        if (cancelled || !result.granted || !result.token) return;
+  const value = useMemo<MobilePushContextValue>(
+    () => ({
+      diagnostics,
+      isCheckingPush,
+      refreshPushDiagnostics,
+    }),
+    [diagnostics, isCheckingPush, refreshPushDiagnostics]
+  );
 
-        await registerMobilePushToken({
-          expoPushToken: result.token,
-          platform: Platform.OS,
-          appVersion: getMobileAppVersion(),
-        });
+  return <MobilePushContext.Provider value={value}>{children}</MobilePushContext.Provider>;
+}
 
-        if (!cancelled) {
-          registeredAccessTokenRef.current = session.accessToken;
-        }
-      } catch (error) {
-        console.warn(
-          '[mobile-push] register_failed',
-          error instanceof Error ? error.message : 'unknown_error'
-        );
-        // Best effort: the app keeps working even if push registration fails.
-      }
-    }
+export function useMobilePushDiagnostics() {
+  const context = useContext(MobilePushContext);
 
-    void registerToken();
+  if (!context) {
+    throw new Error('useMobilePushDiagnostics must be used within MobilePushProvider');
+  }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isReady, session?.accessToken]);
-
-  return children;
+  return context;
 }

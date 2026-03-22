@@ -11,14 +11,16 @@ import { useI18n } from '@/hooks/use-i18n';
 import { getMobileAppConfig, type MobileAppConfig } from '@/lib/api/mobile-app-config';
 import { resetOnboardingCompleted } from '@/lib/storage/onboarding';
 import { useMobilePreferences } from '@/providers/mobile-preferences-provider';
+import { useMobilePushDiagnostics } from '@/providers/mobile-push-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function SettingsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { logout } = useMobileSession();
   const { preferences, updatePreferences } = useMobilePreferences();
+  const { diagnostics, isCheckingPush, refreshPushDiagnostics } = useMobilePushDiagnostics();
   const [appConfig, setAppConfig] = useState<MobileAppConfig | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -62,6 +64,39 @@ export default function SettingsScreen() {
     router.replace('/onboarding');
   }
 
+  const formatPushPermission = useCallback(
+    (status: string) => {
+      switch (status) {
+        case 'granted':
+          return t('settings.pushPermissionGranted');
+        case 'denied':
+          return t('settings.pushPermissionDenied');
+        case 'undetermined':
+          return t('settings.pushPermissionUndetermined');
+        default:
+          return t('settings.pushUnknown');
+      }
+    },
+    [t]
+  );
+
+  const formatPushCheckTime = useCallback(
+    (value: string | null) => {
+      if (!value) return t('settings.pushUnknown');
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return t('settings.pushUnknown');
+      }
+
+      return new Intl.DateTimeFormat(locale, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(date);
+    },
+    [locale, t]
+  );
+
   return (
     <RequireMobileAuth>
       <AppPage
@@ -72,7 +107,12 @@ export default function SettingsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void loadConfig({ current: true }, { mode: 'refresh' })}
+            onRefresh={() =>
+              void Promise.all([
+                loadConfig({ current: true }, { mode: 'refresh' }),
+                refreshPushDiagnostics(),
+              ])
+            }
             tintColor={palette.accent}
             colors={[palette.accent]}
             progressBackgroundColor={palette.surface}
@@ -135,6 +175,75 @@ export default function SettingsScreen() {
               palette={palette}
               last
             />
+          </View>
+
+          <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.pushDiagnosticsTitle')}</Text>
+            <Text style={[styles.cardText, { color: palette.muted }]}>
+              {t('settings.pushDiagnosticsText')}
+            </Text>
+            <DiagnosticRow
+              label={t('settings.pushPermission')}
+              value={formatPushPermission(diagnostics.permissionStatus)}
+              palette={palette}
+            />
+            <DiagnosticRow
+              label={t('settings.pushPlatform')}
+              value={diagnostics.platform.toUpperCase()}
+              palette={palette}
+            />
+            <DiagnosticRow
+              label={t('settings.pushAppVersion')}
+              value={diagnostics.appVersion ?? t('settings.pushUnknown')}
+              palette={palette}
+            />
+            <DiagnosticRow
+              label={t('settings.pushDeviceToken')}
+              value={diagnostics.tokenPreview ?? t('settings.pushTokenMissing')}
+              palette={palette}
+            />
+            <DiagnosticRow
+              label={t('settings.pushBackendRegistration')}
+              value={diagnostics.backendRegistered ? t('common.yes') : t('common.no')}
+              palette={palette}
+            />
+            <DiagnosticRow
+              label={t('settings.pushLastCheck')}
+              value={formatPushCheckTime(diagnostics.lastCheckedAt)}
+              palette={palette}
+              last={!diagnostics.lastError}
+            />
+            {diagnostics.lastError ? (
+              <DiagnosticRow
+                label={t('settings.pushLastError')}
+                value={diagnostics.lastError}
+                palette={palette}
+                tone="danger"
+                last
+              />
+            ) : null}
+
+            <Pressable
+              disabled={isCheckingPush}
+              onPress={() => void refreshPushDiagnostics({ forceRegister: true })}
+              style={[
+                styles.actionButton,
+                styles.cardButtonSpacing,
+                {
+                  backgroundColor: isCheckingPush ? palette.surfaceMuted : `${palette.accent}14`,
+                  borderColor: isCheckingPush ? palette.border : `${palette.accent}33`,
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.actionButtonLabel,
+                  {
+                    color: isCheckingPush ? palette.muted : palette.accent,
+                  },
+                ]}>
+                {isCheckingPush ? t('settings.pushTesting') : t('settings.pushTestRegistration')}
+              </Text>
+            </Pressable>
           </View>
 
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
@@ -257,6 +366,33 @@ function InfoRow({
   );
 }
 
+function DiagnosticRow({
+  label,
+  value,
+  palette,
+  tone = 'default',
+  last = false,
+}: {
+  label: string;
+  value: string;
+  palette: (typeof Colors)['light'];
+  tone?: 'default' | 'danger';
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.diagnosticRow, !last && { borderBottomColor: palette.border, borderBottomWidth: 1 }]}>
+      <Text style={[styles.diagnosticLabel, { color: palette.muted }]}>{label}</Text>
+      <Text
+        style={[
+          styles.diagnosticValue,
+          { color: tone === 'danger' ? palette.danger : palette.headline },
+        ]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { gap: 22 },
   card: { borderWidth: 1, borderRadius: 24, padding: 22, gap: 14 },
@@ -329,6 +465,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
+  cardButtonSpacing: {
+    marginTop: 4,
+  },
   actionButtonLabel: {
     fontSize: 15,
     fontWeight: '700',
@@ -336,5 +475,20 @@ const styles = StyleSheet.create({
   actionButtonDanger: {
     fontSize: 15,
     fontWeight: '800',
+  },
+  diagnosticRow: {
+    gap: 6,
+    paddingBottom: 12,
+  },
+  diagnosticLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  diagnosticValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
 });
