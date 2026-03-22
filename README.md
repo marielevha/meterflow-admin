@@ -870,15 +870,43 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - nom affiche Expo mis a jour dans `mobileapp/meterflow/app.json`
   - branding auth et page `A propos` ajustes sur `E2C Client`
   - textes de permissions natives (camera, photos, localisation) renommes
+  - faux splash React aligne sur `E2C Client` dans `mobileapp/meterflow/app/index.tsx`
+  - layout d'auth epure:
+    - logo seul, sans mention texte redondante
+    - logo agrandi pour mieux occuper l'ecran
 
 - App agent:
   - nom affiche Expo mis a jour dans `mobileapp/agent-app/app.json`
   - branding auth, drawer et page `A propos` ajustes sur `E2C Agent`
   - dictionnaires i18n alignes sur cette nouvelle marque
   - textes de permissions natives renommes
+  - faux splash React aligne sur `E2C Agent` dans `mobileapp/agent-app/app/index.tsx`
+  - layout d'auth epure:
+    - logo seul, sans mention texte redondante
+    - logo agrandi pour mieux occuper l'ecran
+
+- Identite visuelle mobile:
+  - le monogramme precedent a ete remplace par un vrai logo `E2C` avec point haut
+  - composant logo mis a jour dans:
+    - `mobileapp/meterflow/components/app/brand-mark.tsx`
+    - `mobileapp/agent-app/components/app/brand-mark.tsx`
+  - assets natifs regeneres pour les deux apps:
+    - `icon.png`
+    - `favicon.png`
+    - `splash-icon.png`
+    - `android-icon-foreground.png`
+    - `android-icon-background.png`
+    - `android-icon-monochrome.png`
 
 - Admin web:
   - metadata globale et ecran de connexion renommes en `E2C Admin`
+  - landing publique rebrandee autour de `E2C` dans `src/app/(landing)/page.tsx`
+  - placeholder de connexion web rendu plus neutre dans `src/components/auth/SignInForm.tsx`
+
+- Cohherence produit:
+  - `companyName` par defaut passe a `E2C` dans `src/lib/settings/appSettings.ts`
+  - les fallbacks de rappels de releve utilisent maintenant `E2C`
+  - les assets SVG de demo dans `public/seed/demo-assets` ont aussi ete renommes
 
 - Choix volontaire:
   - les identifiants techniques restent stables pour l'instant:

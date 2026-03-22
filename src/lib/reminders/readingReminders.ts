@@ -538,7 +538,7 @@ export async function executeReadingRemindersJob(
       windowStart,
       windowEnd,
       settings.readingReminderTimezone || "UTC",
-      settings.companyName || "MeterFlow",
+      settings.companyName || "E2C",
     );
 
     for (const channel of channels) {
@@ -604,7 +604,7 @@ export async function executeReadingRemindersJob(
             message.emailSubject,
             message.emailText,
             message.emailHtml,
-            settings.companyName || "MeterFlow",
+            settings.companyName || "E2C",
           );
         }
       } else {

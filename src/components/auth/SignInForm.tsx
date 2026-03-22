@@ -88,7 +88,7 @@ export default function SignInForm() {
                   Username or email <span className="text-error-500">*</span>
                 </Label>
                 <Input
-                  placeholder="admin001 or admin@meterflow.local"
+                  placeholder="admin001 or admin@example.com"
                   type="text"
                   onChange={(e) => setIdentifier(e.target.value)}
                 />

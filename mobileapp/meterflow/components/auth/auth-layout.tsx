@@ -41,8 +41,7 @@ export function AuthLayout({
   const titleSize = compactWidth ? 22 : 26;
   const titleLineHeight = compactWidth ? 28 : 32;
   const subtitleSize = compactWidth ? 13 : 14;
-  const brandSize = compactWidth ? 20 : 22;
-  const logoSize = compactWidth ? 50 : 56;
+  const logoSize = compactWidth ? 74 : compactHeight ? 82 : 92;
 
   return (
     <AppShell>
@@ -85,9 +84,6 @@ export function AuthLayout({
                     accentColor={palette.accent}
                   />
                 </View>
-                <Text style={[styles.brand, { color: palette.headline, fontSize: brandSize }]}>
-                  E2C Client
-                </Text>
               </View>
             </View>
 
@@ -153,7 +149,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hero: {
-    minHeight: 54,
+    minHeight: 94,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -174,10 +170,6 @@ const styles = StyleSheet.create({
   logo: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: '900',
   },
   header: {
     alignItems: 'center',
