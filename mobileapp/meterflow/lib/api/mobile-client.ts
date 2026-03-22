@@ -5,6 +5,7 @@ import {
   setCurrentMobileSession,
 } from '@/lib/auth/mobile-session-store';
 import { API_BASE_URL } from '@/lib/api/config';
+import { translateCurrentApp } from '@/lib/i18n/runtime';
 
 type RequestOptions = {
   path: string;
@@ -57,7 +58,7 @@ export async function fetchMobileJson<T>({ path, method = 'GET', body }: Request
   const payload = (await response.json().catch(() => null)) as T | null;
 
   if (!payload) {
-    throw new MobileApiError('Réponse API vide.', {
+    throw new MobileApiError(translateCurrentApp('api.error.emptyResponse'), {
       code: 'empty_response',
       status: response.status,
     });
@@ -143,58 +144,58 @@ function mapMobileApiError(code?: string, status?: number) {
     case 'session_not_found_or_revoked':
     case 'invalid_refresh_token':
     case 'refresh_token_required':
-      return 'Session invalide. Reconnectez-vous.';
+      return translateCurrentApp('api.error.invalidSession');
     case 'meter_id_image_url_primary_index_required':
-      return 'Choisissez un compteur, ajoutez une photo et renseignez l’index principal.';
+      return translateCurrentApp('api.error.readingMeterPhotoIndexRequired');
     case 'image_url_and_primary_index_required':
-      return 'Ajoutez une photo et renseignez l’index principal pour renvoyer le relevé.';
+      return translateCurrentApp('api.error.readingPhotoIndexRequired');
     case 'primary_index_must_be_positive':
-      return "L'index principal doit être un nombre positif.";
+      return translateCurrentApp('api.error.primaryIndexPositive');
     case 'secondary_index_must_be_positive':
-      return "L'index secondaire doit être un nombre positif.";
+      return translateCurrentApp('api.error.secondaryIndexPositive');
     case 'secondary_index_required_for_dual_meter':
-      return 'Ce compteur nécessite aussi un index secondaire.';
+      return translateCurrentApp('api.error.secondaryIndexRequired');
     case 'gps_required_for_reading':
-      return 'La localisation est requise pour transmettre ce relevé.';
+      return translateCurrentApp('api.error.gpsRequired');
     case 'current_and_new_password_required':
-      return 'Renseignez le mot de passe actuel et le nouveau mot de passe.';
+      return translateCurrentApp('api.error.passwordBothRequired');
     case 'password_too_short':
-      return 'Le nouveau mot de passe doit contenir au moins 8 caractères.';
+      return translateCurrentApp('api.error.passwordTooShort');
     case 'invalid_current_password':
-      return 'Le mot de passe actuel est incorrect.';
+      return translateCurrentApp('api.error.currentPasswordInvalid');
     case 'new_password_must_be_different':
-      return 'Le nouveau mot de passe doit être différent de l’ancien.';
+      return translateCurrentApp('api.error.newPasswordDifferent');
     case 'no_updatable_fields':
-      return 'Aucune modification à enregistrer.';
+      return translateCurrentApp('api.error.noUpdatableFields');
     case 'reading_not_eligible_for_resubmission':
-      return "Ce relevé ne peut plus être renvoyé. Vérifiez son statut avant de recommencer.";
+      return translateCurrentApp('api.error.readingResubmissionLocked');
     case 'idempotency_key_conflict':
-      return 'Une autre soumission utilise déjà cette photo. Reprenez le relevé pour continuer.';
+      return translateCurrentApp('api.error.idempotencyConflict');
     case 'meter_not_found':
-      return 'Compteur introuvable.';
+      return translateCurrentApp('api.error.meterNotFound');
     case 'reading_not_found':
-      return 'Relevé introuvable.';
+      return translateCurrentApp('api.error.readingNotFound');
     case 'reading_image_not_found':
-      return "L'image du relevé est introuvable.";
+      return translateCurrentApp('api.error.readingImageNotFound');
     case 'file_required':
-      return 'Ajoutez une photo du compteur avant envoi.';
+      return translateCurrentApp('api.error.fileRequired');
     case 'invalid_file_type':
-      return 'Le format de la photo n’est pas pris en charge.';
+      return translateCurrentApp('api.error.invalidFileType');
     case 'invalid_file_size':
-      return 'La photo est trop lourde. Reprenez une image plus légère.';
+      return translateCurrentApp('api.error.invalidFileSize');
     case 'invalid_request':
-      return 'La demande envoyée est invalide. Merci de réessayer.';
+      return translateCurrentApp('api.error.invalidRequest');
     case 'invalid_status_filter':
-      return 'Le filtre demandé est invalide.';
+      return translateCurrentApp('api.error.invalidStatusFilter');
     case 'invalid_date_from':
     case 'invalid_date_to':
-      return 'La période demandée est invalide.';
+      return translateCurrentApp('api.error.invalidDateRange');
     case 'empty_response':
-      return 'Réponse API vide.';
+      return translateCurrentApp('api.error.emptyResponse');
     default:
       return status && status >= 500
-        ? 'Le service est momentanément indisponible. Réessayez dans un instant.'
-        : 'Impossible de charger les données.';
+        ? translateCurrentApp('api.error.serviceUnavailable')
+        : translateCurrentApp('api.error.loadFailed');
   }
 }
 
@@ -205,7 +206,7 @@ function normalizeRuntimeErrorMessage(message: string) {
     case 'Network request failed':
     case 'Load failed':
     case 'Failed to fetch':
-      return 'Connexion impossible. Vérifiez votre réseau puis réessayez.';
+      return translateCurrentApp('api.error.networkFailed');
     default:
       return trimmed;
   }

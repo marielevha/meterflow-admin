@@ -12,6 +12,7 @@ import { API_BASE_URL } from '@/lib/api/config';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { getClientReadingDetail, type MobileReadingDetail } from '@/lib/api/mobile-readings';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 import { useMobileSession } from '@/providers/mobile-session-provider';
@@ -19,6 +20,7 @@ import { useMobileSession } from '@/providers/mobile-session-provider';
 export default function ReadingDetailScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const params = useLocalSearchParams<{ id?: string; notificationId?: string }>();
   const { session, logout } = useMobileSession();
   const { markNotificationsRead } = useMobileNotifications();
@@ -34,7 +36,7 @@ export default function ReadingDetailScreen() {
 
     async function loadDetail() {
       if (!params.id) {
-        setError('Identifiant du relevé manquant.');
+        setError(t('readingDetail.missingId'));
         setLoading(false);
         return;
       }
@@ -48,7 +50,7 @@ export default function ReadingDetailScreen() {
         setReading(result.reading);
       } catch (loadError) {
         if (!active) return;
-        const message = toMobileErrorMessage(loadError, 'Impossible de charger le détail.');
+        const message = toMobileErrorMessage(loadError, t('readingDetail.fallback'));
         setError(message);
         if (isMobileAuthError(loadError)) {
           await logout();
@@ -65,7 +67,7 @@ export default function ReadingDetailScreen() {
     return () => {
       active = false;
     };
-  }, [logout, params.id]);
+  }, [logout, params.id, t]);
 
   useEffect(() => {
     if (!notificationId) {
@@ -78,16 +80,16 @@ export default function ReadingDetailScreen() {
   return (
     <RequireMobileAuth>
       <AppPage
-        title="Détail relevé"
-        subtitle="Historique client"
+        title={t('readingDetail.title')}
+        subtitle={t('readingDetail.subtitle')}
         topBarMode="back"
         backHref="/readings-history">
         {loading ? (
-          <StateCard text="Chargement du relevé..." color={palette.muted} loading palette={palette} />
+          <StateCard text={t('readingDetail.loading')} color={palette.muted} loading palette={palette} />
         ) : error ? (
           <StateCard text={error} color={palette.danger} palette={palette} />
         ) : !reading ? (
-          <StateCard text="Relevé introuvable." color={palette.muted} palette={palette} />
+          <StateCard text={t('readingDetail.notFound')} color={palette.muted} palette={palette} />
         ) : (
           <>
             {reading.status !== 'PENDING' ? (
@@ -109,7 +111,7 @@ export default function ReadingDetailScreen() {
                           : palette.border,
                   },
                 ]}>
-                <Text style={[styles.sectionTitle, { color: palette.headline }]}>Décision agent</Text>
+                <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('readingDetail.agentDecision')}</Text>
                 <Text style={[styles.decisionTitle, { color: palette.headline }]}>
                   {reading.decisionTitle || reading.statusLabel || '--'}
                 </Text>
@@ -125,7 +127,7 @@ export default function ReadingDetailScreen() {
                             : palette.muted,
                     },
                   ]}>
-                  {reading.decisionMessage || 'Une mise à jour est disponible pour ce relevé.'}
+                  {reading.decisionMessage || t('readingDetail.decisionFallback')}
                 </Text>
                 {reading.canResubmit ? (
                   <Pressable
@@ -141,7 +143,7 @@ export default function ReadingDetailScreen() {
                     style={[styles.resubmitButton, { backgroundColor: '#ffffffa8' }]}>
                     <Ionicons name="camera-outline" size={16} color={palette.primary} />
                     <Text style={[styles.resubmitButtonText, { color: palette.primary }]}>
-                      Refaire le relevé
+                      {t('history.resubmit')}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -154,14 +156,14 @@ export default function ReadingDetailScreen() {
                 {reading.meter.city} / {reading.meter.zone}
               </Text>
               <View style={styles.infoRow}>
-                <InfoItem label="Statut" value={reading.statusLabel || '--'} palette={palette} />
-                <InfoItem label="Index" value={String(reading.primaryIndex ?? '--')} palette={palette} />
+                <InfoItem label={t('readingDetail.status')} value={reading.statusLabel || '--'} palette={palette} />
+                <InfoItem label={t('common.index')} value={String(reading.primaryIndex ?? '--')} palette={palette} />
               </View>
               <View style={styles.infoRow}>
-                <InfoItem label="Soumis le" value={formatDisplayDateTime(reading.readingAt)} palette={palette} />
+                <InfoItem label={t('readingDetail.submittedAt')} value={formatDisplayDateTime(reading.readingAt, locale)} palette={palette} />
                 <InfoItem
-                  label="Traité le"
-                  value={reading.reviewedAt ? formatDisplayDateTime(reading.reviewedAt) : '--'}
+                  label={t('readingDetail.reviewedAt')}
+                  value={reading.reviewedAt ? formatDisplayDateTime(reading.reviewedAt, locale) : '--'}
                   palette={palette}
                 />
               </View>
@@ -177,7 +179,7 @@ export default function ReadingDetailScreen() {
                   borderColor: gpsDistanceWarning(reading.gpsDistanceMeters) ? '#f3c98b' : palette.border,
                 },
               ]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Contrôle GPS</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('readingDetail.gpsCheck')}</Text>
               <View style={styles.gpsRow}>
                 <View
                   style={[
@@ -196,30 +198,30 @@ export default function ReadingDetailScreen() {
                 </View>
                 <View style={styles.gpsBody}>
                   <Text style={[styles.gpsTitle, { color: palette.headline }]}>
-                    {formatGpsDistance(reading.gpsDistanceMeters)}
+                    {formatGpsDistance(reading.gpsDistanceMeters, t)}
                   </Text>
                   <Text
                     style={[
                       styles.gpsMeta,
                       { color: gpsDistanceWarning(reading.gpsDistanceMeters) ? '#9a6514' : palette.muted },
                     ]}>
-                    {gpsDistanceMessage(reading.gpsDistanceMeters)}
+                    {gpsDistanceMessage(reading.gpsDistanceMeters, t)}
                   </Text>
                 </View>
               </View>
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Événements</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('readingDetail.events')}</Text>
               <View style={styles.eventsStack}>
                 {reading.events.map((event) => (
                   <View key={event.id} style={[styles.eventItem, { borderColor: palette.border }]}>
                     <Text style={[styles.eventType, { color: palette.headline }]}>{event.type}</Text>
                     <Text style={[styles.eventMeta, { color: palette.muted }]}>
-                      {formatDisplayDateTime(event.createdAt)}
+                      {formatDisplayDateTime(event.createdAt, locale)}
                     </Text>
                     <Text style={[styles.eventMeta, { color: palette.muted }]}>
-                      {event.user?.username || event.user?.firstName || 'Système'}
+                      {event.user?.username || event.user?.firstName || t('common.system')}
                     </Text>
                   </View>
                 ))}
@@ -227,7 +229,7 @@ export default function ReadingDetailScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Photo du relevé</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('readingDetail.photoTitle')}</Text>
 
               {reading.imageUrl ? (
                 <Image
@@ -247,7 +249,7 @@ export default function ReadingDetailScreen() {
                 <View style={[styles.imagePlaceholder, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
                   <Ionicons name="image-outline" size={24} color={palette.icon} />
                   <Text style={[styles.imagePlaceholderText, { color: palette.muted }]}>
-                    Aucune image disponible pour ce relevé.
+                    {t('readingDetail.photoUnavailable')}
                   </Text>
                 </View>
               )}
@@ -295,10 +297,10 @@ function InfoItem({
   );
 }
 
-function formatDisplayDateTime(value: string) {
+function formatDisplayDateTime(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleString('fr-FR', {
+  return date.toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -312,23 +314,29 @@ function gpsDistanceWarning(value: string | number | null) {
   return distance !== null && distance > 200;
 }
 
-function formatGpsDistance(value: string | number | null) {
+function formatGpsDistance(
+  value: string | number | null,
+  t: (key: string, params?: Record<string, string | number | boolean>) => string
+) {
   const distance = toNullableNumber(value);
-  if (distance === null) return 'Distance non calculable';
-  return `${Math.round(distance)} m du compteur`;
+  if (distance === null) return t('readingDetail.gpsDistanceUnknown');
+  return t('readingDetail.gpsDistanceFromMeter', { value: Math.round(distance) });
 }
 
-function gpsDistanceMessage(value: string | number | null) {
+function gpsDistanceMessage(
+  value: string | number | null,
+  t: (key: string) => string
+) {
   const distance = toNullableNumber(value);
   if (distance === null) {
-    return 'Les coordonnées nécessaires sont incomplètes.';
+    return t('readingDetail.gpsIncomplete');
   }
 
   if (distance > 200) {
-    return 'La prise de photo semble éloignée du compteur enregistré. Un contrôle est recommandé.';
+    return t('readingDetail.gpsFar');
   }
 
-  return 'La position paraît cohérente avec le compteur enregistré.';
+  return t('readingDetail.gpsOk');
 }
 
 function toNullableNumber(value: string | number | null) {

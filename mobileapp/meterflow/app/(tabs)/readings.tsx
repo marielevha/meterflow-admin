@@ -21,6 +21,7 @@ import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AuthInput } from '@/components/auth/auth-input';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
@@ -50,6 +51,7 @@ type CapturedReadingPhotoLocation = {
 export default function ReadingsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ resubmitReadingId?: string; meterId?: string }>();
   const { openDrawer } = useMobileDrawer();
   const { preferences } = useMobilePreferences();
@@ -117,7 +119,7 @@ export default function ReadingsScreen() {
         });
       } catch (loadError) {
         if (!activeRef.current) return;
-        const message = toMobileErrorMessage(loadError, 'Impossible de charger les compteurs.');
+        const message = toMobileErrorMessage(loadError, t('readingsFlow.metersFallback'));
         setMetersError(message);
         if (isMobileAuthError(loadError)) {
           await logout();
@@ -128,7 +130,7 @@ export default function ReadingsScreen() {
         }
       }
     },
-    [forcedMeterId, logout, session?.accessToken]
+    [forcedMeterId, logout, session?.accessToken, t]
   );
 
   useEffect(() => {
@@ -177,8 +179,8 @@ export default function ReadingsScreen() {
       const locationPermission = await Location.requestForegroundPermissionsAsync();
       if (!locationPermission.granted && requireGpsForReading) {
         Alert.alert(
-          'Position requise',
-          'Autorise la localisation pour joindre les coordonnées GPS au relevé avant de continuer.'
+          t('readingsFlow.alert.positionRequiredTitle'),
+          t('readingsFlow.alert.positionRequiredBody')
         );
         return;
       }
@@ -203,8 +205,8 @@ export default function ReadingsScreen() {
 
       if (requireGpsForReading && (location.gpsLatitude === null || location.gpsLongitude === null)) {
         Alert.alert(
-          'Position indisponible',
-          'Nous n’avons pas pu récupérer votre position. Active la localisation puis réessaie.'
+          t('readingsFlow.alert.positionUnavailableTitle'),
+          t('readingsFlow.alert.positionUnavailableBody')
         );
         return;
       }
@@ -219,8 +221,8 @@ export default function ReadingsScreen() {
       setStep('preview');
     } catch (captureError) {
       Alert.alert(
-        'Capture impossible',
-        toCaptureErrorMessage(captureError, requireGpsForReading)
+        t('readingsFlow.alert.captureFailedTitle'),
+        toCaptureErrorMessage(captureError, requireGpsForReading, t)
       );
     } finally {
       setIsCapturing(false);
@@ -233,19 +235,19 @@ export default function ReadingsScreen() {
     }
 
     if (!capturedPhoto) {
-      Alert.alert('Photo manquante', 'Commence par capturer une photo du compteur.');
+      Alert.alert(t('readingsFlow.alert.photoMissingTitle'), t('readingsFlow.alert.photoMissingBody'));
       return;
     }
 
     if (!selectedMeter) {
-      Alert.alert('Compteur requis', 'Choisis le compteur concerné.');
+      Alert.alert(t('readingsFlow.alert.meterRequiredTitle'), t('readingsFlow.alert.meterRequiredBody'));
       return;
     }
 
     if (requireGpsForReading && (capturedPhoto.gpsLatitude === null || capturedPhoto.gpsLongitude === null)) {
       Alert.alert(
-        'Position requise',
-        'La localisation est nécessaire pour transmettre ce relevé. Reprends la photo après avoir activé la position.'
+        t('readingsFlow.alert.positionRequiredTitle'),
+        t('readingsFlow.alert.positionRequiredForSubmit')
       );
       return;
     }
@@ -254,19 +256,23 @@ export default function ReadingsScreen() {
     const secondaryValue = Number(secondaryIndex);
 
     if (!Number.isFinite(primaryValue) || primaryValue < 0) {
-      Alert.alert('Index invalide', "Saisis un index principal valide.");
+      Alert.alert(t('readingsFlow.alert.invalidIndexTitle'), t('readingsFlow.alert.invalidPrimaryIndexBody'));
       return;
     }
 
     if (selectedMeter.type === 'DUAL_INDEX' && (!Number.isFinite(secondaryValue) || secondaryValue < 0)) {
-      Alert.alert('Index secondaire requis', "Ce compteur demande aussi un index secondaire.");
+      Alert.alert(
+        t('readingsFlow.alert.secondaryIndexRequiredTitle'),
+        t('readingsFlow.alert.secondaryIndexRequiredBody')
+      );
       return;
     }
 
     if (gpsDistanceWarning) {
       const shouldContinue = await confirmGpsDistanceWarning(
         mobileGpsDistanceMeters ?? 0,
-        gpsThresholdMeters
+        gpsThresholdMeters,
+        t
       );
       if (!shouldContinue) {
         return;
@@ -304,20 +310,22 @@ export default function ReadingsScreen() {
             });
 
       Alert.alert(
-        isResubmissionFlow ? 'Relevé renvoyé' : 'Relevé transmis',
         isResubmissionFlow
-          ? `Le relevé du compteur ${result.reading.meter.serialNumber} a bien été renvoyé pour validation.`
-          : `Le relevé du compteur ${result.reading.meter.serialNumber} a bien été transmis et sera vérifié par un agent.`,
+          ? t('readingsFlow.alert.resubmittedTitle')
+          : t('readingsFlow.alert.submittedTitle'),
+        isResubmissionFlow
+          ? t('readingsFlow.alert.resubmittedBody', { meter: result.reading.meter.serialNumber })
+          : t('readingsFlow.alert.submittedBody', { meter: result.reading.meter.serialNumber }),
         [
           {
-            text: 'Voir mes relevés',
+            text: t('readingsFlow.alert.viewHistory'),
             onPress: () => {
               resetFlow();
               safePush('/readings-history');
             },
           },
           {
-            text: isResubmissionFlow ? 'Retour caméra' : "Retour à l'accueil",
+            text: isResubmissionFlow ? t('readingsFlow.alert.backToCamera') : t('readingsFlow.alert.backHome'),
             onPress: () => {
               resetFlow();
               if (isResubmissionFlow) {
@@ -335,10 +343,10 @@ export default function ReadingsScreen() {
         await logout();
       }
       Alert.alert(
-        'Envoi impossible',
+        t('readingsFlow.alert.submitFailedTitle'),
         toMobileErrorMessage(
           submitError,
-          "Le relevé n'a pas pu être envoyé. Vérifie ta connexion puis réessaie."
+          t('readingsFlow.alert.submitFailedBody')
         )
       );
     } finally {
@@ -360,9 +368,9 @@ export default function ReadingsScreen() {
         <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
           <View style={styles.centerState}>
             <ActivityIndicator size="small" color={palette.primary} />
-            <Text style={[styles.stateTitle, { color: palette.headline }]}>Préparation de la caméra</Text>
+            <Text style={[styles.stateTitle, { color: palette.headline }]}>{t('readingsFlow.permission.preparingTitle')}</Text>
             <Text style={[styles.stateText, { color: palette.muted }]}>
-              Nous vérifions les permissions nécessaires.
+              {t('readingsFlow.permission.preparingBody')}
             </Text>
           </View>
         </SafeAreaView>
@@ -378,15 +386,15 @@ export default function ReadingsScreen() {
             <View style={[styles.permissionIcon, { backgroundColor: palette.accentSoft }]}>
               <Ionicons name="camera-outline" size={28} color={palette.primary} />
             </View>
-            <Text style={[styles.stateTitle, { color: palette.headline }]}>Activer la caméra</Text>
+            <Text style={[styles.stateTitle, { color: palette.headline }]}>{t('readingsFlow.permission.enableTitle')}</Text>
             <Text style={[styles.stateText, { color: palette.muted }]}>
-              Le relevé commence par une photo nette du compteur et la récupération du GPS.
+              {t('readingsFlow.permission.enableBody')}
             </Text>
 
             <Pressable
               onPress={() => void requestPermission()}
               style={[styles.primaryButton, { backgroundColor: palette.primary }]}>
-              <Text style={styles.primaryButtonLabel}>Autoriser la caméra</Text>
+              <Text style={styles.primaryButtonLabel}>{t('readingsFlow.permission.enableAction')}</Text>
             </Pressable>
           </View>
         </SafeAreaView>
@@ -398,8 +406,8 @@ export default function ReadingsScreen() {
     return (
       <RequireMobileAuth>
         <AppPage
-          title={isResubmissionFlow ? 'Renvoyer le relevé' : 'Finaliser le relevé'}
-          subtitle={isResubmissionFlow ? 'Nouvelle photo et index' : 'Compteur et index'}
+          title={isResubmissionFlow ? t('readingsFlow.details.resubmitTitle') : t('readingsFlow.details.title')}
+          subtitle={isResubmissionFlow ? t('readingsFlow.details.resubmitSubtitle') : t('readingsFlow.details.subtitle')}
           topBarMode="back"
           onBackPress={() => setStep('capture')}
           contentStyle={styles.detailsContainer}>
@@ -409,12 +417,12 @@ export default function ReadingsScreen() {
 
               <View style={styles.compactHeroBody}>
                 <Text style={[styles.compactHeroTitle, { color: palette.headline }]}>
-                  {isResubmissionFlow ? 'Nouvelle photo prête' : 'Photo validée'}
+                  {isResubmissionFlow ? t('readingsFlow.details.photoReadyResubmit') : t('readingsFlow.details.photoReady')}
                 </Text>
                 <Text style={[styles.compactHeroText, { color: palette.muted }]}>
                   {isResubmissionFlow
-                    ? 'Reprenez les index du même compteur puis renvoyez le relevé.'
-                    : 'Choisis maintenant le compteur concerné et renseigne ses index.'}
+                    ? t('readingsFlow.details.photoReadyResubmitBody')
+                    : t('readingsFlow.details.photoReadyBody')}
                 </Text>
 
                 {selectedMeter ? (
@@ -430,7 +438,7 @@ export default function ReadingsScreen() {
           </View>
 
           <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Text style={[styles.sectionTitle, { color: palette.headline }]}>Compteur</Text>
+            <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('common.meter')}</Text>
 
             {loadingMeters ? (
               <View style={styles.inlineState}>
@@ -443,7 +451,7 @@ export default function ReadingsScreen() {
                   onPress={() => void loadMeters()}
                   style={[styles.inlineRetryButton, { backgroundColor: palette.accentSoft }]}>
                   <Ionicons name="refresh-outline" size={15} color={palette.accent} />
-                  <Text style={[styles.inlineRetryButtonText, { color: palette.primary }]}>Réessayer</Text>
+                  <Text style={[styles.inlineRetryButtonText, { color: palette.primary }]}>{t('common.retry')}</Text>
                 </Pressable>
               </View>
             ) : (
@@ -480,13 +488,13 @@ export default function ReadingsScreen() {
                           {meter.serialNumber}
                         </Text>
                         <Text style={[styles.meterChoiceMeta, { color: palette.muted }]}>
-                          {[meter.city, meter.zone].filter(Boolean).join(' / ') || 'Localisation non renseignée'}
+                          {[meter.city, meter.zone].filter(Boolean).join(' / ') || t('meters.locationMissing')}
                         </Text>
                       </View>
 
                       <View style={styles.meterChoiceAside}>
                         <Text style={[styles.meterChoiceType, { color: selected ? palette.primary : palette.muted }]}>
-                          {meter.type === 'DUAL_INDEX' ? 'Double' : 'Simple'}
+                          {meter.type === 'DUAL_INDEX' ? t('readingsFlow.meterType.dual') : t('readingsFlow.meterType.single')}
                         </Text>
                         {selected ? <Ionicons name="checkmark-circle" size={20} color={palette.accent} /> : null}
                       </View>
@@ -523,7 +531,7 @@ export default function ReadingsScreen() {
 
                 <View style={styles.gpsCardBody}>
                   <Text style={[styles.gpsCardTitle, { color: palette.headline }]}>
-                    Vérification GPS
+                    {t('readingsFlow.gps.title')}
                   </Text>
                   <Text
                     style={[
@@ -531,8 +539,8 @@ export default function ReadingsScreen() {
                       { color: gpsDistanceWarning ? '#9a6514' : palette.muted },
                     ]}>
                     {mobileGpsDistanceMeters !== null
-                      ? `${formatMeters(mobileGpsDistanceMeters)} du compteur enregistré`
-                      : 'Coordonnées du compteur indisponibles. Le contrôle se fera côté serveur.'}
+                      ? t('readingsFlow.gps.distanceFromMeter', { value: formatMeters(mobileGpsDistanceMeters) })
+                      : t('readingsFlow.gps.coordinatesMissing')}
                   </Text>
                 </View>
               </View>
@@ -542,10 +550,10 @@ export default function ReadingsScreen() {
                   style={[
                     styles.gpsCardHint,
                     { color: gpsDistanceWarning ? '#9a6514' : palette.muted },
-                  ]}>
-                  {gpsDistanceWarning
-                    ? `Vous êtes au-delà du seuil recommandé (${gpsThresholdMeters} m). Le relevé peut être envoyé, mais il sera signalé pour contrôle.`
-                    : `Position cohérente avec le compteur enregistré (seuil ${gpsThresholdMeters} m).`}
+                ]}>
+                {gpsDistanceWarning
+                    ? t('readingsFlow.gps.aboveThreshold', { threshold: gpsThresholdMeters })
+                    : t('readingsFlow.gps.withinThreshold', { threshold: gpsThresholdMeters })}
                 </Text>
               ) : null}
             </View>
@@ -553,32 +561,32 @@ export default function ReadingsScreen() {
 
           <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <View style={styles.indexHeader}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Index</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('common.index')}</Text>
               {selectedMeter ? (
                 <Text style={[styles.indexHeaderHint, { color: palette.muted }]}>
-                  {selectedMeter.type === 'DUAL_INDEX' ? '2 champs requis' : '1 champ requis'}
+                  {selectedMeter.type === 'DUAL_INDEX' ? t('readingsFlow.index.dualRequired') : t('readingsFlow.index.singleRequired')}
                 </Text>
               ) : null}
             </View>
 
             <View style={styles.indexStack}>
               <AuthInput
-                label="Index principal"
+                label={t('home.primaryIndex')}
                 icon="flash-outline"
                 keyboardType="numeric"
                 value={primaryIndex}
                 onChangeText={setPrimaryIndex}
-                placeholder="Ex: 1254"
+                placeholder={t('readingsFlow.index.primaryPlaceholder')}
               />
 
               {selectedMeter?.type === 'DUAL_INDEX' ? (
                 <AuthInput
-                  label="Index secondaire"
+                  label={t('home.secondaryIndex')}
                   icon="layers-outline"
                   keyboardType="numeric"
                   value={secondaryIndex}
                   onChangeText={setSecondaryIndex}
-                  placeholder="Ex: 874"
+                  placeholder={t('readingsFlow.index.secondaryPlaceholder')}
                 />
               ) : null}
             </View>
@@ -598,7 +606,7 @@ export default function ReadingsScreen() {
                 <>
                   <Ionicons name="cloud-upload-outline" size={18} color="#ffffff" />
                   <Text style={styles.submitButtonText}>
-                    {isResubmissionFlow ? 'Renvoyer le relevé' : 'Envoyer le relevé'}
+                    {isResubmissionFlow ? t('readingsFlow.details.resubmitCta') : t('readingsFlow.details.submitCta')}
                   </Text>
                 </>
               )}
@@ -672,10 +680,10 @@ export default function ReadingsScreen() {
 
                 <View style={styles.headerTextBlock}>
                   <Text style={styles.headerEyebrow}>
-                    {isResubmissionFlow ? 'Nouvelle soumission' : 'Relevé compteur'}
+                    {isResubmissionFlow ? t('readingsFlow.capture.resubmissionEyebrow') : t('readingsFlow.capture.eyebrow')}
                   </Text>
                   <Text style={styles.headerTitle}>
-                    {isResubmissionFlow ? 'Refais une photo nette' : 'Prends une photo nette'}
+                    {isResubmissionFlow ? t('readingsFlow.capture.resubmissionTitle') : t('readingsFlow.capture.title')}
                   </Text>
                 </View>
 
@@ -732,16 +740,16 @@ export default function ReadingsScreen() {
               <View style={styles.helpBackdrop}>
                 <View style={styles.helpCard}>
                   <View style={styles.helpHeader}>
-                    <Text style={styles.helpTitle}>Conseils rapides</Text>
+                    <Text style={styles.helpTitle}>{t('readingsFlow.help.title')}</Text>
                     <Pressable onPress={() => setShowHelp(false)} style={styles.helpCloseButton}>
                       <Ionicons name="close" size={20} color="#ffffff" />
                     </Pressable>
                   </View>
 
                   <View style={styles.helpList}>
-                    <Text style={styles.helpItem}>Place le compteur dans le cadre.</Text>
-                    <Text style={styles.helpItem}>Évite le flou et les reflets.</Text>
-                    <Text style={styles.helpItem}>Autorise la localisation pour joindre les coordonnées GPS.</Text>
+                    <Text style={styles.helpItem}>{t('readingsFlow.help.itemFrame')}</Text>
+                    <Text style={styles.helpItem}>{t('readingsFlow.help.itemBlur')}</Text>
+                    <Text style={styles.helpItem}>{t('readingsFlow.help.itemGps')}</Text>
                   </View>
                 </View>
               </View>
@@ -1255,40 +1263,51 @@ async function getReadingLocationWithTimeout(): Promise<CapturedReadingPhotoLoca
   };
 }
 
-function toCaptureErrorMessage(error: unknown, requireGpsForReading: boolean) {
+function toCaptureErrorMessage(
+  error: unknown,
+  requireGpsForReading: boolean,
+  t: (key: string) => string
+) {
   if (error instanceof Error) {
     switch (error.message) {
       case 'photo_missing':
-        return 'La photo du compteur n’a pas pu être récupérée. Reprends la capture.';
+        return t('readingsFlow.captureError.photoMissing');
       case 'gps_timeout':
         return requireGpsForReading
-          ? 'La position met trop de temps à se charger. Vérifie le GPS puis réessaie.'
-          : 'La photo a bien été lancée, mais la position n’a pas répondu à temps.';
+          ? t('readingsFlow.captureError.gpsTimeoutRequired')
+          : t('readingsFlow.captureError.gpsTimeoutOptional');
       default:
         return requireGpsForReading
-          ? 'Nous n’avons pas pu prendre la photo du compteur avec une position valide.'
-          : 'Nous n’avons pas pu prendre la photo du compteur.';
+          ? t('readingsFlow.captureError.genericRequired')
+          : t('readingsFlow.captureError.generic');
     }
   }
 
   return requireGpsForReading
-    ? 'Nous n’avons pas pu prendre la photo du compteur avec une position valide.'
-    : 'Nous n’avons pas pu prendre la photo du compteur.';
+    ? t('readingsFlow.captureError.genericRequired')
+    : t('readingsFlow.captureError.generic');
 }
 
-function confirmGpsDistanceWarning(distanceMeters: number, thresholdMeters: number) {
+function confirmGpsDistanceWarning(
+  distanceMeters: number,
+  thresholdMeters: number,
+  t: (key: string, params?: Record<string, string | number | boolean>) => string
+) {
   return new Promise<boolean>((resolve) => {
     Alert.alert(
-      'Emplacement à vérifier',
-      `La photo semble avoir été prise à environ ${formatMeters(distanceMeters)} du compteur enregistré, au-delà du seuil recommandé (${thresholdMeters} m). Voulez-vous continuer ?`,
+      t('readingsFlow.gps.warningTitle'),
+      t('readingsFlow.gps.warningBody', {
+        distance: formatMeters(distanceMeters),
+        threshold: thresholdMeters,
+      }),
       [
         {
-          text: 'Annuler',
+          text: t('common.cancel'),
           style: 'cancel',
           onPress: () => resolve(false),
         },
         {
-          text: 'Continuer',
+          text: t('common.continue'),
           onPress: () => resolve(true),
         },
       ]

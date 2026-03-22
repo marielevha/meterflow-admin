@@ -684,6 +684,51 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
     - a propos
     - drawer / tabs / parametres
 
+- Parcours auth client renforce:
+  - creation de compte branchee au backend avec:
+    - `POST /api/v1/mobile/auth/signup`
+    - `POST /api/v1/mobile/auth/activate`
+    - `POST /api/v1/mobile/auth/resend-otp`
+  - flow OTP mobile reel sur:
+    - inscription
+    - verification
+    - renvoi de code
+  - ecran d'inscription simplifie pour le mobile:
+    - champs `Prenom` et `Nom` empiles
+    - suppression de la section localisation a l'inscription
+    - informations d'accompagnement affichees uniquement a la premiere utilisation
+  - navigation auth epuree:
+    - suppression des retours inutiles sur `register`, `forgot-password`, `reset-password`, `verify-otp`
+    - `login -> register` passe par `replace`
+    - sur Android, retour depuis `register` quitte l'application au lieu de revenir sur `login`
+
+- Generation et verification de username cote client:
+  - nouvelles routes:
+    - `POST /api/v1/mobile/auth/username/generate`
+    - `POST /api/v1/mobile/auth/username/check`
+  - logique partagee ajoutee dans `src/lib/auth/username.ts`
+  - le username est genere automatiquement a partir du prenom et du nom des qu'ils sont saisis
+  - si le username est modifie manuellement, une verification immediate de disponibilite est lancee
+  - les suggestions privilegient des formes courtes et lisibles, avec notamment le motif `initialePrenom.nom`
+
+- Couverture i18n client etendue:
+  - ajout d'un helper runtime pour traduire aussi hors hooks React:
+    - `mobileapp/meterflow/lib/i18n/runtime.ts`
+  - ecrans auth migres:
+    - login
+    - register
+    - forgot-password
+    - reset-password
+    - verify-otp
+  - ecrans clients supplementaires migres:
+    - onboarding
+    - historique des releves
+    - detail releve
+    - detail compteur
+    - detail consommation
+    - flow de soumission de releve
+  - messages utilisateur i18nises aussi dans les couches API/mobile auth/upload pour eviter les textes en dur hors composants
+
 - Cloisonnement des roles cote mobile:
   - l'app mobile client est maintenant reservee aux profils `CLIENT`
   - verrou applique sur:

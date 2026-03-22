@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -48,8 +49,10 @@ export function AuthLayout({
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View
-          style={[
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
             styles.page,
             {
               paddingHorizontal: 16,
@@ -130,7 +133,7 @@ export function AuthLayout({
               {children}
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </AppShell>
   );
@@ -141,11 +144,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   page: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
   },
   contentStack: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

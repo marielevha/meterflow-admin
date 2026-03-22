@@ -8,11 +8,13 @@ import { AuthLayout } from '@/components/auth/auth-layout';
 import { AuthPrimaryButton } from '@/components/auth/auth-primary-button';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function LoginScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const { login, isLoading, isAuthenticated } = useMobileSession();
   const [identifier, setIdentifier] = useState('client001');
   const [password, setPassword] = useState('ChangeMe@123');
@@ -26,7 +28,7 @@ export default function LoginScreen() {
     const trimmedIdentifier = identifier.trim();
 
     if (!trimmedIdentifier || !password.trim()) {
-      setError('Renseignez votre identifiant et votre mot de passe.');
+      setError(t('auth.login.error.required'));
       return;
     }
 
@@ -39,32 +41,32 @@ export default function LoginScreen() {
       });
       router.replace('/(tabs)');
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : 'Connexion impossible.');
+      setError(loginError instanceof Error ? loginError.message : t('auth.login.error.fallback'));
     }
   }
 
   return (
-    <AuthLayout title="Connexion" subtitle="Connectez-vous a votre compte">
+    <AuthLayout title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
       <AuthInput
-        label="Email ou nom d'utilisateur"
+        label={t('auth.login.identifierLabel')}
         icon="person-outline"
-        placeholder="Saisissez votre email ou username"
+        placeholder={t('auth.login.identifierPlaceholder')}
         autoCapitalize="none"
         autoCorrect={false}
         value={identifier}
         onChangeText={setIdentifier}
       />
       <AuthInput
-        label="Mot de passe"
+        label={t('auth.login.passwordLabel')}
         icon="lock-closed-outline"
-        placeholder="Votre mot de passe"
+        placeholder={t('auth.login.passwordPlaceholder')}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
 
       <Pressable onPress={() => router.push('/(auth)/forgot-password')} style={styles.inlineAction}>
-        <Text style={[styles.inlineActionText, { color: palette.accent }]}>Mot de passe oublie ?</Text>
+        <Text style={[styles.inlineActionText, { color: palette.accent }]}>{t('auth.login.forgotPassword')}</Text>
       </Pressable>
 
       {error ? (
@@ -73,12 +75,12 @@ export default function LoginScreen() {
         </View>
       ) : null}
 
-      <AuthPrimaryButton label="Se connecter" onPress={handleLogin} loading={isLoading} />
+      <AuthPrimaryButton label={t('auth.login.submit')} onPress={handleLogin} loading={isLoading} />
 
       <AuthFooterLink
-        label="Vous n'avez pas encore de compte ?"
-        actionLabel="Creer un compte"
-        onPress={() => router.push('/(auth)/register')}
+        label={t('auth.login.footerLabel')}
+        actionLabel={t('auth.login.footerAction')}
+        onPress={() => router.replace('/(auth)/register')}
       />
     </AuthLayout>
   );

@@ -21,6 +21,10 @@ const DEFAULT_APP_PREFERENCES: StoredAppPreferences = {
 
 let memoryPreferences: StoredAppPreferences = { ...DEFAULT_APP_PREFERENCES };
 
+export function getStoredAppPreferencesSnapshot() {
+  return memoryPreferences;
+}
+
 function normalizePreferences(value: unknown): StoredAppPreferences {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { ...DEFAULT_APP_PREFERENCES };

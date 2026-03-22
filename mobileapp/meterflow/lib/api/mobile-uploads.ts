@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { fetchMobileAuthResponse } from '@/lib/api/mobile-client';
+import { translateCurrentApp } from '@/lib/i18n/runtime';
 
 type DirectUploadResponse = {
   message: string;
@@ -39,7 +40,7 @@ export async function uploadReadingPhoto(
   const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
 
   if (!fileInfo.exists) {
-    throw new Error('Photo introuvable sur l’appareil.');
+    throw new Error(translateCurrentApp('upload.error.photoMissingOnDevice'));
   }
 
   const mimeType = guessMimeType(uri);
@@ -47,7 +48,7 @@ export async function uploadReadingPhoto(
     typeof fileInfo.size === 'number' && Number.isFinite(fileInfo.size) ? fileInfo.size : 0;
 
   if (typeof options?.maxSizeBytes === 'number' && sizeBytes > options.maxSizeBytes) {
-    throw new Error('La photo est trop volumineuse. Reprenez une image plus légère.');
+    throw new Error(translateCurrentApp('upload.error.photoTooLarge'));
   }
 
   const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
@@ -74,7 +75,7 @@ export async function uploadReadingPhoto(
 
     const payload = (await response.json().catch(() => null)) as DirectUploadResponse | null;
     if (!payload?.file) {
-      throw new Error('Réponse upload invalide.');
+      throw new Error(translateCurrentApp('upload.error.invalidResponse'));
     }
 
     console.log('[uploadReadingPhoto] backend_upload_success', {
