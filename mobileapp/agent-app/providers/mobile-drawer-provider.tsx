@@ -184,7 +184,7 @@ export function MobileDrawerProvider({ children }: PropsWithChildren) {
                 </View>
 
                 <View style={styles.profileBlock}>
-                  <Text style={[styles.profileName, { color: palette.headline }]}>AgentFlow</Text>
+                  <Text style={[styles.profileName, { color: palette.headline }]}>E2C Agent</Text>
                   <Text style={[styles.profileMeta, { color: palette.muted }]}>{t('drawer.agentRole')}</Text>
                 </View>
               </View>

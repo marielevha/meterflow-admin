@@ -77,7 +77,7 @@ export function AuthLayout({ title, subtitle, showBack = false, children }: Auth
                     accentColor={palette.accent}
                   />
                 </View>
-                <Text style={[styles.brand, { color: palette.headline, fontSize: brandSize }]}>AgentFlow</Text>
+                <Text style={[styles.brand, { color: palette.headline, fontSize: brandSize }]}>E2C Agent</Text>
               </View>
             </View>
 

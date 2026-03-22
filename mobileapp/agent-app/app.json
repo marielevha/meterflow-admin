@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "agent-app",
+    "name": "E2C Agent",
     "slug": "agent-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -30,13 +30,13 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "AgentFlow a besoin d'acceder a votre position pour joindre les coordonnees GPS a l'intervention."
+          "locationWhenInUsePermission": "E2C Agent a besoin d'acceder a votre position pour joindre les coordonnees GPS a l'intervention."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "AgentFlow a besoin d'acceder a la camera pour capturer une preuve terrain."
+          "cameraPermission": "E2C Agent a besoin d'acceder a la camera pour capturer une preuve terrain."
         }
       ],
       [

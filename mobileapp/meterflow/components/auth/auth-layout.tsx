@@ -86,7 +86,7 @@ export function AuthLayout({
                   />
                 </View>
                 <Text style={[styles.brand, { color: palette.headline, fontSize: brandSize }]}>
-                  MeterFlow
+                  E2C Client
                 </Text>
               </View>
             </View>

@@ -859,6 +859,35 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - notifications lues / non lues
   - utile pour tester sans reconstruire tout le workflow a la main
 
+### 27) Rebranding des surfaces utilisateur
+
+- Nommage produit harmonise autour de `E2C`:
+  - app client: `E2C Client`
+  - app agent: `E2C Agent`
+  - backoffice web: `E2C Admin`
+
+- App client:
+  - nom affiche Expo mis a jour dans `mobileapp/meterflow/app.json`
+  - branding auth et page `A propos` ajustes sur `E2C Client`
+  - textes de permissions natives (camera, photos, localisation) renommes
+
+- App agent:
+  - nom affiche Expo mis a jour dans `mobileapp/agent-app/app.json`
+  - branding auth, drawer et page `A propos` ajustes sur `E2C Agent`
+  - dictionnaires i18n alignes sur cette nouvelle marque
+  - textes de permissions natives renommes
+
+- Admin web:
+  - metadata globale et ecran de connexion renommes en `E2C Admin`
+
+- Choix volontaire:
+  - les identifiants techniques restent stables pour l'instant:
+    - `slug`
+    - `scheme`
+    - `package` Android
+    - cles de stockage locales
+  - le renommage vise d'abord les surfaces visibles et la communication produit
+
 - Finition UX agent:
   - page `A propos` ajoutee a l'app agent
   - simplification des ecrans de permissions camera / localisation

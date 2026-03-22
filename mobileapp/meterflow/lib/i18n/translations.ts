@@ -240,7 +240,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'profile.updatedAt': 'Derniere mise a jour',
 
     'about.subtitle': 'Informations produit',
-    'about.appName': 'MeterFlow Mobile',
+    'about.appName': 'E2C Client',
     'about.appDescription':
       "L'application client pour l'auto-releve, le suivi des compteurs et les notifications liees a votre consommation.",
     'about.whatItDoes': "Ce que permet l'application",
@@ -261,8 +261,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.mainFunctionValue': 'Auto-releve de compteur',
     'about.whyTitle': 'Pourquoi cette application',
     'about.whyText':
-      "MeterFlow Mobile a ete concue pour rendre la remontee des releves plus simple, plus rapide et plus tracable. L'objectif est de permettre aux clients de transmettre un releve fiable, tout en ameliorant le suivi centralise et la transparence du processus.",
-    'about.footer': '© 2026 MeterFlow. Propulse par E2C.',
+      "E2C Client a ete concue pour rendre la remontee des releves plus simple, plus rapide et plus tracable. L'objectif est de permettre aux clients de transmettre un releve fiable, tout en ameliorant le suivi centralise et la transparence du processus.",
+    'about.footer': '© 2026 E2C Client.',
 
     'meters.subtitle': 'Vue liste',
     'meters.unavailableTitle': 'Compteurs indisponibles',
@@ -767,7 +767,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'profile.updatedAt': 'Last updated',
 
     'about.subtitle': 'Product information',
-    'about.appName': 'MeterFlow Mobile',
+    'about.appName': 'E2C Client',
     'about.appDescription':
       'The client app for self-meter reading, meter tracking and notifications related to your consumption.',
     'about.whatItDoes': 'What the app lets you do',
@@ -788,8 +788,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.mainFunctionValue': 'Self meter reading',
     'about.whyTitle': 'Why this app',
     'about.whyText':
-      'MeterFlow Mobile was designed to make reading submission simpler, faster and more traceable. The goal is to let customers submit a reliable reading while improving centralized tracking and process transparency.',
-    'about.footer': '© 2026 MeterFlow. Powered by E2C.',
+      'E2C Client was designed to make reading submission simpler, faster and more traceable. The goal is to let customers submit a reliable reading while improving centralized tracking and process transparency.',
+    'about.footer': '© 2026 E2C Client.',
 
     'meters.subtitle': 'List view',
     'meters.unavailableTitle': 'Meters unavailable',
@@ -1297,7 +1297,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'profile.updatedAt': 'Mbongwana ya suka',
 
     'about.subtitle': 'Ba sango ya produit',
-    'about.appName': 'MeterFlow Mobile',
+    'about.appName': 'E2C Client',
     'about.appDescription':
       'Application ya klienti mpo na auto-releve, kolanda ba metre mpe biyebisi oyo etali bosaleli na yo.',
     'about.whatItDoes': 'Makambo oyo app ekoki kosala',
@@ -1318,8 +1318,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.mainFunctionValue': 'Auto-releve ya metre',
     'about.whyTitle': 'Mpo na nini app oyo',
     'about.whyText':
-      'MeterFlow Mobile esalemaki mpo ete kotinda releve ezala pete, mbangu mpe ezali trace. Mokano ezali kopesa ba klienti nzela ya kotinda releve ya malamu mpe kobongisa suivi centralise ya mosala nyonso.',
-    'about.footer': '© 2026 MeterFlow. E2C nde ezali kotambwisa yango.',
+      'E2C Client esalemaki mpo ete kotinda releve ezala pete, mbangu mpe ezali trace. Mokano ezali kopesa ba klienti nzela ya kotinda releve ya malamu mpe kobongisa suivi centralise ya mosala nyonso.',
+    'about.footer': '© 2026 E2C Client.',
 
     'meters.subtitle': 'Liste',
     'meters.unavailableTitle': 'Ba metre ezwami te',
