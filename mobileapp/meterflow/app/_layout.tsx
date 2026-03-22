@@ -11,7 +11,6 @@ import { MobilePushProvider } from '@/providers/mobile-push-provider';
 import { AppThemeProvider, useAppTheme } from '@/providers/app-theme-provider';
 
 export default function RootLayout() {
-  console.log('API BASE URL CUSTOMER=', process.env.EXPO_PUBLIC_API_BASE_URL);
   return (
     <AppThemeProvider>
       <MobilePreferencesProvider>
