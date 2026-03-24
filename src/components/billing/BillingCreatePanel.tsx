@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import Button from "@/components/ui/button/Button";
 
 type BillingCreatePanelProps = {
@@ -22,10 +23,11 @@ export default function BillingCreatePanel({
   closedDescription,
   openLabel,
   closeLabel,
-  visibleBadgeLabel = "Form visible",
-  hiddenBadgeLabel = "Form hidden",
+  visibleBadgeLabel,
+  hiddenBadgeLabel,
   children,
 }: BillingCreatePanelProps) {
+  const { t } = useAdminI18n();
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
@@ -42,11 +44,11 @@ export default function BillingCreatePanel({
           <div className="flex shrink-0 items-center gap-3">
             {isOpen ? (
               <span className="rounded-full bg-success-50 px-3 py-1 text-xs font-medium text-success-700 dark:bg-success-500/10 dark:text-success-300">
-                {visibleBadgeLabel}
+                {visibleBadgeLabel || t("billing.createPanelVisible")}
               </span>
             ) : (
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-white/[0.05] dark:text-gray-300">
-                {hiddenBadgeLabel}
+                {hiddenBadgeLabel || t("billing.createPanelHidden")}
               </span>
             )}
 

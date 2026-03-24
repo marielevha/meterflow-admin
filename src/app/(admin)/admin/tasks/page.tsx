@@ -226,7 +226,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
       <div>
         <PageBreadcrumb pageTitle={t("tasks.pageTitle")} />
         <ComponentCard title={t("tasks.pageTitle")} desc={t("tasks.queueDesc")}>
-          <p className="text-sm text-error-600 dark:text-error-400">invalid_tasks_pagination</p>
+          <p className="text-sm text-error-600 dark:text-error-400">{t("tasks.errorInvalidPagination")}</p>
         </ComponentCard>
       </div>
     );

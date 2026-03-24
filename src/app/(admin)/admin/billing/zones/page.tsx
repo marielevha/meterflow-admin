@@ -5,6 +5,7 @@ import BillingCreatePanel from "@/components/billing/BillingCreatePanel";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createZoneAction } from "@/app/(admin)/admin/billing/actions";
@@ -22,6 +23,7 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingZonesPage({ searchParams }: { searchParams: SearchParams }) {
+  const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
@@ -60,7 +62,7 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
     const errorState = getBillingPageErrorState(error, "billing.zones");
     return (
       <div>
-        <PageBreadcrumb pageTitle="Billing zones" />
+        <PageBreadcrumb pageTitle={t("billing.zonesPageTitle")} />
         <BillingSchemaNotice {...errorState} />
       </div>
     );
@@ -68,47 +70,47 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Billing zones" />
+      <PageBreadcrumb pageTitle={t("billing.zonesPageTitle")} />
 
       {error ? (
         <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
-          Error: {error}
+          {t("common.error")}: {error}
         </div>
       ) : null}
       {success ? (
         <div className="mb-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
-          Success: {success}
+          {t("common.success")}: {success}
         </div>
       ) : null}
 
       <div className="space-y-6">
         <BillingCreatePanel
           defaultOpen={Boolean(error)}
-          title="Zone creation form"
-          openDescription="The form is open. You can register a new service zone, then continue reviewing coverage just below."
-          closedDescription="The form is hidden by default to keep the zones table easier to scan. Open it only when you need to add a new zone."
-          openLabel="New zone"
-          closeLabel="Hide form"
+          title={t("billing.zoneCreatePanelTitle")}
+          openDescription={t("billing.zoneCreateOpenDescription")}
+          closedDescription={t("billing.zoneCreateClosedDescription")}
+          openLabel={t("billing.newZone")}
+          closeLabel={t("billing.hideForm")}
         >
           <ComponentCard
-            title="Create zone"
-            desc="Register operational service zones used by meters, tariffs and campaigns."
+            title={t("billing.createZone")}
+            desc={t("billing.zonesCardDescription")}
           >
             <form action={createZoneAction} className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <Field label="Code">
+                <Field label={t("billing.codeLabel")}>
                   <Input name="code" placeholder="CG-BZV-BCG" required />
                 </Field>
-                <Field label="Zone name">
+                <Field label={t("billing.zoneName")}>
                   <Input name="name" placeholder="Bacongo" required />
                 </Field>
-                <Field label="City">
+                <Field label={t("billing.cityName")}>
                   <select
                     name="cityId"
                     className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                     required
                   >
-                    <option value="">Choose city</option>
+                    <option value="">{t("billing.chooseCity")}</option>
                     {cities.map((city) => (
                       <option key={city.id} value={city.id}>
                         {city.name}
@@ -122,33 +124,33 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
                 type="submit"
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
               >
-                Create zone
+                {t("billing.createZone")}
               </button>
             </form>
           </ComponentCard>
         </BillingCreatePanel>
 
         <ComponentCard
-          title="Zones"
-          desc="Coverage summary for billing operations."
+          title={t("billing.zonesCardTitle")}
+          desc={t("billing.zonesCardDesc")}
         >
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
               <Table className="table-fixed">
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
-                    <TableCell isHeader className="w-[28%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Zone</TableCell>
-                    <TableCell isHeader className="w-[28%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">City</TableCell>
-                    <TableCell isHeader className="w-[11%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meters</TableCell>
-                    <TableCell isHeader className="w-[11%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Tariffs</TableCell>
-                    <TableCell isHeader className="w-[12%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Campaigns</TableCell>
-                    <TableCell isHeader className="w-[10%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</TableCell>
+                    <TableCell isHeader className="w-[28%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.zoneName")}</TableCell>
+                    <TableCell isHeader className="w-[28%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.cityName")}</TableCell>
+                    <TableCell isHeader className="w-[11%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.metersCount")}</TableCell>
+                    <TableCell isHeader className="w-[11%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.tariffsCount")}</TableCell>
+                    <TableCell isHeader className="w-[12%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.statCampaigns")}</TableCell>
+                    <TableCell isHeader className="w-[10%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.status")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                   {zones.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No zones yet.
+                        {t("billing.noZonesYet")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -160,13 +162,13 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <p className="break-words">{zone.city.name}</p>
-                          <p className="break-words text-xs text-gray-500 dark:text-gray-400">{zone.city.region || "No region"}</p>
+                          <p className="break-words text-xs text-gray-500 dark:text-gray-400">{zone.city.region || t("billing.noRegion")}</p>
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{zone._count.meters}</TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{zone._count.tariffPlans}</TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{zone._count.campaignAssignments}</TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          {zone.isActive ? "Active" : "Inactive"}
+                          {zone.isActive ? t("billing.active") : t("billing.inactive")}
                         </TableCell>
                       </TableRow>
                     ))

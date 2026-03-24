@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CloseLineIcon } from "@/icons";
+import { translateReadingEventType } from "@/lib/admin-i18n/labels";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 type ReadingEventsFiltersProps = {
   initialEvQ: string;
@@ -27,6 +29,7 @@ export default function ReadingEventsFilters({
   eventTypeOptions,
   pageSizeOptions,
 }: ReadingEventsFiltersProps) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const pathname = usePathname();
   const isFirstRender = useRef(true);
@@ -80,7 +83,7 @@ export default function ReadingEventsFilters({
           type="text"
           value={evQ}
           onChange={(event) => setEvQ(event.target.value)}
-          placeholder="Search by meter serial, actor or phone"
+          placeholder={t("history.searchEventPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -95,10 +98,10 @@ export default function ReadingEventsFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All events</option>
+          <option value="">{t("history.allEvents")}</option>
           {eventTypeOptions.map((eventType) => (
             <option key={eventType} value={eventType}>
-              {eventType}
+              {translateReadingEventType(eventType, t)}
             </option>
           ))}
         </select>
@@ -116,7 +119,7 @@ export default function ReadingEventsFilters({
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
-              {size} / page
+              {size} {t("history.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -125,8 +128,8 @@ export default function ReadingEventsFilters({
       <div className="lg:col-span-1 flex justify-end">
         <button
           type="button"
-          title="Reset events filters"
-          aria-label="Reset events filters"
+          title={t("history.resetEventFilters")}
+          aria-label={t("history.resetEventFilters")}
           onClick={() => {
             const defaultSize = String(pageSizeOptions[0] ?? 10);
             setEvQ("");

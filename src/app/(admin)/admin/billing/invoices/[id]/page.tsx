@@ -4,6 +4,12 @@ import { DeliveryChannel, PaymentMethod } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
+import {
+  translateDeliveryChannel,
+  translateInvoiceStatus,
+  translatePaymentMethod,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { getInvoiceDetail } from "@/lib/backoffice/billing";
 import {
@@ -30,6 +36,7 @@ export default async function BillingInvoiceDetailPage({
   params: Promise<{ id: string }>;
   searchParams: SearchParams;
 }) {
+  const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearch = await searchParams;
   const error = firstValue(resolvedSearch.error);
@@ -42,7 +49,7 @@ export default async function BillingInvoiceDetailPage({
     const errorState = getBillingPageErrorState(error, "billing.invoice_detail");
     return (
       <div>
-        <PageBreadcrumb pageTitle="Invoice detail" />
+        <PageBreadcrumb pageTitle={t("billing.invoiceDetailPageTitle")} />
         <BillingSchemaNotice {...errorState} />
       </div>
     );
@@ -50,9 +57,9 @@ export default async function BillingInvoiceDetailPage({
   if (result.status !== 200) {
     return (
       <div>
-        <PageBreadcrumb pageTitle="Invoice detail" />
+        <PageBreadcrumb pageTitle={t("billing.invoiceDetailPageTitle")} />
         <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
-          Invoice not found.
+          {t("billing.invoiceNotFound")}
         </div>
       </div>
     );
@@ -66,46 +73,52 @@ export default async function BillingInvoiceDetailPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Invoice detail" />
+      <PageBreadcrumb pageTitle={t("billing.invoiceDetailPageTitle")} />
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">Error: {error}</div>
+        <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">{t("common.error")}: {error}</div>
       ) : null}
       {success ? (
-        <div className="mb-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">Success: {success}</div>
+        <div className="mb-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">{t("common.success")}: {success}</div>
       ) : null}
 
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">{invoice.invoiceNumber}</h2>
-        <Link href="/admin/billing/invoices" className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">Back</Link>
+        <Link href="/admin/billing/invoices" className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">{t("billing.backToInvoices")}</Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8 space-y-6">
-          <ComponentCard title="Invoice summary" desc="Customer, meter and billing period.">
+          <ComponentCard title={t("billing.invoiceSummaryTitle")} desc={t("billing.invoiceSummaryDesc")}>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="Customer" value={customer} />
-              <Field label="Phone" value={invoice.customer.phone} />
-              <Field label="Meter" value={invoice.meter.serialNumber} />
-              <Field label="Location" value={`${invoice.meter.city || "-"} / ${invoice.meter.zone || "-"}`} />
-              <Field label="Status" value={invoice.status} />
-              <Field label="Campaign" value={invoice.campaign?.code || "N/A"} />
-              <Field label="Period" value={`${invoice.periodStart.toISOString().slice(0, 10)} → ${invoice.periodEnd.toISOString().slice(0, 10)}`} />
-              <Field label="Due date" value={invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : "N/A"} />
-              <Field label="From index (N-1)" value={invoice.fromPrimaryIndex?.toString() || "N/A"} />
-              <Field label="To index (N)" value={invoice.toPrimaryIndex?.toString() || "N/A"} />
-              <Field label="Total" value={`${invoice.totalAmount.toString()} ${invoice.currency}`} />
-              <Field label="Paid" value={`${invoice.paidAmount.toString()} ${invoice.currency}`} />
+              <Field label={t("billing.customerColumn")} value={customer} />
+              <Field label={t("billing.phoneLabel")} value={invoice.customer.phone} />
+              <Field label={t("billing.meterColumn")} value={invoice.meter.serialNumber} />
+              <Field label={t("billing.locationLabel")} value={`${invoice.meter.city || "-"} / ${invoice.meter.zone || "-"}`} />
+              <Field label={t("common.status")} value={translateInvoiceStatus(invoice.status, t)} />
+              <Field label={t("billing.campaignLabel")} value={invoice.campaign?.code || t("billing.notAvailableShort")} />
+              <Field label={t("billing.periodColumnShort")} value={`${invoice.periodStart.toISOString().slice(0, 10)} → ${invoice.periodEnd.toISOString().slice(0, 10)}`} />
+              <Field label={t("billing.dueLabel")} value={invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : t("billing.notAvailableShort")} />
+              <Field label={t("billing.fromIndex")} value={invoice.fromPrimaryIndex?.toString() || t("billing.notAvailableShort")} />
+              <Field label={t("billing.toIndex")} value={invoice.toPrimaryIndex?.toString() || t("billing.notAvailableShort")} />
+              <Field label={t("billing.totalLabel")} value={`${invoice.totalAmount.toString()} ${invoice.currency}`} />
+              <Field label={t("billing.paidLabel")} value={`${invoice.paidAmount.toString()} ${invoice.currency}`} />
             </div>
           </ComponentCard>
 
-          <ComponentCard title="Invoice lines" desc="Computed pricing lines.">
+          <ComponentCard title={t("billing.invoiceLinesTitle")} desc={t("billing.invoiceLinesDesc")}>
             <div className="space-y-2">
               {invoice.lines.map((line: any) => (
                 <div key={line.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
                   <div>
                     <p className="font-medium text-gray-800 dark:text-white/90">{line.label}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{line.type} | QTY {line.quantity.toString()} × {line.unitPrice.toString()}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t("billing.quantityTimesUnitPrice", {
+                        type: line.label,
+                        quantity: line.quantity.toString(),
+                        unitPrice: line.unitPrice.toString(),
+                      })}
+                    </p>
                   </div>
                   <p className="font-semibold text-gray-800 dark:text-white/90">{line.amount.toString()}</p>
                 </div>
@@ -113,7 +126,7 @@ export default async function BillingInvoiceDetailPage({
             </div>
           </ComponentCard>
 
-          <ComponentCard title="Timeline" desc="Invoice events, payments and deliveries.">
+          <ComponentCard title={t("billing.timelineTitle")} desc={t("billing.timelineDesc")}>
             <div className="space-y-2">
               {invoice.events.map((event: any) => (
                 <div key={event.id} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
@@ -126,39 +139,39 @@ export default async function BillingInvoiceDetailPage({
         </div>
 
         <div className="xl:col-span-4 space-y-6">
-          <ComponentCard title="Register payment" desc="Add a payment record.">
+          <ComponentCard title={t("billing.registerPaymentTitle")} desc={t("billing.registerPaymentDesc")}>
             <form action={registerInvoicePaymentAction} className="space-y-3">
               <input type="hidden" name="invoiceId" value={invoice.id} />
-              <Input name="amount" type="number" step="0.01" placeholder="Amount" required />
+              <Input name="amount" type="number" step="0.01" placeholder={t("billing.amountPlaceholder")} required />
               <select name="method" className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                 {Object.values(PaymentMethod).map((method) => (
-                  <option key={method} value={method}>{method}</option>
+                  <option key={method} value={method}>{translatePaymentMethod(method, t)}</option>
                 ))}
               </select>
-              <Input name="reference" placeholder="Reference" />
+              <Input name="reference" placeholder={t("billing.referencePlaceholder")} />
               <Input name="paidAt" type="datetime-local" />
-              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Add payment</button>
+              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">{t("billing.addPayment")}</button>
             </form>
           </ComponentCard>
 
-          <ComponentCard title="Record delivery" desc="Track invoice distribution.">
+          <ComponentCard title={t("billing.recordDeliveryTitle")} desc={t("billing.recordDeliveryDesc")}>
             <form action={triggerInvoiceDeliveryAction} className="space-y-3">
               <input type="hidden" name="invoiceId" value={invoice.id} />
               <select name="channel" className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                 {Object.values(DeliveryChannel).map((channel) => (
-                  <option key={channel} value={channel}>{channel}</option>
+                  <option key={channel} value={channel}>{translateDeliveryChannel(channel, t)}</option>
                 ))}
               </select>
-              <Input name="recipient" placeholder="Recipient (phone/email)" />
-              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">Record delivery</button>
+              <Input name="recipient" placeholder={t("billing.recipientPlaceholder")} />
+              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">{t("billing.recordDelivery")}</button>
             </form>
           </ComponentCard>
 
-          <ComponentCard title="Quick stats" desc="Instant operational values.">
+          <ComponentCard title={t("billing.quickStatsTitle")} desc={t("billing.quickStatsDesc")}>
             <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <p>Payments: {invoice.payments.length}</p>
-              <p>Deliveries: {invoice.deliveries.length}</p>
-              <p>Events: {invoice.events.length}</p>
+              <p>{t("billing.paymentCount", { count: invoice.payments.length })}</p>
+              <p>{t("billing.deliveryCount", { count: invoice.deliveries.length })}</p>
+              <p>{t("billing.eventCount", { count: invoice.events.length })}</p>
             </div>
           </ComponentCard>
         </div>

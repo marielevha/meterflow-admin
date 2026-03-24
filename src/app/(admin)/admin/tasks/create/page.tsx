@@ -6,6 +6,13 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import SearchableSelect from "@/components/form/SearchableSelect";
+import {
+  translateReadingStatus,
+  translateTaskPriority,
+  translateTaskStatus,
+  translateTaskType,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import { prisma } from "@/lib/prisma";
 import { createTaskAction } from "./actions";
@@ -26,18 +33,19 @@ function normalizeEnum<T extends string>(value: string, options: readonly T[], f
   return (options as readonly string[]).includes(value) ? (value as T) : fallback;
 }
 
-function mapError(code: string) {
-  if (code === "insufficient_role") return "Only supervisor/admin can create manual tasks.";
-  if (code === "title_required") return "Title is required.";
-  if (code === "meter_or_reading_required") return "Select a meter or a reading.";
-  if (code === "assigned_agent_not_found") return "Selected assignee is invalid.";
-  if (code === "meter_not_found") return "Selected meter not found.";
-  if (code === "reading_not_found") return "Selected reading not found.";
-  if (code === "meter_reading_mismatch") return "Reading and meter do not match.";
-  return code ? "Unable to create task." : "";
+function mapError(code: string, t: (key: string) => string) {
+  if (code === "insufficient_role") return t("tasks.errorInsufficientCreateRole");
+  if (code === "title_required") return t("tasks.errorTitleRequired");
+  if (code === "meter_or_reading_required") return t("tasks.errorMeterOrReadingRequired");
+  if (code === "assigned_agent_not_found") return t("tasks.errorAssignedAgentNotFound");
+  if (code === "meter_not_found") return t("tasks.errorMeterNotFound");
+  if (code === "reading_not_found") return t("tasks.errorReadingNotFound");
+  if (code === "meter_reading_mismatch") return t("tasks.errorMeterReadingMismatch");
+  return code ? t("tasks.errorUpdateFailed") : "";
 }
 
 export default async function CreateTaskPage({ searchParams }: { searchParams: SearchParams }) {
+  const { t } = await getAdminTranslator();
   const staff = await getCurrentStaffFromServerAction();
   if (!staff) redirect("/signin");
 
@@ -94,11 +102,11 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
     }),
   ]);
 
-  const errorMessage = mapError(errorCode);
+  const errorMessage = mapError(errorCode, t);
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Create task" />
+      <PageBreadcrumb pageTitle={t("tasks.createPageTitle")} />
 
       <form action={createTaskAction} className="space-y-6">
         {errorMessage ? (
@@ -108,45 +116,45 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
         ) : null}
         {prefillReadingId ? (
           <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
-            Task prefilled from reading <span className="font-semibold">{prefillReadingId.slice(0, 8)}</span>.
+            {t("tasks.prefilledFromReading", { id: prefillReadingId.slice(0, 8) })}
           </div>
         ) : null}
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <QuickInfo label="Available meters" value={meters.length} />
-          <QuickInfo label="Recent readings" value={readings.length} />
-          <QuickInfo label="Active agents" value={agents.length} />
+          <QuickInfo label={t("tasks.availableMeters")} value={meters.length} />
+          <QuickInfo label={t("tasks.recentReadingsCount")} value={readings.length} />
+          <QuickInfo label={t("tasks.activeAgentsCount")} value={agents.length} />
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-6">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">1) Core details</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.coreDetailsTitle")}</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Start with a clear title and context for supervisors and field agents.
+              {t("tasks.coreDetailsDesc")}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="title">Title *</Label>
+              <Label htmlFor="title">{t("common.title")} *</Label>
               <Input
                 id="title"
                 name="title"
                 defaultValue={prefillTitle}
-                placeholder="Ex: Field recheck after suspicious GPS"
+                placeholder={t("tasks.titlePlaceholder")}
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Use an action-oriented title.</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("tasks.titleHint")}</p>
             </div>
 
             <div className="md:col-span-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("common.description")}</Label>
               <textarea
                 id="description"
                 name="description"
                 rows={4}
                 defaultValue={prefillDescription}
                 className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                placeholder="Operational context, expected checks, evidence required..."
+                placeholder={t("tasks.descriptionPlaceholder")}
               />
             </div>
           </div>
@@ -154,21 +162,21 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-6">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">2) Scope & linkage</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.scopeLinkageTitle")}</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Link this task to a meter or a reading. At least one is required.
+              {t("tasks.scopeLinkageDesc")}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="meterId">Meter</Label>
+              <Label htmlFor="meterId">{t("common.meter")}</Label>
               <SearchableSelect
                 id="meterId"
                 name="meterId"
                 defaultValue={prefillMeterId}
-                emptyLabel="None"
-                placeholder="Search meter by serial/reference"
+                emptyLabel={t("common.notAvailable")}
+                placeholder={t("tasks.meterSearchPlaceholder")}
                 options={meters.map((meter) => ({
                   value: meter.id,
                   label: meter.serialNumber,
@@ -176,26 +184,26 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
                 }))}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Recommended when the task is mainly a field operation.
+                {t("tasks.meterLinkHint")}
               </p>
             </div>
 
             <div>
-              <Label htmlFor="readingId">Reading</Label>
+              <Label htmlFor="readingId">{t("history.reading")}</Label>
               <SearchableSelect
                 id="readingId"
                 name="readingId"
                 defaultValue={prefillReadingId}
-                emptyLabel="None"
-                placeholder="Search reading"
+                emptyLabel={t("common.notAvailable")}
+                placeholder={t("tasks.readingSearchPlaceholder")}
                 options={readings.map((reading) => ({
                   value: reading.id,
-                  label: `${reading.meter.serialNumber} • ${reading.status}`,
+                  label: `${reading.meter.serialNumber} • ${translateReadingStatus(reading.status, t)}`,
                   hint: reading.readingAt.toISOString().slice(0, 16).replace("T", " "),
                 }))}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Use this when task originates from a suspicious or rejected reading.
+                {t("tasks.readingLinkHint")}
               </p>
             </div>
           </div>
@@ -203,36 +211,36 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-6">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">3) Execution setup</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.executionSetupTitle")}</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Configure ownership, urgency and lifecycle state.
+              {t("tasks.executionSetupDesc")}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="assignedToId">Assigned agent</Label>
+              <Label htmlFor="assignedToId">{t("tasks.tableAssignee")}</Label>
               <SearchableSelect
                 id="assignedToId"
                 name="assignedToId"
                 defaultValue={prefillAssignedToId}
-                emptyLabel="Unassigned"
-                placeholder="Search agent"
+                emptyLabel={t("tasks.unassigned")}
+                placeholder={t("meters.searchAgentPlaceholder")}
                 options={agents.map((agent) => ({
                   value: agent.id,
-                  label: [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim() || "Agent",
+                  label: [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim() || t("users.roleAgent"),
                   hint: agent.phone,
                 }))}
               />
             </div>
 
             <div>
-              <Label htmlFor="dueAt">Due date</Label>
+              <Label htmlFor="dueAt">{t("tasks.dueAt")}</Label>
               <Input id="dueAt" name="dueAt" type="datetime-local" defaultValue={prefillDueAt} />
             </div>
 
             <div>
-              <Label htmlFor="type">Type</Label>
+              <Label htmlFor="type">{t("common.type")}</Label>
               <select
                 id="type"
                 name="type"
@@ -240,13 +248,13 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
                 {Object.values(TaskType).map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>{translateTaskType(item, t)}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <Label htmlFor="priority">Priority</Label>
+              <Label htmlFor="priority">{t("common.priority")}</Label>
               <select
                 id="priority"
                 name="priority"
@@ -254,13 +262,13 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
                 {Object.values(TaskPriority).map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>{translateTaskPriority(item, t)}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <Label htmlFor="status">Initial status</Label>
+              <Label htmlFor="status">{t("tasks.initialStatus")}</Label>
               <select
                 id="status"
                 name="status"
@@ -268,7 +276,7 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
                 {Object.values(TaskStatus).map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>{translateTaskStatus(item, t)}</option>
                 ))}
               </select>
             </div>
@@ -278,11 +286,11 @@ export default async function CreateTaskPage({ searchParams }: { searchParams: S
         <div className="sticky bottom-4 z-30 rounded-xl border border-gray-200 bg-white/90 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Tip: set a due date and assign an agent to reduce backlog.
+              {t("tasks.createTip")}
             </p>
             <div className="flex items-center justify-end gap-2">
-              <Link href="/admin/tasks" className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">Cancel</Link>
-              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Create task</button>
+              <Link href="/admin/tasks" className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">{t("common.cancel")}</Link>
+              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">{t("tasks.createTask")}</button>
             </div>
           </div>
         </div>

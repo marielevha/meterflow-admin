@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 type ConsumptionFiltersProps = {
   initialQ: string;
@@ -18,6 +19,7 @@ export default function ConsumptionFilters({
   cityOptions,
   zoneOptions,
 }: ConsumptionFiltersProps) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -73,7 +75,7 @@ export default function ConsumptionFilters({
           type="text"
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="Search by serial, reference, customer phone/name"
+          placeholder={t("consumption.searchPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -87,7 +89,7 @@ export default function ConsumptionFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All cities</option>
+          <option value="">{t("consumption.allCities")}</option>
           {cityOptions.map((item) => (
             <option key={item} value={item}>
               {item}
@@ -105,7 +107,7 @@ export default function ConsumptionFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All zones</option>
+          <option value="">{t("consumption.allZones")}</option>
           {zoneOptions.map((item) => (
             <option key={item} value={item}>
               {item}
@@ -122,8 +124,8 @@ export default function ConsumptionFilters({
             setZone("");
             router.replace(pathname, { scroll: false });
           }}
-          aria-label="Reset filters"
-          title="Reset filters"
+          aria-label={t("consumption.resetFilters")}
+          title={t("consumption.resetFilters")}
           className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
         >
           <svg

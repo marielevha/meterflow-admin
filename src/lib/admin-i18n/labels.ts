@@ -1,6 +1,10 @@
 import {
+  BillingCampaignStatus,
+  DeliveryChannel,
+  InvoiceStatus,
   MeterStatus,
   MeterType,
+  PaymentMethod,
   ReadingEventType,
   ReadingStatus,
   TaskEventType,
@@ -8,6 +12,7 @@ import {
   TaskPriority,
   TaskStatus,
   TaskType,
+  TariffBillingMode,
   UserRole,
   UserStatus,
 } from "@prisma/client";
@@ -134,6 +139,108 @@ export function translateReadingSource(value: string | null | undefined, t: Tran
   if (value === "AGENT") return t("readings.sourceAgent");
   if (value === "IMPORT") return t("readings.sourceImport");
   return value || t("common.notAvailable");
+}
+
+export function translateTariffBillingMode(mode: TariffBillingMode | string, t: Translator) {
+  if (mode === TariffBillingMode.TIME_OF_USE || mode === "TIME_OF_USE") return t("billing.timeOfUse");
+  return t("billing.singleRate");
+}
+
+export function translateBillingCampaignStatus(status: BillingCampaignStatus | string, t: Translator) {
+  switch (status) {
+    case BillingCampaignStatus.DRAFT:
+    case "DRAFT":
+      return t("billing.campaignStatusDraft");
+    case BillingCampaignStatus.READY:
+    case "READY":
+      return t("billing.campaignStatusReady");
+    case BillingCampaignStatus.RUNNING:
+    case "RUNNING":
+      return t("billing.campaignStatusRunning");
+    case BillingCampaignStatus.GENERATED:
+    case "GENERATED":
+      return t("billing.campaignStatusGenerated");
+    case BillingCampaignStatus.ISSUED:
+    case "ISSUED":
+      return t("billing.campaignStatusIssued");
+    case BillingCampaignStatus.CLOSED:
+    case "CLOSED":
+      return t("billing.campaignStatusClosed");
+    case BillingCampaignStatus.CANCELED:
+    case "CANCELED":
+      return t("billing.campaignStatusCanceled");
+    default:
+      return String(status);
+  }
+}
+
+export function translateInvoiceStatus(status: InvoiceStatus | string, t: Translator) {
+  switch (status) {
+    case InvoiceStatus.DRAFT:
+    case "DRAFT":
+      return t("billing.statusDraft");
+    case InvoiceStatus.PENDING_REVIEW:
+    case "PENDING_REVIEW":
+      return t("billing.statusPendingReview");
+    case InvoiceStatus.ISSUED:
+    case "ISSUED":
+      return t("billing.statusIssued");
+    case InvoiceStatus.DELIVERED:
+    case "DELIVERED":
+      return t("billing.statusDelivered");
+    case InvoiceStatus.PARTIALLY_PAID:
+    case "PARTIALLY_PAID":
+      return t("billing.statusPartiallyPaid");
+    case InvoiceStatus.PAID:
+    case "PAID":
+      return t("billing.statusPaid");
+    case InvoiceStatus.OVERDUE:
+    case "OVERDUE":
+      return t("billing.statusOverdue");
+    case InvoiceStatus.CANCELED:
+    case "CANCELED":
+      return t("billing.statusCanceled");
+    default:
+      return String(status);
+  }
+}
+
+export function translatePaymentMethod(method: PaymentMethod | string, t: Translator) {
+  switch (method) {
+    case PaymentMethod.CASH:
+    case "CASH":
+      return t("billing.paymentMethodCash");
+    case PaymentMethod.MOBILE_MONEY:
+    case "MOBILE_MONEY":
+      return t("billing.paymentMethodMobileMoney");
+    case PaymentMethod.BANK_TRANSFER:
+    case "BANK_TRANSFER":
+      return t("billing.paymentMethodBankTransfer");
+    case PaymentMethod.CARD:
+    case "CARD":
+      return t("billing.paymentMethodCard");
+    default:
+      return t("billing.paymentMethodOther");
+  }
+}
+
+export function translateDeliveryChannel(channel: DeliveryChannel | string, t: Translator) {
+  switch (channel) {
+    case DeliveryChannel.SMS:
+    case "SMS":
+      return t("billing.deliveryChannelSms");
+    case DeliveryChannel.EMAIL:
+    case "EMAIL":
+      return t("billing.deliveryChannelEmail");
+    case DeliveryChannel.PORTAL:
+    case "PORTAL":
+      return t("billing.deliveryChannelPortal");
+    case DeliveryChannel.PRINT:
+    case "PRINT":
+      return t("billing.deliveryChannelPrint");
+    default:
+      return String(channel);
+  }
 }
 
 export function translateReviewReasonCode(value: string | null | undefined, t: Translator) {

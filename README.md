@@ -849,6 +849,58 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - mode sombre ajuste sur les boutons et elements principaux
   - champ de login simplifie sur l'app agent: `Username`
 
+### 27) Upgrade i18n admin
+
+- Couverture i18n etendue sur les pages backoffice les plus utilisees:
+  - billing:
+    - `/admin/billing`
+    - `/admin/billing/cities`
+    - `/admin/billing/zones`
+    - `/admin/billing/tariffs`
+    - `/admin/billing/campaigns`
+    - `/admin/billing/invoices`
+    - `/admin/billing/invoices/:id`
+  - historique / operations:
+    - `/admin/history`
+    - `/admin/consumption`
+  - creation / edition metier:
+    - `/admin/meters/create`
+    - `/admin/tasks/create`
+    - `/admin/rules-permissions/roles/:id`
+
+- Internationalisation des composants admin partages:
+  - `BillingCreatePanel`
+  - `BillingSchemaNotice`
+  - `TariffPlanStatusSwitch`
+  - filtres `History`
+  - filtres `Consumption`
+
+- Ajout de helpers de traduction pour les enums metier admin:
+  - statuts de factures
+  - statuts de campagnes
+  - modes tarifaires
+  - methodes de paiement
+  - canaux de diffusion
+  - statuts / types / priorites de mission
+  - statuts / evenements de releves
+  - statuts / types de compteurs
+
+- Dictionnaires admin `fr`, `en`, `ln` enrichis pour:
+  - billing
+  - history
+  - consumption
+  - creation de compteurs
+  - creation de missions
+  - permissions d'un role
+  - pages secondaires visibles (`Calendar`, `Profile`, `Blank`)
+
+- Navigation admin alignee sur le nouveau referentiel i18n:
+  - ajout du label `Cities` dans le sidebar localise
+
+- Point restant:
+  - les routes purement showcase du template TailAdmin (`ui-elements`, `forms`, `tables`, `charts`) ne sont pas encore integralement localisees
+  - le backoffice metier, lui, est maintenant largement couvert par le systeme i18n admin
+
 
 ## Overview
 

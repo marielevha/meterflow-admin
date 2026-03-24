@@ -7,6 +7,11 @@ import Badge from "@/components/ui/badge/Badge";
 import MeterStatesFilters from "@/components/history/MeterStatesFilters";
 import ReadingEventsFilters from "@/components/history/ReadingEventsFilters";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  translateReadingEventType,
+  translateReadingStatus,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -34,6 +39,7 @@ export default async function HistoryPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const { t } = await getAdminTranslator();
   const resolved = await searchParams;
 
   const msQ = firstValue(resolved.msQ).trim();
@@ -158,10 +164,10 @@ export default async function HistoryPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="History" />
+      <PageBreadcrumb pageTitle={t("history.pageTitle")} />
 
       <div className="grid grid-cols-1 gap-6">
-        <ComponentCard title="Meter states history" desc="Evolution des index par compteur.">
+        <ComponentCard title={t("history.meterStatesTitle")} desc={t("history.meterStatesDesc")}>
           <MeterStatesFilters
             initialMsQ={msQ}
             initialMsHasSource={msHasSource}
@@ -178,18 +184,18 @@ export default async function HistoryPage({
               <Table>
                 <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                   <TableRow>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Effective at</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meter</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Previous</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Current</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Source reading</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.effectiveAt")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.meter")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.previousValue")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.currentValue")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.sourceReading")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                   {meterStates.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No history found.
+                        {t("history.noHistoryFound")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -210,10 +216,10 @@ export default async function HistoryPage({
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {state.sourceReading ? (
                             <Badge size="sm" color="info">
-                              {state.sourceReading.status}
+                              {translateReadingStatus(state.sourceReading.status, t)}
                             </Badge>
                           ) : (
-                            "N/A"
+                            t("common.notAvailable")
                           )}
                         </TableCell>
                       </TableRow>
@@ -226,8 +232,11 @@ export default async function HistoryPage({
 
           <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {meterStates.length === 0 ? 0 : msSkip + 1} - {Math.min(msSkip + meterStates.length, meterStatesTotal)} of{" "}
-              {meterStatesTotal} states
+              {t("history.statesShowing", {
+                start: meterStates.length === 0 ? 0 : msSkip + 1,
+                end: Math.min(msSkip + meterStates.length, meterStatesTotal),
+                total: meterStatesTotal,
+              })}
             </p>
             <div className="flex items-center gap-2">
               <Link
@@ -239,7 +248,7 @@ export default async function HistoryPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Previous
+                {t("common.previous")}
               </Link>
               {msVisiblePages.map((pageNumber) => (
                 <Link
@@ -263,13 +272,13 @@ export default async function HistoryPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Next
+                {t("common.next")}
               </Link>
             </div>
           </div>
         </ComponentCard>
 
-        <ComponentCard title="Reading events audit trail" desc="Trace complete des actions effectuees sur les releves.">
+        <ComponentCard title={t("history.eventsTitle")} desc={t("history.eventsDesc")}>
           <ReadingEventsFilters
             initialEvQ={evQ}
             initialEvType={evType}
@@ -287,19 +296,19 @@ export default async function HistoryPage({
               <Table>
                 <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                   <TableRow>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Created at</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Reading</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meter</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">User</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Payload</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.createdAt")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.event")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.reading")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.meter")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.user")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("history.payload")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                   {readingEvents.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No events found.
+                        {t("history.noEventsFound")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -307,16 +316,16 @@ export default async function HistoryPage({
                       const actor =
                         [event.user?.firstName, event.user?.lastName].filter(Boolean).join(" ").trim() ||
                         event.user?.phone ||
-                        "System";
+                        t("history.systemActor");
                       return (
                         <TableRow key={event.id}>
                           <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                             {event.createdAt.toISOString().slice(0, 19).replace("T", " ")}
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{event.type}</TableCell>
+                          <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{translateReadingEventType(event.type, t)}</TableCell>
                           <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                             <Badge size="sm" color="light">
-                              {event.reading.status}
+                              {translateReadingStatus(event.reading.status, t)}
                             </Badge>
                           </TableCell>
                           <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{event.reading.meter.serialNumber}</TableCell>
@@ -337,8 +346,11 @@ export default async function HistoryPage({
 
           <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {readingEvents.length === 0 ? 0 : evSkip + 1} - {Math.min(evSkip + readingEvents.length, readingEventsTotal)} of{" "}
-              {readingEventsTotal} events
+              {t("history.eventsShowing", {
+                start: readingEvents.length === 0 ? 0 : evSkip + 1,
+                end: Math.min(evSkip + readingEvents.length, readingEventsTotal),
+                total: readingEventsTotal,
+              })}
             </p>
             <div className="flex items-center gap-2">
               <Link
@@ -350,7 +362,7 @@ export default async function HistoryPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Previous
+                {t("common.previous")}
               </Link>
               {evVisiblePages.map((pageNumber) => (
                 <Link
@@ -374,7 +386,7 @@ export default async function HistoryPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Next
+                {t("common.next")}
               </Link>
             </div>
           </div>

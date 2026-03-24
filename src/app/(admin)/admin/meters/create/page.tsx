@@ -5,6 +5,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import SearchableSelect from "@/components/form/SearchableSelect";
+import { translateMeterStatus, translateMeterType } from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { prisma } from "@/lib/prisma";
 import { createMeterAction } from "./actions";
 
@@ -13,12 +15,12 @@ export const metadata: Metadata = {
   description: "Create meter page",
 };
 
-function messageFromError(errorCode: string) {
-  if (errorCode === "required_fields") return "Serial number and customer are required.";
-  if (errorCode === "invalid_type") return "Invalid meter type selected.";
-  if (errorCode === "invalid_status") return "Invalid meter status selected.";
-  if (errorCode === "unique_violation") return "Serial number or meter reference already exists.";
-  if (errorCode === "create_failed") return "Meter creation failed. Please try again.";
+function messageFromError(errorCode: string, t: (key: string) => string) {
+  if (errorCode === "required_fields") return t("meters.errorRequiredFields");
+  if (errorCode === "invalid_type") return t("meters.errorInvalidType");
+  if (errorCode === "invalid_status") return t("meters.errorInvalidStatus");
+  if (errorCode === "unique_violation") return t("meters.errorUniqueViolation");
+  if (errorCode === "create_failed") return t("meters.errorCreateFailed");
   return "";
 }
 
@@ -31,11 +33,12 @@ export default async function CreateMeterPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
   const errorCode = Array.isArray(resolvedSearchParams.error)
     ? resolvedSearchParams.error[0]
     : resolvedSearchParams.error || "";
-  const errorMessage = messageFromError(errorCode);
+  const errorMessage = messageFromError(errorCode, t);
 
   const [customers, agents] = await prisma.$transaction([
     prisma.user.findMany({
@@ -72,7 +75,7 @@ export default async function CreateMeterPage({
     const name = [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim();
     return {
       value: customer.id,
-      label: name || "Client",
+      label: name || t("common.customer"),
       hint: customer.phone,
     };
   });
@@ -81,14 +84,14 @@ export default async function CreateMeterPage({
     const name = [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim();
     return {
       value: agent.id,
-      label: name || "Agent",
+      label: name || t("users.roleAgent"),
       hint: agent.phone,
     };
   });
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Add meter" />
+      <PageBreadcrumb pageTitle={t("meters.createPageTitle")} />
 
       <form action={createMeterAction} className="space-y-6">
         {errorMessage ? (
@@ -99,17 +102,17 @@ export default async function CreateMeterPage({
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Meter identity</h3>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.meterIdentity")}</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Primary identifiers and operational configuration.
+              {t("meters.identityDescription")}
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <FormInput label="Serial number" name="serialNumber" defaultValue="" />
-            <FormInput label="Reference" name="meterReference" defaultValue="" />
+            <FormInput label={t("meters.serialNumber")} name="serialNumber" defaultValue="" />
+            <FormInput label={t("meters.reference")} name="meterReference" defaultValue="" />
 
             <div>
-              <Label htmlFor="type">Type</Label>
+              <Label htmlFor="type">{t("common.type")}</Label>
               <select
                 id="type"
                 name="type"
@@ -118,14 +121,14 @@ export default async function CreateMeterPage({
               >
                 {Object.values(MeterType).map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {translateMeterType(item, t)}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">{t("common.status")}</Label>
               <select
                 id="status"
                 name="status"
@@ -134,7 +137,7 @@ export default async function CreateMeterPage({
               >
                 {Object.values(MeterStatus).map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {translateMeterStatus(item, t)}
                   </option>
                 ))}
               </select>
@@ -144,29 +147,29 @@ export default async function CreateMeterPage({
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Assignment</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Customer ownership and field assignment.</p>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.assignment")}</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("meters.assignmentDescription")}</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="customerId">Customer</Label>
+              <Label htmlFor="customerId">{t("common.customer")}</Label>
               <SearchableSelect
                 id="customerId"
                 name="customerId"
                 options={customerOptions}
-                placeholder="Search customer by name or phone"
+                placeholder={t("meters.searchCustomerPlaceholder")}
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="assignedAgentId">Assigned agent</Label>
+              <Label htmlFor="assignedAgentId">{t("meters.assignedAgent")}</Label>
               <SearchableSelect
                 id="assignedAgentId"
                 name="assignedAgentId"
                 options={agentOptions}
-                placeholder="Search agent by name or phone"
-                emptyLabel="Unassigned"
+                placeholder={t("meters.searchAgentPlaceholder")}
+                emptyLabel={t("meters.unassigned")}
               />
             </div>
           </div>
@@ -174,32 +177,32 @@ export default async function CreateMeterPage({
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Location</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Address and GPS coordinates.</p>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.location")}</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("meters.locationDescription")}</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <FormInput label="Address line 1" name="addressLine1" defaultValue="" />
-            <FormInput label="Address line 2" name="addressLine2" defaultValue="" />
-            <FormInput label="City" name="city" defaultValue="" />
-            <FormInput label="Zone" name="zone" defaultValue="" />
-            <FormInput label="Latitude" name="latitude" defaultValue="" />
-            <FormInput label="Longitude" name="longitude" defaultValue="" />
+            <FormInput label={t("meters.addressLine1")} name="addressLine1" defaultValue="" />
+            <FormInput label={t("meters.addressLine2")} name="addressLine2" defaultValue="" />
+            <FormInput label={t("users.city")} name="city" defaultValue="" />
+            <FormInput label={t("users.zone")} name="zone" defaultValue="" />
+            <FormInput label={t("meters.latitude")} name="latitude" defaultValue="" />
+            <FormInput label={t("meters.longitude")} name="longitude" defaultValue="" />
           </div>
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Timeline</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Operational dates for this meter.</p>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.timeline")}</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("meters.timelineDescription")}</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormInput
-              label="Installed at"
+              label={t("meters.installedAt")}
               name="installedAt"
               type="date"
               defaultValue={toInputDate(new Date())}
             />
-            <FormInput label="Last inspection at" name="lastInspectionAt" type="date" defaultValue="" />
+            <FormInput label={t("meters.lastInspection")} name="lastInspectionAt" type="date" defaultValue="" />
           </div>
         </section>
 
@@ -209,13 +212,13 @@ export default async function CreateMeterPage({
               href="/admin/meters"
               className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
             >
-              Cancel
+              {t("common.cancel")}
             </Link>
             <button
               type="submit"
               className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
             >
-              Create meter
+              {t("meters.createSubmit")}
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import BillingCreatePanel from "@/components/billing/BillingCreatePanel";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createCityAction } from "@/app/(admin)/admin/billing/actions";
@@ -22,6 +23,7 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingCitiesPage({ searchParams }: { searchParams: SearchParams }) {
+  const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
@@ -52,7 +54,7 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
     const errorState = getBillingPageErrorState(error, "billing.cities");
     return (
       <div>
-        <PageBreadcrumb pageTitle="Billing cities" />
+        <PageBreadcrumb pageTitle={t("billing.citiesPageTitle")} />
         <BillingSchemaNotice {...errorState} />
       </div>
     );
@@ -60,41 +62,41 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Billing cities" />
+      <PageBreadcrumb pageTitle={t("billing.citiesPageTitle")} />
 
       {error ? (
         <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
-          Error: {error}
+          {t("common.error")}: {error}
         </div>
       ) : null}
       {success ? (
         <div className="mb-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
-          Success: {success}
+          {t("common.success")}: {success}
         </div>
       ) : null}
 
       <div className="space-y-6">
         <BillingCreatePanel
           defaultOpen={Boolean(error)}
-          title="City creation form"
-          openDescription="The form is open. You can register a new billing city, then continue structuring zones just below."
-          closedDescription="The form is hidden by default to keep the cities table easier to scan. Open it only when you need to add a new city."
-          openLabel="New city"
-          closeLabel="Hide form"
+          title={t("billing.cityCreatePanelTitle")}
+          openDescription={t("billing.cityCreateOpenDescription")}
+          closedDescription={t("billing.cityCreateClosedDescription")}
+          openLabel={t("billing.newCity")}
+          closeLabel={t("billing.hideForm")}
         >
           <ComponentCard
-            title="Create city"
-            desc="Register the city reference used by billing zones."
+            title={t("billing.createCity")}
+            desc={t("billing.citiesCardDescription")}
           >
             <form action={createCityAction} className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <Field label="Code">
+                <Field label={t("billing.codeLabel")}>
                   <Input name="code" placeholder="CG-CITY-BZV" required />
                 </Field>
-                <Field label="City name">
+                <Field label={t("billing.cityName")}>
                   <Input name="name" placeholder="Brazzaville" required />
                 </Field>
-                <Field label="Region">
+                <Field label={t("users.region")}>
                   <Input name="region" placeholder="Brazzaville" />
                 </Field>
               </div>
@@ -102,28 +104,28 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
                 type="submit"
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
               >
-                Create city
+                {t("billing.createCity")}
               </button>
             </form>
           </ComponentCard>
         </BillingCreatePanel>
 
-        <ComponentCard title="Cities" desc="Reference cities that group billing zones.">
+        <ComponentCard title={t("billing.citiesCardTitle")} desc={t("billing.citiesCardDesc")}>
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
             <Table className="table-fixed">
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
                   <TableCell isHeader className="w-[34%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    City
+                    {t("billing.cityName")}
                   </TableCell>
                   <TableCell isHeader className="w-[28%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Region
+                    {t("users.region")}
                   </TableCell>
                   <TableCell isHeader className="w-[18%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Zones
+                    {t("billing.zonesCount")}
                   </TableCell>
                   <TableCell isHeader className="w-[20%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">
-                    Status
+                    {t("common.status")}
                   </TableCell>
                 </TableRow>
               </TableHeader>
@@ -131,7 +133,7 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
                 {cities.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No cities yet.
+                      {t("billing.noCitiesYet")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -142,13 +144,13 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
                         <p className="break-words text-xs text-gray-500 dark:text-gray-400">{city.code}</p>
                       </TableCell>
                       <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        <span className="break-words">{city.region || "No region"}</span>
+                        <span className="break-words">{city.region || t("billing.noRegion")}</span>
                       </TableCell>
                       <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                         {city._count.zones}
                       </TableCell>
                       <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {city.isActive ? "Active" : "Inactive"}
+                        {city.isActive ? t("billing.active") : t("billing.inactive")}
                       </TableCell>
                     </TableRow>
                   ))

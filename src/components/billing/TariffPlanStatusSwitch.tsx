@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import { toggleTariffPlanInlineAction } from "@/app/(admin)/admin/billing/actions";
@@ -18,6 +19,7 @@ export default function TariffPlanStatusSwitch({
   initialChecked,
 }: TariffPlanStatusSwitchProps) {
   const router = useRouter();
+  const { t } = useAdminI18n();
   const [isChecked, setIsChecked] = useState(initialChecked);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -30,13 +32,13 @@ export default function TariffPlanStatusSwitch({
   }, [initialChecked]);
 
   const confirmTitle = useMemo(
-    () => (pendingValue ? "Enable tariff plan?" : "Disable tariff plan?"),
-    [pendingValue]
+    () => (pendingValue ? t("billing.enableTariffQuestion") : t("billing.disableTariffQuestion")),
+    [pendingValue, t]
   );
 
   const successTitle = useMemo(
-    () => (isChecked ? "Tariff plan enabled" : "Tariff plan disabled"),
-    [isChecked]
+    () => (isChecked ? t("billing.tariffEnabled") : t("billing.tariffDisabled")),
+    [isChecked, t]
   );
 
   const openConfirmation = () => {
@@ -75,8 +77,8 @@ export default function TariffPlanStatusSwitch({
         disabled={isPending}
         className="inline-flex items-center disabled:cursor-not-allowed disabled:opacity-60"
         aria-pressed={isChecked}
-        aria-label={isChecked ? `Disable ${planCode}` : `Enable ${planCode}`}
-        title={isChecked ? "Disable tariff plan" : "Enable tariff plan"}
+        aria-label={isChecked ? t("billing.disableTariffQuestion") : t("billing.enableTariffQuestion")}
+        title={isChecked ? t("billing.disableTariffQuestion") : t("billing.enableTariffQuestion")}
       >
         <span
           className={`relative block h-6 w-11 rounded-full transition ${
@@ -102,22 +104,22 @@ export default function TariffPlanStatusSwitch({
             <h4 className="text-xl font-semibold text-gray-800 dark:text-white/90">{confirmTitle}</h4>
             <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
               {pendingValue
-                ? `This will make ${planCode} available again for campaigns and invoice generation.`
-                : `This will stop ${planCode} from being used for new billing campaigns and future invoice generation.`}
+                ? t("billing.enableTariffBody", { code: planCode })
+                : t("billing.disableTariffBody", { code: planCode })}
             </p>
             {error ? (
               <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
-                Error: {error}
+                {t("common.error")}: {error}
               </div>
             ) : null}
           </div>
 
           <div className="flex items-center justify-end gap-3">
             <Button size="sm" variant="outline" onClick={closeConfirmation} disabled={isPending}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button size="sm" onClick={handleConfirm} disabled={isPending}>
-              {isPending ? "Saving..." : pendingValue ? "Yes, enable" : "Yes, disable"}
+              {isPending ? t("settingsForm.saving") : pendingValue ? t("billing.yesEnable") : t("billing.yesDisable")}
             </Button>
           </div>
         </div>
@@ -143,12 +145,12 @@ export default function TariffPlanStatusSwitch({
           </div>
           <h4 className="mt-5 text-2xl font-semibold text-gray-800 dark:text-white/90">{successTitle}</h4>
           <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
-            {planCode} was updated successfully.
+            {t("billing.updatedSuccessfully", { code: planCode })}
           </p>
 
           <div className="mt-8 flex items-center justify-center">
             <Button size="sm" onClick={() => setSuccessOpen(false)}>
-              Close
+              {t("common.close")}
             </Button>
           </div>
         </div>

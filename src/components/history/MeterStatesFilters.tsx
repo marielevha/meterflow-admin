@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CloseLineIcon } from "@/icons";
+import { useAdminI18n } from "@/hooks/use-admin-i18n";
 
 type MeterStatesFiltersProps = {
   initialMsQ: string;
@@ -25,6 +26,7 @@ export default function MeterStatesFilters({
   evPage,
   pageSizeOptions,
 }: MeterStatesFiltersProps) {
+  const { t } = useAdminI18n();
   const router = useRouter();
   const pathname = usePathname();
   const isFirstRender = useRef(true);
@@ -77,7 +79,7 @@ export default function MeterStatesFilters({
           type="text"
           value={msQ}
           onChange={(event) => setMsQ(event.target.value)}
-          placeholder="Search by meter serial"
+          placeholder={t("history.searchMeterPlaceholder")}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         />
       </div>
@@ -92,9 +94,9 @@ export default function MeterStatesFilters({
           }}
           className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-          <option value="">All sources</option>
-          <option value="with">With source reading</option>
-          <option value="without">Without source reading</option>
+          <option value="">{t("history.allSources")}</option>
+          <option value="with">{t("history.withSourceReading")}</option>
+          <option value="without">{t("history.withoutSourceReading")}</option>
         </select>
       </div>
 
@@ -110,7 +112,7 @@ export default function MeterStatesFilters({
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
-              {size} / page
+              {size} {t("history.pageSizeSuffix")}
             </option>
           ))}
         </select>
@@ -119,8 +121,8 @@ export default function MeterStatesFilters({
       <div className="lg:col-span-1 flex justify-end">
         <button
           type="button"
-          title="Reset meter states filters"
-          aria-label="Reset meter states filters"
+          title={t("history.resetMeterStatesFilters")}
+          aria-label={t("history.resetMeterStatesFilters")}
           onClick={() => {
             const defaultSize = String(pageSizeOptions[0] ?? 10);
             setMsQ("");

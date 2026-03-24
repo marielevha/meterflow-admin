@@ -536,6 +536,7 @@ function translateNavLabel(t: (key: string) => string, label: string) {
     Tasks: "nav.tasks",
     "Add task": "nav.addTask",
     Billing: "nav.billing",
+    Cities: "nav.cities",
     Zones: "nav.zones",
     Tariffs: "nav.tariffs",
     Campaigns: "nav.campaigns",

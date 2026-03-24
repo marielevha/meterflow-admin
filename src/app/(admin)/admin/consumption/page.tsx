@@ -6,6 +6,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import ConsumptionFilters from "@/components/consumption/ConsumptionFilters";
 import ConsumptionPerPage from "@/components/consumption/ConsumptionPerPage";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default async function ConsumptionPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
   const q = firstValue(resolvedSearchParams.q).trim();
   const city = firstValue(resolvedSearchParams.city).trim();
@@ -115,7 +117,7 @@ export default async function ConsumptionPage({
     return {
       id: meter.id,
       meter: meter.serialNumber,
-      reference: meter.meterReference || "N/A",
+      reference: meter.meterReference || t("meters.noReference"),
       customer,
       city: meter.city || "-",
       zone: meter.zone || "-",
@@ -160,19 +162,19 @@ export default async function ConsumptionPage({
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Consumption" />
+      <PageBreadcrumb pageTitle={t("consumption.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard label="Total latest consumption" value={totalConsumption.toFixed(2)} />
-        <StatCard label="Average per meter" value={averagePerMeter.toFixed(2)} />
-        <StatCard label="Meters analyzed" value={String(rows.length)} />
+        <StatCard label={t("consumption.totalLatestConsumption")} value={totalConsumption.toFixed(2)} />
+        <StatCard label={t("consumption.averagePerMeter")} value={averagePerMeter.toFixed(2)} />
+        <StatCard label={t("consumption.metersAnalyzed")} value={String(rows.length)} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <ComponentCard title="Top consumers" desc="Top 5 par consommation la plus recente." className="xl:col-span-1">
+        <ComponentCard title={t("consumption.topConsumersTitle")} desc={t("consumption.topConsumersDesc")} className="xl:col-span-1">
           <div className="space-y-3">
             {topConsumers.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No data</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("consumption.noData")}</p>
             ) : (
               topConsumers.map((item, index) => (
                 <div
@@ -191,7 +193,7 @@ export default async function ConsumptionPage({
           </div>
         </ComponentCard>
 
-        <ComponentCard title="Consumption by meter" desc="Delta entre les 2 derniers etats du compteur." className="xl:col-span-2">
+        <ComponentCard title={t("consumption.byMeterTitle")} desc={t("consumption.byMeterDesc")} className="xl:col-span-2">
           <ConsumptionFilters
             initialQ={q}
             initialCity={city}
@@ -205,20 +207,20 @@ export default async function ConsumptionPage({
               <Table>
                 <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                   <TableRow>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Meter</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Customer</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Location</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Delta primary</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Delta secondary</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Total delta</TableCell>
-                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Avg latest readings</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.meterColumn")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.customerColumn")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.locationColumn")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.deltaPrimary")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.deltaSecondary")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.totalDelta")}</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("consumption.avgLatestReadings")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                   {rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No consumption data found.
+                        {t("consumption.noConsumptionFound")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -247,8 +249,11 @@ export default async function ConsumptionPage({
           <div className="flex flex-col gap-3 pt-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Showing {rows.length === 0 ? 0 : skip + 1} - {Math.min(skip + rows.length, totalFiltered)} of{" "}
-                {totalFiltered} meters
+                {t("consumption.showingSummary", {
+                  start: rows.length === 0 ? 0 : skip + 1,
+                  end: Math.min(skip + rows.length, totalFiltered),
+                  total: totalFiltered,
+                })}
               </p>
               <ConsumptionPerPage value={pageSize} options={PAGE_SIZE_OPTIONS} />
             </div>
@@ -262,7 +267,7 @@ export default async function ConsumptionPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Previous
+                {t("common.previous")}
               </Link>
 
               {visiblePages.map((pageNumber) => (
@@ -288,7 +293,7 @@ export default async function ConsumptionPage({
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
                 }`}
               >
-                Next
+                {t("common.next")}
               </Link>
             </div>
           </div>

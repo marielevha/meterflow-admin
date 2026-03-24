@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
+import { translateUserRole } from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { prisma } from "@/lib/prisma";
 import { updateRolePermissionsAction } from "./actions";
 
@@ -18,9 +20,9 @@ function roleBadge(code: string) {
   return "success" as const;
 }
 
-function messageFromError(errorCode: string) {
-  if (errorCode === "role_not_found") return "Role introuvable.";
-  if (errorCode === "invalid_permission_ids") return "Liste de permissions invalide.";
+function messageFromError(errorCode: string, t: (key: string) => string) {
+  if (errorCode === "role_not_found") return t("rbac.errorRoleNotFound");
+  if (errorCode === "invalid_permission_ids") return t("rbac.errorInvalidPermissionIds");
   return "";
 }
 
@@ -31,6 +33,7 @@ export default async function RolePermissionsPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const errorCode = Array.isArray(resolvedSearchParams.error)
@@ -69,28 +72,29 @@ export default async function RolePermissionsPage({
   }, {});
 
   const submit = updateRolePermissionsAction.bind(null, role.id);
-  const errorMessage = messageFromError(errorCode);
+  const errorMessage = messageFromError(errorCode, t);
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Role permissions" />
+      <PageBreadcrumb pageTitle={t("rbac.rolePermissionsPageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Role</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("users.roleLabel")}</p>
           <div className="mt-2">
             <Badge size="sm" color={roleBadge(role.code)}>
-              {role.code}
+              {translateUserRole(role.code, t)}
             </Badge>
           </div>
           <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{role.name}</p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{role.code}</p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Assigned permissions</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("rbac.assignedPermissions")}</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{selectedIds.size}</h3>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Users with this role</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t("rbac.usersWithRole")}</p>
           <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
             {role.userAssignments.length}
           </h3>
@@ -100,7 +104,7 @@ export default async function RolePermissionsPage({
       <form action={submit} className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         {updated ? (
           <div className="mb-4 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
-            Permissions mises a jour.
+            {t("rbac.permissionsUpdated")}
           </div>
         ) : null}
         {errorMessage ? (
@@ -146,13 +150,13 @@ export default async function RolePermissionsPage({
             href="/admin/rules-permissions"
             className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
           >
-            Back
+            {t("common.back")}
           </Link>
           <button
             type="submit"
             className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
           >
-            Save permissions
+            {t("rbac.savePermissions")}
           </button>
         </div>
       </form>

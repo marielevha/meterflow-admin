@@ -7,6 +7,10 @@ import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import TariffPlanStatusSwitch from "@/components/billing/TariffPlanStatusSwitch";
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  translateTariffBillingMode,
+} from "@/lib/admin-i18n/labels";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createTariffPlanAction } from "@/app/(admin)/admin/billing/actions";
@@ -53,6 +57,7 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingTariffsPage({ searchParams }: { searchParams: SearchParams }) {
+  const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
@@ -112,7 +117,7 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
     const errorState = getBillingPageErrorState(error, "billing.tariffs");
     return (
       <div>
-        <PageBreadcrumb pageTitle="Billing tariffs" />
+        <PageBreadcrumb pageTitle={t("billing.tariffsPageTitle")} />
         <BillingSchemaNotice {...errorState} />
       </div>
     );
@@ -120,46 +125,46 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Billing tariffs" />
+      <PageBreadcrumb pageTitle={t("billing.tariffsPageTitle")} />
 
       {error ? (
         <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
-          Error: {error}
+          {t("common.error")}: {error}
         </div>
       ) : null}
       {success ? (
         <div className="mb-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
-          Success: {success}
+          {t("common.success")}: {success}
         </div>
       ) : null}
 
       <div className="space-y-6">
         <BillingCreatePanel
           defaultOpen={Boolean(error)}
-          title="Tariff creation form"
-          openDescription="The form is open. You can create a new tariff plan, then return to the list just below."
-          closedDescription="The form is hidden by default to keep the tariff table easier to scan. Open it only when you need to add a new plan."
-          openLabel="New tariff plan"
-          closeLabel="Hide form"
+          title={t("billing.tariffCreatePanelTitle")}
+          openDescription={t("billing.tariffCreateOpenDescription")}
+          closedDescription={t("billing.tariffCreateClosedDescription")}
+          openLabel={t("billing.newTariff")}
+          closeLabel={t("billing.hideForm")}
         >
           <ComponentCard
-            title="Create tariff plan"
-            desc="Define zone pricing with single-rate or HP/HC billing and optional tax rules."
+            title={t("billing.createTariffCardTitle")}
+            desc={t("billing.createTariffCardDesc")}
           >
             <form action={createTariffPlanAction} className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Field label="Code">
+                <Field label={t("billing.codeLabel")}>
                   <Input name="code" placeholder="CG-BZV-BAC-TOU-2026" required />
                 </Field>
-                <Field label="Plan name">
+                <Field label={t("billing.planName")}>
                   <Input name="name" placeholder="Bacongo HP/HC 2026" required />
                 </Field>
-                <Field label="Zone">
+                <Field label={t("billing.zoneLabel")}>
                   <select
                     name="zoneId"
                     className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                   >
-                    <option value="">Global / all zones</option>
+                    <option value="">{t("billing.globalOption")}</option>
                     {zones.map((zone) => (
                     <option key={zone.id} value={zone.id}>
                         {zone.city.name} - {zone.name}
@@ -167,55 +172,55 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                     ))}
                   </select>
                 </Field>
-                <Field label="Billing mode">
+                <Field label={t("billing.billingMode")}>
                   <select
                     name="billingMode"
                     defaultValue={TariffBillingMode.SINGLE_RATE}
                     className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                   >
-                    <option value={TariffBillingMode.SINGLE_RATE}>Single rate</option>
-                    <option value={TariffBillingMode.TIME_OF_USE}>Time of use (HP / HC)</option>
+                    <option value={TariffBillingMode.SINGLE_RATE}>{t("billing.singleRate")}</option>
+                    <option value={TariffBillingMode.TIME_OF_USE}>{t("billing.timeOfUse")}</option>
                   </select>
                 </Field>
-                <Field label="Currency">
+                <Field label={t("billing.currencyLabel")}>
                   <Input name="currency" placeholder="XAF" defaultValue="XAF" />
                 </Field>
-                <Field label="Fixed charge">
+                <Field label={t("billing.fixedCharge")}>
                   <Input name="fixedCharge" type="number" step="0.01" placeholder="1500" defaultValue="0" />
                 </Field>
-                <Field label="Base tax %">
+                <Field label={t("billing.baseTaxPercent")}>
                   <Input name="taxPercent" type="number" step="0.01" placeholder="18" defaultValue="0" />
                 </Field>
-                <Field label="Late fee %">
+                <Field label={t("billing.lateFeePercent")}>
                   <Input name="lateFeePercent" type="number" step="0.01" placeholder="5" defaultValue="0" />
                 </Field>
-                <Field label="Single unit price">
+                <Field label={t("billing.singleUnitPrice")}>
                   <Input name="singleUnitPrice" type="number" step="0.001" placeholder="95" />
                 </Field>
-                <Field label="HP unit price">
+                <Field label={t("billing.hpUnitPrice")}>
                   <Input name="hpUnitPrice" type="number" step="0.001" placeholder="110" />
                 </Field>
-                <Field label="HC unit price">
+                <Field label={t("billing.hcUnitPrice")}>
                   <Input name="hcUnitPrice" type="number" step="0.001" placeholder="75" />
                 </Field>
-                <Field label="Effective from">
+                <Field label={t("billing.effectiveFrom")}>
                   <Input name="effectiveFrom" type="datetime-local" />
                 </Field>
-                <Field label="Effective to">
+                <Field label={t("billing.effectiveTo")}>
                   <Input name="effectiveTo" type="datetime-local" />
                 </Field>
               </div>
 
-              <Field label="Description">
+              <Field label={t("common.description")}>
                 <textarea
                   name="description"
                   rows={2}
-                  placeholder="Optional internal description"
+                  placeholder={t("common.noDescription")}
                   className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 />
               </Field>
 
-              <Field label="Additional tax rules">
+              <Field label={t("billing.additionalTaxRules")}>
                 <textarea
                   name="taxes"
                   rows={4}
@@ -223,21 +228,18 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                   className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 font-mono text-xs text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 />
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Format par ligne: <code>CODE,Nom,Type,Scope,Valeur[,Description]</code>. Types:
-                  <code> PERCENT</code> ou <code>FIXED</code>. Scopes: <code>CONSUMPTION</code>,
-                  <code> FIXED_CHARGE</code> ou <code>SUBTOTAL</code>.
+                  {t("billing.additionalTaxRulesHint")}
                 </p>
               </Field>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400">
-                Use <strong>single unit price</strong> for standard meters. Use <strong>HP / HC</strong> rates
-                for dual-index meters billed with peak and off-peak consumption.
+                {t("billing.tariffPricingHint")}
               </div>
 
               <div>
-                <Label>Default plan</Label>
+                <Label>{t("billing.defaultPlan")}</Label>
                 <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <input type="checkbox" name="isDefault" className="h-4 w-4" /> Set as default fallback
+                  <input type="checkbox" name="isDefault" className="h-4 w-4" /> {t("billing.setAsDefaultFallback")}
                 </label>
               </div>
 
@@ -245,34 +247,34 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                 type="submit"
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
               >
-                Create tariff
+                {t("billing.createTariff")}
               </button>
             </form>
           </ComponentCard>
         </BillingCreatePanel>
 
         <ComponentCard
-          title="Tariff plans"
-          desc="Zone assignment, rate structure and tax configuration."
+          title={t("billing.tariffsCardTitle")}
+          desc={t("billing.tariffsCardDesc")}
         >
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
               <Table className="table-fixed">
                 <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                   <TableRow>
-                    <TableCell isHeader className="w-[18%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Plan</TableCell>
-                    <TableCell isHeader className="w-[16%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Zone</TableCell>
-                    <TableCell isHeader className="w-[18%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Pricing</TableCell>
-                    <TableCell isHeader className="w-[22%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Taxes</TableCell>
-                    <TableCell isHeader className="w-[14%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Usage</TableCell>
-                    <TableCell isHeader className="w-[7%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</TableCell>
-                    <TableCell isHeader className="w-[5%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</TableCell>
+                    <TableCell isHeader className="w-[18%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.planColumn")}</TableCell>
+                    <TableCell isHeader className="w-[16%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.zoneLabel")}</TableCell>
+                    <TableCell isHeader className="w-[18%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.pricingColumn")}</TableCell>
+                    <TableCell isHeader className="w-[22%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.taxesColumn")}</TableCell>
+                    <TableCell isHeader className="w-[14%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.usageColumn")}</TableCell>
+                    <TableCell isHeader className="w-[7%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("billing.statusColumn")}</TableCell>
+                    <TableCell isHeader className="w-[5%] px-4 py-3 text-start text-theme-xs font-medium text-gray-500 dark:text-gray-400">{t("common.actions")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                   {plans.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No plans yet.
+                        {t("billing.noPlansYet")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -294,47 +296,53 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                               </p>
                             </>
                           ) : (
-                            <span className="text-gray-500 dark:text-gray-400">Global</span>
+                            <span className="text-gray-500 dark:text-gray-400">{t("billing.globalZone")}</span>
                           )}
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          <p className="font-medium">
-                            {plan.billingMode === TariffBillingMode.TIME_OF_USE ? "Time of use" : "Single rate"}
-                          </p>
+                          <p className="font-medium">{translateTariffBillingMode(plan.billingMode, t)}</p>
                           {plan.billingMode === TariffBillingMode.TIME_OF_USE ? (
                             <>
-                              <p className="break-words">HP: {plan.hpUnitPrice?.toString() || "0"} {plan.currency}/kWh</p>
-                              <p className="break-words">HC: {plan.hcUnitPrice?.toString() || "0"} {plan.currency}/kWh</p>
+                              <p className="break-words">{t("billing.hpPriceLine", { value: plan.hpUnitPrice?.toString() || "0", currency: plan.currency })}</p>
+                              <p className="break-words">{t("billing.hcPriceLine", { value: plan.hcUnitPrice?.toString() || "0", currency: plan.currency })}</p>
                             </>
                           ) : (
-                            <p className="break-words">Unit: {plan.singleUnitPrice?.toString() || "0"} {plan.currency}/kWh</p>
+                            <p className="break-words">{t("billing.unitPriceLine", { value: plan.singleUnitPrice?.toString() || "0", currency: plan.currency })}</p>
                           )}
-                          <p className="break-words">Fixed: {plan.fixedCharge.toString()} {plan.currency}</p>
-                          <p className="break-words">Base tax: {plan.taxPercent.toString()}%</p>
+                          <p className="break-words">{t("billing.fixedChargeLine", { value: plan.fixedCharge.toString(), currency: plan.currency })}</p>
+                          <p className="break-words">{t("billing.baseTaxLine", { value: plan.taxPercent.toString() })}</p>
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-xs text-gray-700 dark:text-gray-300">
                           {plan.taxes.length === 0 ? (
-                            <span className="text-gray-500 dark:text-gray-400">No additional taxes</span>
+                            <span className="text-gray-500 dark:text-gray-400">{t("billing.noAdditionalTaxes")}</span>
                           ) : (
                             plan.taxes.map((taxLink) => (
                               <p key={taxLink.id} className="break-words">
-                                {taxLink.taxRule.name} [{taxLink.taxRule.type} / {taxLink.taxRule.applicationScope}] ={" "}
-                                {taxLink.taxRule.value.toString()}
+                                {t("billing.taxRuleLine", {
+                                  name: taxLink.taxRule.name,
+                                  type: taxLink.taxRule.type,
+                                  scope: taxLink.taxRule.applicationScope,
+                                  value: taxLink.taxRule.value.toString(),
+                                })}
                               </p>
                             ))
                           )}
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          <p>{plan._count.campaigns} campaigns</p>
-                          <p>{plan._count.invoices} invoices</p>
+                          <p>{t("billing.campaignsUsage", { count: plan._count.campaigns })}</p>
+                          <p>{t("billing.invoicesUsage", { count: plan._count.invoices })}</p>
                           <p className="break-words text-xs text-gray-500 dark:text-gray-400">
-                            {plan.effectiveFrom ? `From ${plan.effectiveFrom.toISOString().slice(0, 10)}` : "Immediate"}
-                            {plan.effectiveTo ? ` · Until ${plan.effectiveTo.toISOString().slice(0, 10)}` : ""}
+                            {plan.effectiveFrom
+                              ? t("billing.fromDate", { date: plan.effectiveFrom.toISOString().slice(0, 10) })
+                              : t("billing.immediate")}
+                            {plan.effectiveTo
+                              ? ` · ${t("billing.untilDate", { date: plan.effectiveTo.toISOString().slice(0, 10) })}`
+                              : ""}
                           </p>
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          {plan.isDefault ? "Default • " : ""}
-                          {plan.isActive ? "Active" : "Inactive"}
+                          {plan.isDefault ? `${t("billing.defaultBadge")} • ` : ""}
+                          {plan.isActive ? t("billing.active") : t("billing.inactive")}
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <TariffPlanStatusSwitch

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { InvoiceStatus } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { prisma } from "@/lib/prisma";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BillingPage() {
+  const { t } = await getAdminTranslator();
   let cityCount = 0;
   let zoneCount = 0;
   let campaignCount = 0;
@@ -53,7 +55,7 @@ export default async function BillingPage() {
     const errorState = getBillingPageErrorState(error, "billing.overview");
     return (
       <div>
-        <PageBreadcrumb pageTitle="Billing" />
+        <PageBreadcrumb pageTitle={t("billing.pageTitle")} />
         <BillingSchemaNotice {...errorState} />
       </div>
     );
@@ -61,46 +63,54 @@ export default async function BillingPage() {
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Billing" />
+      <PageBreadcrumb pageTitle={t("billing.pageTitle")} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Cities" value={cityCount} hint="Billing geography reference" />
-        <StatCard label="Zones" value={zoneCount} hint="Service coverage configured" />
-        <StatCard label="Campaigns" value={campaignCount} hint={`${activeCampaignCount} in progress`} />
-        <StatCard label="Active tariffs" value={tariffCount} hint="Pricing plans available" />
-        <StatCard label="Invoices" value={invoiceCount} hint={`${issuedCount} issued · ${paidCount} paid · ${overdueCount} overdue`} />
+        <StatCard label={t("billing.statCities")} value={cityCount} hint={t("billing.statCitiesHint")} />
+        <StatCard label={t("billing.statZones")} value={zoneCount} hint={t("billing.statZonesHint")} />
+        <StatCard
+          label={t("billing.statCampaigns")}
+          value={campaignCount}
+          hint={t("billing.statCampaignsHint", { count: activeCampaignCount })}
+        />
+        <StatCard label={t("billing.statActiveTariffs")} value={tariffCount} hint={t("billing.statActiveTariffsHint")} />
+        <StatCard
+          label={t("billing.statInvoices")}
+          value={invoiceCount}
+          hint={t("billing.statInvoicesHint", { issued: issuedCount, paid: paidCount, overdue: overdueCount })}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
         <QuickLink
-          title="Cities"
-          description="Maintain the billing city reference used to organize service zones."
+          title={t("billing.statCities")}
+          description={t("billing.citiesCardDescription")}
           href="/admin/billing/cities"
-          actionLabel="Manage cities"
+          actionLabel={t("billing.manageCities")}
         />
         <QuickLink
-          title="Zones"
-          description="Maintain the service zones used by meters, tariffs and campaigns."
+          title={t("billing.statZones")}
+          description={t("billing.zonesCardDescription")}
           href="/admin/billing/zones"
-          actionLabel="Manage zones"
+          actionLabel={t("billing.manageZones")}
         />
         <QuickLink
-          title="Tariff plans"
-          description="Create single-rate or HP/HC tariffs with optional zone-specific taxes."
+          title={t("billing.tariffsCardTitle")}
+          description={t("billing.tariffsCardDescription")}
           href="/admin/billing/tariffs"
-          actionLabel="Manage tariffs"
+          actionLabel={t("billing.manageTariffs")}
         />
         <QuickLink
-          title="Billing campaigns"
-          description="Plan billing windows and generate invoices in batch."
+          title={t("billing.campaignsPageTitle")}
+          description={t("billing.campaignsCardDescription")}
           href="/admin/billing/campaigns"
-          actionLabel="Manage campaigns"
+          actionLabel={t("billing.manageCampaigns")}
         />
         <QuickLink
-          title="Invoices"
-          description="Review, issue, collect payments and track delivery."
+          title={t("billing.statInvoices")}
+          description={t("billing.invoicesCardDescription")}
           href="/admin/billing/invoices"
-          actionLabel="Manage invoices"
+          actionLabel={t("billing.manageInvoices")}
         />
       </div>
     </div>
