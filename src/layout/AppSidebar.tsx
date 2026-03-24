@@ -87,6 +87,8 @@ const navItems: NavItem[] = [
     name: "Billing",
     subItems: [
       { name: "Overview", path: "/admin/billing", pro: false },
+      { name: "Cities", path: "/admin/billing/cities", pro: false },
+      { name: "Zones", path: "/admin/billing/zones", pro: false },
       { name: "Tariffs", path: "/admin/billing/tariffs", pro: false },
       { name: "Campaigns", path: "/admin/billing/campaigns", pro: false },
       { name: "Invoices", path: "/admin/billing/invoices", pro: false },
@@ -534,6 +536,7 @@ function translateNavLabel(t: (key: string) => string, label: string) {
     Tasks: "nav.tasks",
     "Add task": "nav.addTask",
     Billing: "nav.billing",
+    Zones: "nav.zones",
     Tariffs: "nav.tariffs",
     Campaigns: "nav.campaigns",
     Invoices: "nav.invoices",

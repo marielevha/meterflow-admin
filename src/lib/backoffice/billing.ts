@@ -6,6 +6,9 @@ import {
   InvoiceStatus,
   PaymentMethod,
   Prisma,
+  TariffBillingMode,
+  TaxApplicationScope,
+  TaxRuleType,
   UserRole,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -22,16 +25,33 @@ type CreateTariffTierInput = {
   unitPrice: number;
 };
 
+type CreateTaxRuleInput = {
+  code?: string;
+  name?: string;
+  description?: string;
+  type?: TaxRuleType;
+  applicationScope?: TaxApplicationScope;
+  value?: number;
+};
+
 type CreateTariffPlanInput = {
   code?: string;
   name?: string;
   description?: string;
+  zoneId?: string | null;
+  billingMode?: TariffBillingMode;
   currency?: string;
+  singleUnitPrice?: number;
+  hpUnitPrice?: number;
+  hcUnitPrice?: number;
   fixedCharge?: number;
   taxPercent?: number;
   lateFeePercent?: number;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
   isDefault?: boolean;
   tiers?: CreateTariffTierInput[];
+  taxes?: CreateTaxRuleInput[];
 };
 
 type UpdateTariffPlanInput = Partial<CreateTariffPlanInput> & {
@@ -47,10 +67,21 @@ type CreateCampaignInput = {
   submissionEndAt?: string;
   cutoffAt?: string;
   frequency?: string;
-  city?: string;
-  zone?: string;
+  zoneIds?: string[];
   tariffPlanId?: string;
   notes?: string;
+};
+
+type CreateCityInput = {
+  code?: string;
+  name?: string;
+  region?: string;
+};
+
+type CreateZoneInput = {
+  code?: string;
+  name?: string;
+  cityId?: string | null;
 };
 
 type InvoiceFilters = {
@@ -118,6 +149,12 @@ function toDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function isDateWithinRange(target: Date, start?: Date | null, end?: Date | null) {
+  if (start && target < start) return false;
+  if (end && target > end) return false;
+  return true;
+}
+
 function round(value: number, scale = TAX_SCALE): number {
   const factor = 10 ** scale;
   return Math.round(value * factor) / factor;
@@ -168,25 +205,147 @@ function assertAdmin(user: StaffUser) {
   return { ok: true as const };
 }
 
-async function resolveTariffPlanId(inputTariffPlanId?: string | null) {
+async function resolveZone(inputZoneId?: string | null) {
+  if (!inputZoneId) return null;
+
+  const zone = await prisma.zone.findFirst({
+    where: { id: inputZoneId, deletedAt: null, isActive: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      cityId: true,
+      city: { select: { id: true, code: true, name: true, region: true } },
+    },
+  });
+
+  return zone ?? null;
+}
+
+async function resolveCity(inputCityId?: string | null) {
+  if (!inputCityId) return null;
+
+  const city = await prisma.city.findFirst({
+    where: { id: inputCityId, deletedAt: null, isActive: true },
+    select: { id: true, code: true, name: true, region: true },
+  });
+
+  return city ?? null;
+}
+
+async function resolveZones(inputZoneIds?: string[]) {
+  const zoneIds = Array.from(
+    new Set((inputZoneIds || []).map((zoneId) => toTrimmed(zoneId)).filter(Boolean))
+  );
+  if (zoneIds.length === 0) return [];
+
+  return prisma.zone.findMany({
+    where: {
+      id: { in: zoneIds },
+      deletedAt: null,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      cityId: true,
+      city: { select: { id: true, code: true, name: true, region: true } },
+    },
+    orderBy: [{ city: { name: "asc" } }, { name: "asc" }],
+  });
+}
+
+function normalizeBillingMode(mode: unknown): TariffBillingMode {
+  return mode === TariffBillingMode.TIME_OF_USE
+    ? TariffBillingMode.TIME_OF_USE
+    : TariffBillingMode.SINGLE_RATE;
+}
+
+function normalizeTaxType(type: unknown): TaxRuleType {
+  return type === TaxRuleType.FIXED ? TaxRuleType.FIXED : TaxRuleType.PERCENT;
+}
+
+function normalizeTaxScope(scope: unknown): TaxApplicationScope {
+  if (
+    scope === TaxApplicationScope.CONSUMPTION ||
+    scope === TaxApplicationScope.FIXED_CHARGE ||
+    scope === TaxApplicationScope.SUBTOTAL
+  ) {
+    return scope;
+  }
+
+  return TaxApplicationScope.SUBTOTAL;
+}
+
+function normalizeTaxRules(taxes: CreateTaxRuleInput[], fallbackZoneId?: string | null) {
+  const seenCodes = new Set<string>();
+  const normalized = [];
+
+  for (const tax of taxes) {
+    const code = toTrimmed(tax.code)?.toUpperCase();
+    const name = toTrimmed(tax.name);
+    const description = toTrimmed(tax.description);
+    const value = Math.max(0, toNumber(tax.value));
+
+    if (!code || !name) {
+      return { ok: false as const, error: "tax_code_and_name_required" };
+    }
+    if (seenCodes.has(code)) {
+      return { ok: false as const, error: "duplicate_tax_code_in_payload" };
+    }
+    seenCodes.add(code);
+
+    normalized.push({
+      code,
+      name,
+      description,
+      type: normalizeTaxType(tax.type),
+      applicationScope: normalizeTaxScope(tax.applicationScope),
+      value: round(value, M3_SCALE),
+      zoneId: fallbackZoneId ?? null,
+    });
+  }
+
+  return { ok: true as const, taxes: normalized };
+}
+
+async function resolveTariffPlanId(inputTariffPlanId?: string | null, zoneIds?: string[]) {
+  const resolvedZoneIds = (zoneIds || []).filter(Boolean);
+  const singleZoneId = resolvedZoneIds.length === 1 ? resolvedZoneIds[0] : null;
+
   if (inputTariffPlanId) {
     const plan = await prisma.tariffPlan.findFirst({
-      where: { id: inputTariffPlanId, deletedAt: null, isActive: true },
+      where: {
+        id: inputTariffPlanId,
+        deletedAt: null,
+        isActive: true,
+        ...(singleZoneId ? { OR: [{ zoneId: singleZoneId }, { zoneId: null }] } : {}),
+      },
       select: { id: true },
     });
     return plan?.id || null;
   }
 
   const defaultPlan = await prisma.tariffPlan.findFirst({
-    where: { deletedAt: null, isDefault: true, isActive: true },
-    orderBy: { createdAt: "asc" },
+    where: {
+      deletedAt: null,
+      isDefault: true,
+      isActive: true,
+      ...(singleZoneId ? { OR: [{ zoneId: singleZoneId }, { zoneId: null }] } : { zoneId: null }),
+    },
+    orderBy: [{ zoneId: "desc" }, { createdAt: "asc" }],
     select: { id: true },
   });
   if (defaultPlan) return defaultPlan.id;
 
   const anyPlan = await prisma.tariffPlan.findFirst({
-    where: { deletedAt: null, isActive: true },
-    orderBy: { createdAt: "asc" },
+    where: {
+      deletedAt: null,
+      isActive: true,
+      ...(singleZoneId ? { OR: [{ zoneId: singleZoneId }, { zoneId: null }] } : { zoneId: null }),
+    },
+    orderBy: [{ zoneId: "desc" }, { createdAt: "asc" }],
     select: { id: true },
   });
   return anyPlan?.id || null;
@@ -244,6 +403,219 @@ function computeConsumptionCharge(
   return { lines, total: round(total, TAX_SCALE) };
 }
 
+function buildRateLabel(mode: TariffBillingMode, channel: "PRIMARY" | "SECONDARY" | "TOTAL") {
+  if (mode === TariffBillingMode.TIME_OF_USE) {
+    return channel === "PRIMARY" ? "Energie HP" : "Energie HC";
+  }
+
+  return "Energie facturee";
+}
+
+function computeTariffCharge(
+  tariffPlan: {
+    billingMode: TariffBillingMode;
+    singleUnitPrice: Prisma.Decimal | null;
+    hpUnitPrice: Prisma.Decimal | null;
+    hcUnitPrice: Prisma.Decimal | null;
+  },
+  consumptionPrimary: number,
+  consumptionSecondary: number,
+) {
+  if (tariffPlan.billingMode === TariffBillingMode.TIME_OF_USE) {
+    const hpUnitPrice = decimalToNumber(tariffPlan.hpUnitPrice);
+    const hcUnitPrice = decimalToNumber(tariffPlan.hcUnitPrice);
+    const hpAmount = round(consumptionPrimary * hpUnitPrice, TAX_SCALE);
+    const hcAmount = round(consumptionSecondary * hcUnitPrice, TAX_SCALE);
+
+    const lines = [
+      {
+        label: buildRateLabel(tariffPlan.billingMode, "PRIMARY"),
+        quantity: round(consumptionPrimary, M3_SCALE),
+        unitPrice: round(hpUnitPrice, M3_SCALE),
+        amount: hpAmount,
+        meta: { indexType: "PRIMARY" },
+      },
+      {
+        label: buildRateLabel(tariffPlan.billingMode, "SECONDARY"),
+        quantity: round(consumptionSecondary, M3_SCALE),
+        unitPrice: round(hcUnitPrice, M3_SCALE),
+        amount: hcAmount,
+        meta: { indexType: "SECONDARY" },
+      },
+    ].filter((line) => line.quantity > 0 || line.amount > 0);
+
+    return { lines, total: round(hpAmount + hcAmount, TAX_SCALE) };
+  }
+
+  const singleUnitPrice = decimalToNumber(tariffPlan.singleUnitPrice);
+  const totalConsumption = round(consumptionPrimary + consumptionSecondary, M3_SCALE);
+  const amount = round(totalConsumption * singleUnitPrice, TAX_SCALE);
+
+  return {
+    lines: [
+      {
+        label: buildRateLabel(tariffPlan.billingMode, "TOTAL"),
+        quantity: totalConsumption,
+        unitPrice: round(singleUnitPrice, M3_SCALE),
+        amount,
+        meta: {
+          billedSecondaryIncluded: consumptionSecondary > 0,
+        },
+      },
+    ].filter((line) => line.quantity > 0 || line.amount > 0),
+    total: amount,
+  };
+}
+
+function computeAdditionalTaxes(
+  taxLinks: Array<{
+    sortOrder: number;
+    taxRule: {
+      code: string;
+      name: string;
+      type: TaxRuleType;
+      applicationScope: TaxApplicationScope;
+      value: Prisma.Decimal;
+    };
+  }>,
+  amounts: { consumption: number; fixedCharge: number; subtotal: number },
+) {
+  const lines = [];
+  let total = 0;
+
+  const orderedTaxLinks = [...taxLinks].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  for (const link of orderedTaxLinks) {
+    const rule = link.taxRule;
+    const value = decimalToNumber(rule.value);
+    const baseAmount =
+      rule.applicationScope === TaxApplicationScope.CONSUMPTION
+        ? amounts.consumption
+        : rule.applicationScope === TaxApplicationScope.FIXED_CHARGE
+          ? amounts.fixedCharge
+          : amounts.subtotal;
+
+    const amount =
+      rule.type === TaxRuleType.PERCENT
+        ? round((baseAmount * value) / 100, TAX_SCALE)
+        : round(value, TAX_SCALE);
+
+    lines.push({
+      label: rule.type === TaxRuleType.PERCENT ? `${rule.name} (${value}%)` : rule.name,
+      quantity: 1,
+      unitPrice: amount,
+      amount,
+      meta: {
+        taxRuleCode: rule.code,
+        taxType: rule.type,
+        applicationScope: rule.applicationScope,
+        baseAmount,
+        value,
+      },
+    });
+    total += amount;
+  }
+
+  return { lines, total: round(total, TAX_SCALE) };
+}
+
+export async function listZones() {
+  const zones = await prisma.zone.findMany({
+    where: { deletedAt: null },
+    orderBy: [{ city: { name: "asc" } }, { name: "asc" }],
+    include: {
+      city: true,
+      _count: {
+        select: { meters: true, tariffPlans: true, campaignAssignments: true },
+      },
+    },
+  });
+
+  return { status: 200, body: { zones } };
+}
+
+export async function listCities() {
+  const cities = await prisma.city.findMany({
+    where: { deletedAt: null },
+    orderBy: [{ name: "asc" }],
+    include: {
+      _count: {
+        select: { zones: true },
+      },
+    },
+  });
+
+  return { status: 200, body: { cities } };
+}
+
+export async function createCity(staff: StaffUser, payload: CreateCityInput) {
+  const admin = assertAdmin(staff);
+  if (!admin.ok) return admin;
+
+  const code = toTrimmed(payload.code)?.toUpperCase();
+  const name = toTrimmed(payload.name);
+  const region = toTrimmed(payload.region);
+
+  if (!code || !name) {
+    return { status: 400, body: { error: "city_code_name_required" } };
+  }
+
+  try {
+    const city = await prisma.city.create({
+      data: {
+        code,
+        name,
+        region,
+      },
+    });
+
+    return { status: 201, body: { message: "city_created", city } };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { status: 409, body: { error: "city_code_already_exists" } };
+    }
+    return { status: 500, body: { error: "failed_to_create_city" } };
+  }
+}
+
+export async function createZone(staff: StaffUser, payload: CreateZoneInput) {
+  const admin = assertAdmin(staff);
+  if (!admin.ok) return admin;
+
+  const code = toTrimmed(payload.code)?.toUpperCase();
+  const name = toTrimmed(payload.name);
+  const cityId = toTrimmed(payload.cityId);
+
+  if (!code || !name || !cityId) {
+    return { status: 400, body: { error: "zone_code_name_city_required" } };
+  }
+
+  const city = await resolveCity(cityId);
+  if (!city) {
+    return { status: 400, body: { error: "city_not_found" } };
+  }
+
+  try {
+    const zone = await prisma.zone.create({
+      data: {
+        code,
+        name,
+        cityId: city.id,
+      },
+      include: {
+        city: { select: { id: true, code: true, name: true, region: true } },
+      },
+    });
+
+    return { status: 201, body: { message: "zone_created", zone } };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { status: 409, body: { error: "zone_code_already_exists" } };
+    }
+    return { status: 500, body: { error: "failed_to_create_zone" } };
+  }
+}
+
 export async function listTariffPlans() {
   const plans = await prisma.tariffPlan.findMany({
     where: { deletedAt: null },
@@ -252,9 +624,33 @@ export async function listTariffPlans() {
         where: { deletedAt: null },
         orderBy: { minConsumption: "asc" },
       },
+      serviceZone: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          city: { select: { id: true, code: true, name: true, region: true } },
+        },
+      },
+      taxes: {
+        where: { deletedAt: null, taxRule: { deletedAt: null } },
+        orderBy: { sortOrder: "asc" },
+        include: {
+          taxRule: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              type: true,
+              applicationScope: true,
+              value: true,
+            },
+          },
+        },
+      },
       _count: { select: { invoices: true, campaigns: true } },
     },
-    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+    orderBy: [{ isDefault: "desc" }, { code: "asc" }, { createdAt: "asc" }],
   });
 
   return { status: 200, body: { plans } };
@@ -267,23 +663,62 @@ export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPl
   const code = toTrimmed(payload.code)?.toUpperCase();
   const name = toTrimmed(payload.name);
   const description = toTrimmed(payload.description);
+  const zoneId = toTrimmed(payload.zoneId);
+  const billingMode = normalizeBillingMode(payload.billingMode);
   const currency = toTrimmed(payload.currency)?.toUpperCase() || "XAF";
+  const singleUnitPrice = Math.max(0, toNumber(payload.singleUnitPrice));
+  const hpUnitPrice = Math.max(0, toNumber(payload.hpUnitPrice));
+  const hcUnitPrice = Math.max(0, toNumber(payload.hcUnitPrice));
   const fixedCharge = Math.max(0, toNumber(payload.fixedCharge));
   const taxPercent = Math.max(0, toNumber(payload.taxPercent));
   const lateFeePercent = Math.max(0, toNumber(payload.lateFeePercent));
+  const effectiveFrom = toDate(payload.effectiveFrom);
+  const effectiveTo = toDate(payload.effectiveTo);
   const isDefault = Boolean(payload.isDefault);
-  const tiersInput = Array.isArray(payload.tiers) ? payload.tiers : [];
+  const taxesInput = Array.isArray(payload.taxes) ? payload.taxes : [];
 
   if (!code || !name) {
     return { status: 400, body: { error: "code_and_name_required" } };
   }
-  if (tiersInput.length === 0) {
-    return { status: 400, body: { error: "tiers_required" } };
+  if (effectiveFrom && effectiveTo && effectiveTo <= effectiveFrom) {
+    return { status: 400, body: { error: "invalid_effective_range" } };
+  }
+  if (
+    (billingMode === TariffBillingMode.SINGLE_RATE && singleUnitPrice <= 0) ||
+    (billingMode === TariffBillingMode.TIME_OF_USE && (hpUnitPrice <= 0 || hcUnitPrice <= 0))
+  ) {
+    return {
+      status: 400,
+      body: {
+        error:
+          billingMode === TariffBillingMode.SINGLE_RATE
+            ? "single_unit_price_required"
+            : "hp_hc_unit_prices_required",
+      },
+    };
   }
 
-  const tiersNormalized = normalizeTiers(tiersInput);
-  if (!tiersNormalized.ok) {
-    return { status: 400, body: { error: tiersNormalized.error } };
+  const zone = zoneId ? await resolveZone(zoneId) : null;
+  if (zoneId && !zone) {
+    return { status: 400, body: { error: "zone_not_found" } };
+  }
+
+  const normalizedTaxes = normalizeTaxRules(taxesInput, zone?.id ?? null);
+  if (!normalizedTaxes.ok) {
+    return { status: 400, body: { error: normalizedTaxes.error } };
+  }
+
+  if (normalizedTaxes.taxes.length > 0) {
+    const existingTaxCodes = await prisma.taxRule.findMany({
+      where: {
+        code: { in: normalizedTaxes.taxes.map((tax) => tax.code) },
+        deletedAt: null,
+      },
+      select: { code: true },
+    });
+    if (existingTaxCodes.length > 0) {
+      return { status: 409, body: { error: "tax_code_already_exists" } };
+    }
   }
 
   try {
@@ -300,22 +735,67 @@ export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPl
           code,
           name,
           description,
+          zoneId: zone?.id ?? null,
+          billingMode,
           currency,
+          singleUnitPrice:
+            billingMode === TariffBillingMode.SINGLE_RATE ? toDecimal(singleUnitPrice, M3_SCALE) : null,
+          hpUnitPrice:
+            billingMode === TariffBillingMode.TIME_OF_USE ? toDecimal(hpUnitPrice, M3_SCALE) : null,
+          hcUnitPrice:
+            billingMode === TariffBillingMode.TIME_OF_USE ? toDecimal(hcUnitPrice, M3_SCALE) : null,
           fixedCharge: toDecimal(fixedCharge),
           taxPercent: toDecimal(taxPercent),
           lateFeePercent: toDecimal(lateFeePercent),
+          effectiveFrom,
+          effectiveTo,
           isDefault,
-          tiers: {
-            create: tiersNormalized.tiers.map((tier) => ({
-              minConsumption: toDecimal(tier.minConsumption, M3_SCALE),
-              maxConsumption:
-                tier.maxConsumption === null ? null : toDecimal(tier.maxConsumption, M3_SCALE),
-              unitPrice: toDecimal(tier.unitPrice, M3_SCALE),
+          taxes: {
+            create: normalizedTaxes.taxes.map((tax, index) => ({
+              sortOrder: index,
+              taxRule: {
+                create: {
+                  code: tax.code,
+                  name: tax.name,
+                  description: tax.description,
+                  zoneId: tax.zoneId,
+                  type: tax.type,
+                  applicationScope: tax.applicationScope,
+                  value: toDecimal(tax.value, M3_SCALE),
+                  isActive: true,
+                  effectiveFrom,
+                  effectiveTo,
+                },
+              },
             })),
           },
         },
         include: {
           tiers: { where: { deletedAt: null }, orderBy: { minConsumption: "asc" } },
+          serviceZone: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              city: { select: { id: true, code: true, name: true, region: true } },
+            },
+          },
+          taxes: {
+            where: { deletedAt: null, taxRule: { deletedAt: null } },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              taxRule: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  type: true,
+                  applicationScope: true,
+                  value: true,
+                },
+              },
+            },
+          },
         },
       });
     });
@@ -342,63 +822,8 @@ export async function updateTariffPlan(
     select: { id: true },
   });
   if (!existing) return { status: 404, body: { error: "tariff_plan_not_found" } };
-
-  const hasTierPayload = Array.isArray(payload.tiers);
-  if (hasTierPayload) {
-    const normalized = normalizeTiers(payload.tiers || []);
-    if (!normalized.ok) return { status: 400, body: { error: normalized.error } };
-
-    const updated = await prisma.$transaction(async (tx) => {
-      if (payload.isDefault) {
-        await tx.tariffPlan.updateMany({
-          where: { isDefault: true, deletedAt: null, id: { not: tariffPlanId } },
-          data: { isDefault: false },
-        });
-      }
-
-      await tx.tariffTier.updateMany({
-        where: { tariffPlanId, deletedAt: null },
-        data: { deletedAt: new Date() },
-      });
-
-      return tx.tariffPlan.update({
-        where: { id: tariffPlanId },
-        data: {
-          code: toTrimmed(payload.code)?.toUpperCase() || undefined,
-          name: toTrimmed(payload.name) || undefined,
-          description: payload.description !== undefined ? toTrimmed(payload.description) : undefined,
-          currency: toTrimmed(payload.currency)?.toUpperCase() || undefined,
-          fixedCharge:
-            payload.fixedCharge !== undefined
-              ? toDecimal(Math.max(0, toNumber(payload.fixedCharge)))
-              : undefined,
-          taxPercent:
-            payload.taxPercent !== undefined
-              ? toDecimal(Math.max(0, toNumber(payload.taxPercent)))
-              : undefined,
-          lateFeePercent:
-            payload.lateFeePercent !== undefined
-              ? toDecimal(Math.max(0, toNumber(payload.lateFeePercent)))
-              : undefined,
-          isDefault: payload.isDefault,
-          isActive: payload.isActive,
-          tiers: {
-            create: normalized.tiers.map((tier) => ({
-              minConsumption: toDecimal(tier.minConsumption, M3_SCALE),
-              maxConsumption:
-                tier.maxConsumption === null ? null : toDecimal(tier.maxConsumption, M3_SCALE),
-              unitPrice: toDecimal(tier.unitPrice, M3_SCALE),
-            })),
-          },
-        },
-        include: {
-          tiers: { where: { deletedAt: null }, orderBy: { minConsumption: "asc" } },
-        },
-      });
-    });
-
-    return { status: 200, body: { message: "tariff_plan_updated", plan: updated } };
-  }
+  const billingMode =
+    payload.billingMode !== undefined ? normalizeBillingMode(payload.billingMode) : undefined;
 
   const updated = await prisma.$transaction(async (tx) => {
     if (payload.isDefault) {
@@ -414,7 +839,21 @@ export async function updateTariffPlan(
         code: toTrimmed(payload.code)?.toUpperCase() || undefined,
         name: toTrimmed(payload.name) || undefined,
         description: payload.description !== undefined ? toTrimmed(payload.description) : undefined,
+        zoneId: payload.zoneId !== undefined ? toTrimmed(payload.zoneId) : undefined,
+        billingMode,
         currency: toTrimmed(payload.currency)?.toUpperCase() || undefined,
+        singleUnitPrice:
+          payload.singleUnitPrice !== undefined
+            ? toDecimal(Math.max(0, toNumber(payload.singleUnitPrice)), M3_SCALE)
+            : undefined,
+        hpUnitPrice:
+          payload.hpUnitPrice !== undefined
+            ? toDecimal(Math.max(0, toNumber(payload.hpUnitPrice)), M3_SCALE)
+            : undefined,
+        hcUnitPrice:
+          payload.hcUnitPrice !== undefined
+            ? toDecimal(Math.max(0, toNumber(payload.hcUnitPrice)), M3_SCALE)
+            : undefined,
         fixedCharge:
           payload.fixedCharge !== undefined
             ? toDecimal(Math.max(0, toNumber(payload.fixedCharge)))
@@ -427,11 +866,38 @@ export async function updateTariffPlan(
           payload.lateFeePercent !== undefined
             ? toDecimal(Math.max(0, toNumber(payload.lateFeePercent)))
             : undefined,
+        effectiveFrom:
+          payload.effectiveFrom !== undefined ? toDate(payload.effectiveFrom) : undefined,
+        effectiveTo: payload.effectiveTo !== undefined ? toDate(payload.effectiveTo) : undefined,
         isDefault: payload.isDefault,
         isActive: payload.isActive,
       },
       include: {
         tiers: { where: { deletedAt: null }, orderBy: { minConsumption: "asc" } },
+        serviceZone: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            city: { select: { id: true, code: true, name: true, region: true } },
+          },
+        },
+        taxes: {
+          where: { deletedAt: null, taxRule: { deletedAt: null } },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            taxRule: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                type: true,
+                applicationScope: true,
+                value: true,
+              },
+            },
+          },
+        },
       },
     });
   });
@@ -448,9 +914,26 @@ export async function listBillingCampaigns() {
       name: true,
       periodStart: true,
       periodEnd: true,
-      city: true,
-      zone: true,
+      cityNameSnapshot: true,
+      zoneNameSnapshot: true,
       status: true,
+      zones: {
+        where: { deletedAt: null, zone: { deletedAt: null } },
+        orderBy: [{ zone: { city: { name: "asc" } } }, { zone: { name: "asc" } }],
+        select: {
+          id: true,
+          cityNameSnapshot: true,
+          zoneNameSnapshot: true,
+          zone: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              city: { select: { id: true, code: true, name: true, region: true } },
+            },
+          },
+        },
+      },
       tariffPlan: { select: { id: true, code: true, name: true } },
       _count: { select: { invoices: true } },
     },
@@ -471,8 +954,7 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
   const submissionEndAt = toDate(payload.submissionEndAt);
   const cutoffAt = toDate(payload.cutoffAt);
   const frequency = toTrimmed(payload.frequency) || "MONTHLY";
-  const city = toTrimmed(payload.city);
-  const zone = toTrimmed(payload.zone);
+  const requestedZoneIds = Array.isArray(payload.zoneIds) ? payload.zoneIds : [];
   const notes = toTrimmed(payload.notes);
 
   if (!code || !name || !periodStart || !periodEnd) {
@@ -491,12 +973,39 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
     return { status: 400, body: { error: "invalid_cutoff" } };
   }
 
-  const tariffPlanId = await resolveTariffPlanId(toTrimmed(payload.tariffPlanId));
+  const selectedZones = await resolveZones(requestedZoneIds);
+  if (requestedZoneIds.length > 0 && selectedZones.length !== new Set(requestedZoneIds).size) {
+    return { status: 400, body: { error: "one_or_more_zones_not_found" } };
+  }
+
+  const selectedZoneIds = selectedZones.map((zone) => zone.id);
+  const tariffPlanId = await resolveTariffPlanId(toTrimmed(payload.tariffPlanId), selectedZoneIds);
   if (!tariffPlanId) {
     return { status: 400, body: { error: "active_tariff_plan_required" } };
   }
 
   const settings = await getAppSettings();
+
+  const selectedTariff = await prisma.tariffPlan.findFirst({
+    where: { id: tariffPlanId, deletedAt: null, isActive: true },
+    select: { zoneId: true, code: true },
+  });
+  if (!selectedTariff) {
+    return { status: 400, body: { error: "active_tariff_plan_required" } };
+  }
+  if (selectedTariff.zoneId) {
+    if (selectedZoneIds.length !== 1) {
+      return { status: 400, body: { error: "tariff_requires_single_matching_zone" } };
+    }
+    if (selectedTariff.zoneId !== selectedZoneIds[0]) {
+      return { status: 400, body: { error: "tariff_zone_mismatch" } };
+    }
+  }
+  if (!selectedTariff.zoneId && selectedZoneIds.length === 0) {
+    // Global campaigns remain allowed. No extra validation needed.
+  } else if (selectedZoneIds.length > 0 && selectedTariff.zoneId && selectedTariff.zoneId !== selectedZoneIds[0]) {
+    return { status: 400, body: { error: "tariff_zone_mismatch" } };
+  }
 
   try {
     const campaign = await prisma.billingCampaign.create({
@@ -509,14 +1018,46 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
         submissionEndAt: effectiveSubmissionEnd,
         cutoffAt: effectiveCutoff,
         frequency,
-        city,
-        zone,
+        cityNameSnapshot:
+          selectedZones.length === 1
+            ? selectedZones[0].city.name
+            : selectedZones.length > 1
+              ? "MULTI_ZONE"
+              : null,
+        zoneNameSnapshot:
+          selectedZones.length === 1
+            ? selectedZones[0].name
+            : selectedZones.length > 1
+              ? `${selectedZones.length} zones`
+              : null,
         notes,
         tariffPlanId,
         createdById: staff.id,
         settingsSnapshot: settings,
+        zones: {
+          create: selectedZones.map((selectedZone) => ({
+            zoneId: selectedZone.id,
+            cityNameSnapshot: selectedZone.city.name,
+            zoneNameSnapshot: selectedZone.name,
+          })),
+        },
       },
-      include: { tariffPlan: { select: { id: true, code: true, name: true } } },
+      include: {
+        zones: {
+          where: { deletedAt: null, zone: { deletedAt: null } },
+          include: {
+            zone: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                city: { select: { id: true, code: true, name: true, region: true } },
+              },
+            },
+          },
+        },
+        tariffPlan: { select: { id: true, code: true, name: true } },
+      },
     });
     return { status: 201, body: { message: "billing_campaign_created", campaign } };
   } catch (error) {
@@ -534,11 +1075,27 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
   const campaign = await prisma.billingCampaign.findFirst({
     where: { id: campaignId, deletedAt: null },
     include: {
+      zones: {
+        where: { deletedAt: null, zone: { deletedAt: null } },
+        include: {
+          zone: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              city: { select: { id: true, code: true, name: true, region: true } },
+            },
+          },
+        },
+      },
       tariffPlan: {
         include: {
-          tiers: {
-            where: { deletedAt: null },
-            orderBy: { minConsumption: "asc" },
+          taxes: {
+            where: { deletedAt: null, taxRule: { deletedAt: null, isActive: true } },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              taxRule: true,
+            },
           },
         },
       },
@@ -549,6 +1106,9 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
     return { status: 400, body: { error: "tariff_plan_not_available" } };
   }
   const tariffPlan = campaign.tariffPlan;
+  if (!isDateWithinRange(campaign.periodEnd, tariffPlan.effectiveFrom, tariffPlan.effectiveTo)) {
+    return { status: 400, body: { error: "tariff_plan_not_effective_for_campaign" } };
+  }
   if (campaign.finalizedAt) {
     return { status: 409, body: { error: "campaign_cycle_finalized" } };
   }
@@ -559,19 +1119,25 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
   const submissionStart = campaign.submissionStartAt ?? campaign.periodStart;
   const submissionEnd = campaign.submissionEndAt ?? campaign.periodEnd;
   const cutoffAt = campaign.cutoffAt ?? campaign.periodEnd;
+  const campaignZoneIds = campaign.zones.map((link) => link.zoneId);
+  const campaignZones = campaign.zones.map((link) => link.zone);
+  const effectiveTaxLinks = tariffPlan.taxes.filter((link) =>
+    isDateWithinRange(campaign.periodEnd, link.taxRule.effectiveFrom, link.taxRule.effectiveTo)
+  );
 
   const meters = await prisma.meter.findMany({
     where: {
       deletedAt: null,
       status: { in: ["ACTIVE", "REPLACED"] },
-      ...(campaign.city ? { city: campaign.city } : {}),
-      ...(campaign.zone ? { zone: campaign.zone } : {}),
+      ...(campaignZoneIds.length > 0 ? { zoneId: { in: campaignZoneIds } } : {}),
     },
     select: {
       id: true,
       customerId: true,
       serialNumber: true,
       status: true,
+      type: true,
+      zoneId: true,
     },
   });
 
@@ -706,29 +1272,56 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
       exceptionReasons.push("missing_baseline_reference");
     }
 
+    if (meter.type === "DUAL_INDEX" && fromSecondary === null && toSecondary !== null) {
+      hasException = true;
+      exceptionReasons.push("missing_secondary_baseline_reference");
+    }
+
     if (meter.status === "REPLACED") {
       hasException = true;
       exceptionReasons.push("meter_replaced_cycle_break");
     }
 
     const decreasingIndex = fromPrimary !== null && toPrimary !== null && toPrimary < fromPrimary;
+    const decreasingSecondaryIndex =
+      fromSecondary !== null && toSecondary !== null && toSecondary < fromSecondary;
     if (decreasingIndex) {
       hasException = true;
       exceptionReasons.push("decreasing_index_detected");
     }
+    if (decreasingSecondaryIndex) {
+      hasException = true;
+      exceptionReasons.push("decreasing_secondary_index_detected");
+    }
 
     const safeFromPrimary = fromPrimary === null ? toPrimary ?? 0 : fromPrimary;
     const safeToPrimary = toPrimary === null ? safeFromPrimary : toPrimary;
+    const safeFromSecondary = fromSecondary === null ? toSecondary ?? 0 : fromSecondary;
+    const safeToSecondary = toSecondary === null ? safeFromSecondary : toSecondary;
     const consumptionPrimary =
       decreasingIndex ? 0 : Math.max(0, round(safeToPrimary - safeFromPrimary, M3_SCALE));
+    const consumptionSecondary =
+      decreasingSecondaryIndex
+        ? 0
+        : Math.max(0, round(safeToSecondary - safeFromSecondary, M3_SCALE));
 
-    const charge = computeConsumptionCharge(consumptionPrimary, tariffPlan.tiers);
+    const charge = computeTariffCharge(
+      tariffPlan,
+      consumptionPrimary,
+      meter.type === "DUAL_INDEX" ? consumptionSecondary : 0,
+    );
     const fixedAmount = decimalToNumber(tariffPlan.fixedCharge);
     const subtotal = round(charge.total, TAX_SCALE);
-    const taxableBase = round(subtotal + fixedAmount, TAX_SCALE);
+    const subtotalBase = round(subtotal + fixedAmount, TAX_SCALE);
     const taxRate = decimalToNumber(tariffPlan.taxPercent);
-    const taxAmount = round((taxableBase * taxRate) / 100, TAX_SCALE);
-    const totalAmount = round(taxableBase + taxAmount, TAX_SCALE);
+    const baseTaxAmount = round((subtotalBase * taxRate) / 100, TAX_SCALE);
+    const additionalTaxes = computeAdditionalTaxes(effectiveTaxLinks, {
+      consumption: subtotal,
+      fixedCharge: fixedAmount,
+      subtotal: subtotalBase,
+    });
+    const taxAmount = round(baseTaxAmount + additionalTaxes.total, TAX_SCALE);
+    const totalAmount = round(subtotalBase + taxAmount, TAX_SCALE);
 
     const invoiceNumber = await generateInvoiceNumber(reading?.readingAt ?? cutoffAt);
 
@@ -751,14 +1344,15 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           dueDate: new Date(campaign.periodEnd.getTime() + 15 * 24 * 60 * 60 * 1000),
           fromPrimaryIndex: toDecimal(safeFromPrimary, M3_SCALE),
           toPrimaryIndex: toDecimal(safeToPrimary, M3_SCALE),
-          fromSecondaryIndex: fromSecondary !== null ? toDecimal(fromSecondary, M3_SCALE) : null,
-          toSecondaryIndex: toSecondary !== null ? toDecimal(toSecondary, M3_SCALE) : null,
+          fromSecondaryIndex: fromSecondary !== null ? toDecimal(safeFromSecondary, M3_SCALE) : null,
+          toSecondaryIndex: toSecondary !== null ? toDecimal(safeToSecondary, M3_SCALE) : null,
           previousPrimary: toDecimal(safeFromPrimary, M3_SCALE),
           currentPrimary: toDecimal(safeToPrimary, M3_SCALE),
-          previousSecondary: fromSecondary !== null ? toDecimal(fromSecondary, M3_SCALE) : null,
-          currentSecondary: toSecondary !== null ? toDecimal(toSecondary, M3_SCALE) : null,
+          previousSecondary: fromSecondary !== null ? toDecimal(safeFromSecondary, M3_SCALE) : null,
+          currentSecondary: toSecondary !== null ? toDecimal(safeToSecondary, M3_SCALE) : null,
           consumptionPrimary: toDecimal(consumptionPrimary, M3_SCALE),
-          consumptionSecondary: null,
+          consumptionSecondary:
+            meter.type === "DUAL_INDEX" ? toDecimal(consumptionSecondary, M3_SCALE) : null,
           isEstimated,
           estimationMethod,
           hasException,
@@ -770,6 +1364,7 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           paidAmount: toDecimal(0),
           metadata: {
             meterSerial: meter.serialNumber,
+            billingMode: tariffPlan.billingMode,
             taxRate,
             cycle: {
               fromReadingId,
@@ -778,6 +1373,22 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
               submissionStart,
               submissionEnd,
             },
+            appliedTaxes: effectiveTaxLinks.map((link) => ({
+              code: link.taxRule.code,
+              name: link.taxRule.name,
+              type: link.taxRule.type,
+              applicationScope: link.taxRule.applicationScope,
+              value: decimalToNumber(link.taxRule.value),
+            })),
+            serviceZones:
+              campaignZones.length > 0
+                ? campaignZones.map((zone) => ({
+                    id: zone.id,
+                    code: zone.code,
+                    name: zone.name,
+                    city: zone.city.name,
+                  }))
+                : null,
             exceptionReasons,
           },
         },
@@ -791,6 +1402,7 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           quantity: toDecimal(line.quantity, M3_SCALE),
           unitPrice: toDecimal(line.unitPrice, M3_SCALE),
           amount: toDecimal(line.amount),
+          meta: line.meta,
         })),
         {
           invoiceId: created.id,
@@ -805,9 +1417,22 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           type: InvoiceLineType.TAX,
           label: `Tax (${taxRate}%)`,
           quantity: toDecimal(1, M3_SCALE),
-          unitPrice: toDecimal(taxAmount, M3_SCALE),
-          amount: toDecimal(taxAmount),
+          unitPrice: toDecimal(baseTaxAmount, M3_SCALE),
+          amount: toDecimal(baseTaxAmount),
+          meta: {
+            taxPercent: taxRate,
+            taxKind: "BASE",
+          },
         },
+        ...additionalTaxes.lines.map((taxLine) => ({
+          invoiceId: created.id,
+          type: InvoiceLineType.TAX,
+          label: taxLine.label,
+          quantity: toDecimal(taxLine.quantity, M3_SCALE),
+          unitPrice: toDecimal(taxLine.unitPrice, M3_SCALE),
+          amount: toDecimal(taxLine.amount),
+          meta: taxLine.meta,
+        })),
       ];
       await tx.invoiceLine.createMany({ data: lines });
 
@@ -821,10 +1446,13 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
             fromReadingId,
             toReadingId,
             consumptionPrimary,
+            consumptionSecondary,
             subtotal,
             totalAmount,
             isEstimated,
             hasException,
+            billingMode: tariffPlan.billingMode,
+            appliedTaxCodes: effectiveTaxLinks.map((link) => link.taxRule.code),
             exceptionReasons,
           },
         },

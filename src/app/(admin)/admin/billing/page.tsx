@@ -12,6 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function BillingPage() {
+  let cityCount = 0;
+  let zoneCount = 0;
   let campaignCount = 0;
   let activeCampaignCount = 0;
   let tariffCount = 0;
@@ -22,6 +24,8 @@ export default async function BillingPage() {
 
   try {
     [
+      cityCount,
+      zoneCount,
       campaignCount,
       activeCampaignCount,
       tariffCount,
@@ -30,6 +34,8 @@ export default async function BillingPage() {
       paidCount,
       overdueCount,
     ] = await prisma.$transaction([
+      prisma.city.count({ where: { deletedAt: null, isActive: true } }),
+      prisma.zone.count({ where: { deletedAt: null, isActive: true } }),
       prisma.billingCampaign.count({ where: { deletedAt: null } }),
       prisma.billingCampaign.count({
         where: {
@@ -57,17 +63,30 @@ export default async function BillingPage() {
     <div>
       <PageBreadcrumb pageTitle="Billing" />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Cities" value={cityCount} hint="Billing geography reference" />
+        <StatCard label="Zones" value={zoneCount} hint="Service coverage configured" />
         <StatCard label="Campaigns" value={campaignCount} hint={`${activeCampaignCount} in progress`} />
         <StatCard label="Active tariffs" value={tariffCount} hint="Pricing plans available" />
-        <StatCard label="Invoices" value={invoiceCount} hint={`${issuedCount} issued`} />
-        <StatCard label="Collections" value={paidCount} hint={`${overdueCount} overdue`} />
+        <StatCard label="Invoices" value={invoiceCount} hint={`${issuedCount} issued · ${paidCount} paid · ${overdueCount} overdue`} />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+        <QuickLink
+          title="Cities"
+          description="Maintain the billing city reference used to organize service zones."
+          href="/admin/billing/cities"
+          actionLabel="Manage cities"
+        />
+        <QuickLink
+          title="Zones"
+          description="Maintain the service zones used by meters, tariffs and campaigns."
+          href="/admin/billing/zones"
+          actionLabel="Manage zones"
+        />
         <QuickLink
           title="Tariff plans"
-          description="Create and maintain tariff plans with pricing tiers."
+          description="Create single-rate or HP/HC tariffs with optional zone-specific taxes."
           href="/admin/billing/tariffs"
           actionLabel="Manage tariffs"
         />

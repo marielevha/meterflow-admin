@@ -15,12 +15,15 @@ const {
   ReadingEventType,
   ReadingSource,
   ReadingStatus,
+  TariffBillingMode,
   TaskEventType,
   TaskItemStatus,
   TaskPriority,
   TaskResolutionCode,
   TaskStatus,
   TaskType,
+  TaxApplicationScope,
+  TaxRuleType,
   UserRole,
   UserStatus,
 } = require("@prisma/client");
@@ -270,6 +273,21 @@ const users = [
   },
 ];
 
+const managedCities = [
+  { code: "CG-CITY-BZV", name: "Brazzaville", region: "Brazzaville" },
+  { code: "CG-CITY-PNR", name: "Pointe-Noire", region: "Pointe-Noire" },
+  { code: "CG-CITY-DLS", name: "Dolisie", region: "Niari" },
+];
+
+const managedZones = [
+  { code: "CG-BZV-MKL", name: "Makelele", cityCode: "CG-CITY-BZV" },
+  { code: "CG-BZV-BCG", name: "Bacongo", cityCode: "CG-CITY-BZV" },
+  { code: "CG-BZV-TLG", name: "Talangai", cityCode: "CG-CITY-BZV" },
+  { code: "CG-PNR-TIE", name: "Tie-Tie", cityCode: "CG-CITY-PNR" },
+  { code: "CG-PNR-LMB", name: "Lumumba", cityCode: "CG-CITY-PNR" },
+  { code: "CG-DLS-CNT", name: "Centre", cityCode: "CG-CITY-DLS" },
+];
+
 const meters = [
   {
     serialNumber: "MF-CG-BZV-0001",
@@ -281,6 +299,7 @@ const meters = [
     addressLine1: "Avenue Matsoua, Makelele",
     city: "Brazzaville",
     zone: "Makelele",
+    zoneCode: "CG-BZV-MKL",
     latitude: -4.283,
     longitude: 15.2756,
     installedAt: "2024-07-18T09:00:00.000Z",
@@ -296,6 +315,7 @@ const meters = [
     addressLine1: "Rue Mbaka, Bacongo",
     city: "Brazzaville",
     zone: "Bacongo",
+    zoneCode: "CG-BZV-BCG",
     latitude: -4.2894,
     longitude: 15.2673,
     installedAt: "2024-09-02T09:00:00.000Z",
@@ -311,6 +331,7 @@ const meters = [
     addressLine1: "Avenue Tchicaya U Tamsi, Tie-Tie",
     city: "Pointe-Noire",
     zone: "Tie-Tie",
+    zoneCode: "CG-PNR-TIE",
     latitude: -4.7872,
     longitude: 11.8521,
     installedAt: "2023-12-14T09:00:00.000Z",
@@ -326,6 +347,7 @@ const meters = [
     addressLine1: "Avenue Marien Ngouabi, Lumumba",
     city: "Pointe-Noire",
     zone: "Lumumba",
+    zoneCode: "CG-PNR-LMB",
     latitude: -4.7885,
     longitude: 11.8502,
     installedAt: "2024-03-09T09:00:00.000Z",
@@ -341,6 +363,7 @@ const meters = [
     addressLine1: "Avenue de l Independance, Centre",
     city: "Dolisie",
     zone: "Centre",
+    zoneCode: "CG-DLS-CNT",
     latitude: -4.1989,
     longitude: 12.6664,
     installedAt: "2024-11-04T09:00:00.000Z",
@@ -356,6 +379,7 @@ const meters = [
     addressLine1: "Rue de l OUA, Talangai",
     city: "Brazzaville",
     zone: "Talangai",
+    zoneCode: "CG-BZV-TLG",
     latitude: -4.2338,
     longitude: 15.2708,
     installedAt: "2024-05-12T09:00:00.000Z",
@@ -589,41 +613,163 @@ const managedTaskDefinitions = [
 
 const managedTariffPlans = [
   {
-    code: "CG-BT-RES-2026",
-    name: "Tarif BT Residentiel 2026",
-    description: "Tarif de demonstration pour les clients residentiels basse tension.",
+    code: "CG-MKL-RES-STD-2026",
+    name: "Tarif residentiel Makelele 2026",
+    description: "Tarif simple pour les abonnes residentiels de Makelele.",
+    zoneCode: "CG-BZV-MKL",
+    billingMode: TariffBillingMode.SINGLE_RATE,
     currency: "XAF",
+    singleUnitPrice: 96,
+    hpUnitPrice: null,
+    hcUnitPrice: null,
     fixedCharge: 1500,
     taxPercent: 18,
     lateFeePercent: 5,
     isDefault: true,
     isActive: true,
-    tiers: [
-      { minConsumption: 0, maxConsumption: 100, unitPrice: 95 },
-      { minConsumption: 100, maxConsumption: null, unitPrice: 120 },
+    taxes: [
+      {
+        code: "CG-MKL-AV-2026",
+        name: "Taxe audiovisuelle Makelele",
+        type: TaxRuleType.FIXED,
+        applicationScope: TaxApplicationScope.SUBTOTAL,
+        value: 300,
+      },
     ],
   },
   {
-    code: "CG-BT-PME-2026",
-    name: "Tarif BT Professionnel 2026",
-    description: "Tarif de demonstration pour petits commerces et ateliers.",
+    code: "CG-BCG-RES-TOU-2026",
+    name: "Tarif HP/HC Bacongo 2026",
+    description: "Tarif heures pleines / heures creuses pour les doubles index de Bacongo.",
+    zoneCode: "CG-BZV-BCG",
+    billingMode: TariffBillingMode.TIME_OF_USE,
     currency: "XAF",
-    fixedCharge: 3000,
+    singleUnitPrice: null,
+    hpUnitPrice: 118,
+    hcUnitPrice: 74,
+    fixedCharge: 1800,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [
+      {
+        code: "CG-BCG-AV-2026",
+        name: "Taxe audiovisuelle Bacongo",
+        type: TaxRuleType.PERCENT,
+        applicationScope: TaxApplicationScope.SUBTOTAL,
+        value: 2.5,
+      },
+    ],
+  },
+  {
+    code: "CG-TIE-RES-STD-2026",
+    name: "Tarif residentiel Tie-Tie 2026",
+    description: "Tarif simple pour les menages de Tie-Tie.",
+    zoneCode: "CG-PNR-TIE",
+    billingMode: TariffBillingMode.SINGLE_RATE,
+    currency: "XAF",
+    singleUnitPrice: 102,
+    hpUnitPrice: null,
+    hcUnitPrice: null,
+    fixedCharge: 1700,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [],
+  },
+  {
+    code: "CG-LMB-PRO-TOU-2026",
+    name: "Tarif professionnel Lumumba 2026",
+    description: "Tarif HP/HC applique aux petits professionnels de Lumumba.",
+    zoneCode: "CG-PNR-LMB",
+    billingMode: TariffBillingMode.TIME_OF_USE,
+    currency: "XAF",
+    singleUnitPrice: null,
+    hpUnitPrice: 126,
+    hcUnitPrice: 82,
+    fixedCharge: 3200,
     taxPercent: 18,
     lateFeePercent: 7,
     isDefault: false,
     isActive: true,
-    tiers: [
-      { minConsumption: 0, maxConsumption: 200, unitPrice: 110 },
-      { minConsumption: 200, maxConsumption: null, unitPrice: 135 },
+    taxes: [
+      {
+        code: "CG-LMB-COM-2026",
+        name: "Redevance communale Lumumba",
+        type: TaxRuleType.FIXED,
+        applicationScope: TaxApplicationScope.SUBTOTAL,
+        value: 500,
+      },
     ],
+  },
+  {
+    code: "CG-CNT-RES-STD-2026",
+    name: "Tarif residentiel Dolisie Centre 2026",
+    description: "Tarif simple pour le centre de Dolisie.",
+    zoneCode: "CG-DLS-CNT",
+    billingMode: TariffBillingMode.SINGLE_RATE,
+    currency: "XAF",
+    singleUnitPrice: 93,
+    hpUnitPrice: null,
+    hcUnitPrice: null,
+    fixedCharge: 1400,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [
+      {
+        code: "CG-CNT-RLV-2026",
+        name: "Redevance service local",
+        type: TaxRuleType.FIXED,
+        applicationScope: TaxApplicationScope.SUBTOTAL,
+        value: 250,
+      },
+    ],
+  },
+  {
+    code: "CG-TLG-RES-STD-2026",
+    name: "Tarif residentiel Talangai 2026",
+    description: "Tarif simple applique au secteur de Talangai.",
+    zoneCode: "CG-BZV-TLG",
+    billingMode: TariffBillingMode.SINGLE_RATE,
+    currency: "XAF",
+    singleUnitPrice: 98,
+    hpUnitPrice: null,
+    hcUnitPrice: null,
+    fixedCharge: 1500,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [],
+  },
+  {
+    code: "CG-GLOBAL-STD-2026",
+    name: "Tarif general de secours 2026",
+    description: "Tarif global conserve comme fallback pour les simulations hors zone.",
+    zoneCode: null,
+    billingMode: TariffBillingMode.SINGLE_RATE,
+    currency: "XAF",
+    singleUnitPrice: 100,
+    hpUnitPrice: null,
+    hcUnitPrice: null,
+    fixedCharge: 1600,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [],
   },
 ];
 
 const managedBillingCampaigns = [
   {
-    code: "CG-BILL-2026-02",
-    name: "Campagne facturation fevrier 2026",
+    code: "CG-BILL-2026-02-MKL",
+    name: "Campagne fevrier 2026 - Makelele",
+    zoneCodes: ["CG-BZV-MKL"],
     periodStart: "2026-02-01T00:00:00.000Z",
     periodEnd: "2026-02-28T23:59:59.000Z",
     submissionStartAt: "2026-02-20T00:00:00.000Z",
@@ -631,17 +777,94 @@ const managedBillingCampaigns = [
     cutoffAt: "2026-03-06T08:00:00.000Z",
     frequency: "MONTHLY",
     status: BillingCampaignStatus.ISSUED,
-    tariffPlanCode: "CG-BT-RES-2026",
+    tariffPlanCode: "CG-MKL-RES-STD-2026",
     createdByUsername: "admin001",
     launchedAt: "2026-02-20T08:00:00.000Z",
     generatedAt: "2026-03-06T09:00:00.000Z",
     issuedAt: "2026-03-07T10:00:00.000Z",
     finalizedAt: "2026-03-10T12:00:00.000Z",
-    notes: "Campagne fermee et prete pour demonstration des operations de facturation et de recouvrement.",
+    notes: "Cycle fevrier cloture pour la zone de Makelele.",
   },
   {
-    code: "CG-BILL-2026-03",
-    name: "Campagne facturation mars 2026",
+    code: "CG-BILL-2026-02-BCG",
+    name: "Campagne fevrier 2026 - Bacongo",
+    zoneCodes: ["CG-BZV-BCG"],
+    periodStart: "2026-02-01T00:00:00.000Z",
+    periodEnd: "2026-02-28T23:59:59.000Z",
+    submissionStartAt: "2026-02-20T00:00:00.000Z",
+    submissionEndAt: "2026-03-05T23:59:59.000Z",
+    cutoffAt: "2026-03-06T08:00:00.000Z",
+    frequency: "MONTHLY",
+    status: BillingCampaignStatus.ISSUED,
+    tariffPlanCode: "CG-BCG-RES-TOU-2026",
+    createdByUsername: "admin001",
+    launchedAt: "2026-02-20T08:10:00.000Z",
+    generatedAt: "2026-03-06T09:05:00.000Z",
+    issuedAt: "2026-03-07T10:05:00.000Z",
+    finalizedAt: "2026-03-10T12:05:00.000Z",
+    notes: "Cycle fevrier des compteurs doubles index de Bacongo.",
+  },
+  {
+    code: "CG-BILL-2026-02-TIE",
+    name: "Campagne fevrier 2026 - Tie-Tie",
+    zoneCodes: ["CG-PNR-TIE"],
+    periodStart: "2026-02-01T00:00:00.000Z",
+    periodEnd: "2026-02-28T23:59:59.000Z",
+    submissionStartAt: "2026-02-20T00:00:00.000Z",
+    submissionEndAt: "2026-03-05T23:59:59.000Z",
+    cutoffAt: "2026-03-06T08:00:00.000Z",
+    frequency: "MONTHLY",
+    status: BillingCampaignStatus.ISSUED,
+    tariffPlanCode: "CG-TIE-RES-STD-2026",
+    createdByUsername: "admin001",
+    launchedAt: "2026-02-20T08:20:00.000Z",
+    generatedAt: "2026-03-06T09:10:00.000Z",
+    issuedAt: "2026-03-07T10:10:00.000Z",
+    finalizedAt: "2026-03-10T12:10:00.000Z",
+    notes: "Cycle fevrier cloture pour la zone de Tie-Tie.",
+  },
+  {
+    code: "CG-BILL-2026-02-LMB",
+    name: "Campagne fevrier 2026 - Lumumba",
+    zoneCodes: ["CG-PNR-LMB"],
+    periodStart: "2026-02-01T00:00:00.000Z",
+    periodEnd: "2026-02-28T23:59:59.000Z",
+    submissionStartAt: "2026-02-20T00:00:00.000Z",
+    submissionEndAt: "2026-03-05T23:59:59.000Z",
+    cutoffAt: "2026-03-06T08:00:00.000Z",
+    frequency: "MONTHLY",
+    status: BillingCampaignStatus.ISSUED,
+    tariffPlanCode: "CG-LMB-PRO-TOU-2026",
+    createdByUsername: "admin001",
+    launchedAt: "2026-02-20T08:30:00.000Z",
+    generatedAt: "2026-03-06T09:20:00.000Z",
+    issuedAt: "2026-03-07T10:20:00.000Z",
+    finalizedAt: "2026-03-10T12:20:00.000Z",
+    notes: "Campagne professionnelle fermee pour Lumumba.",
+  },
+  {
+    code: "CG-BILL-2026-02-TLG",
+    name: "Campagne fevrier 2026 - Talangai",
+    zoneCodes: ["CG-BZV-TLG"],
+    periodStart: "2026-02-01T00:00:00.000Z",
+    periodEnd: "2026-02-28T23:59:59.000Z",
+    submissionStartAt: "2026-02-20T00:00:00.000Z",
+    submissionEndAt: "2026-03-05T23:59:59.000Z",
+    cutoffAt: "2026-03-06T08:00:00.000Z",
+    frequency: "MONTHLY",
+    status: BillingCampaignStatus.ISSUED,
+    tariffPlanCode: "CG-TLG-RES-STD-2026",
+    createdByUsername: "admin001",
+    launchedAt: "2026-02-20T08:40:00.000Z",
+    generatedAt: "2026-03-06T09:25:00.000Z",
+    issuedAt: "2026-03-07T10:30:00.000Z",
+    finalizedAt: "2026-03-10T12:30:00.000Z",
+    notes: "Cycle fevrier cloture pour Talangai.",
+  },
+  {
+    code: "CG-BILL-2026-03-URBAN",
+    name: "Campagne mars 2026 - Reseau urbain prioritaire",
+    zoneCodes: ["CG-BZV-MKL", "CG-BZV-TLG", "CG-DLS-CNT"],
     periodStart: "2026-03-01T00:00:00.000Z",
     periodEnd: "2026-03-31T23:59:59.000Z",
     submissionStartAt: "2026-03-20T00:00:00.000Z",
@@ -649,10 +872,10 @@ const managedBillingCampaigns = [
     cutoffAt: "2026-04-06T08:00:00.000Z",
     frequency: "MONTHLY",
     status: BillingCampaignStatus.RUNNING,
-    tariffPlanCode: "CG-BT-RES-2026",
+    tariffPlanCode: "CG-GLOBAL-STD-2026",
     createdByUsername: "admin001",
     launchedAt: "2026-03-20T08:00:00.000Z",
-    notes: "Fenetre courante de collecte des releves de mars sur Brazzaville, Pointe-Noire et Dolisie.",
+    notes: "Campagne multi-zones ouverte pour illustrer la collecte et la generation mutualisee sur un tarif global.",
   },
 ];
 
@@ -1397,35 +1620,6 @@ function planByCodeMap(plans) {
   return Object.fromEntries(plans.map((plan) => [plan.code, plan]));
 }
 
-function buildConsumptionLines(consumption, plan) {
-  const lines = [];
-  const tiers = [...plan.tiers].sort((a, b) => a.minConsumption - b.minConsumption);
-
-  for (const tier of tiers) {
-    const tierMax = tier.maxConsumption ?? Number.POSITIVE_INFINITY;
-    const rawQuantity = Math.max(0, Math.min(consumption, tierMax) - tier.minConsumption);
-    const lineQuantity = roundTo(rawQuantity, 3);
-    if (lineQuantity <= 0) continue;
-
-    lines.push({
-      type: InvoiceLineType.CONSUMPTION,
-      label:
-        tier.maxConsumption === null
-          ? `Energie au dela de ${tier.minConsumption} kWh`
-          : `Energie ${tier.minConsumption}-${tier.maxConsumption} kWh`,
-      quantity: quantity(lineQuantity),
-      unitPrice: quantity(tier.unitPrice),
-      amount: money(lineQuantity * tier.unitPrice),
-      meta: {
-        tierMin: tier.minConsumption,
-        tierMax: tier.maxConsumption,
-      },
-    });
-  }
-
-  return lines;
-}
-
 function sumMoney(lines) {
   return roundTo(
     lines.reduce((total, line) => total + Number(line.amount), 0),
@@ -1433,12 +1627,84 @@ function sumMoney(lines) {
   );
 }
 
+function buildConsumptionLines(consumptionPrimary, consumptionSecondary, plan) {
+  if (plan.billingMode === TariffBillingMode.TIME_OF_USE) {
+    return [
+      {
+        type: InvoiceLineType.CONSUMPTION,
+        label: "Energie HP",
+        quantity: quantity(consumptionPrimary || 0),
+        unitPrice: quantity(plan.hpUnitPrice || 0),
+        amount: money((consumptionPrimary || 0) * (plan.hpUnitPrice || 0)),
+        meta: { indexType: "PRIMARY" },
+      },
+      {
+        type: InvoiceLineType.CONSUMPTION,
+        label: "Energie HC",
+        quantity: quantity(consumptionSecondary || 0),
+        unitPrice: quantity(plan.hcUnitPrice || 0),
+        amount: money((consumptionSecondary || 0) * (plan.hcUnitPrice || 0)),
+        meta: { indexType: "SECONDARY" },
+      },
+    ].filter((line) => Number(line.quantity) > 0 || Number(line.amount) > 0);
+  }
+
+  const totalConsumption = roundTo((consumptionPrimary || 0) + (consumptionSecondary || 0), 3);
+  return [
+    {
+      type: InvoiceLineType.CONSUMPTION,
+      label: "Energie facturee",
+      quantity: quantity(totalConsumption),
+      unitPrice: quantity(plan.singleUnitPrice || 0),
+      amount: money(totalConsumption * (plan.singleUnitPrice || 0)),
+      meta: { billingMode: TariffBillingMode.SINGLE_RATE },
+    },
+  ].filter((line) => Number(line.quantity) > 0 || Number(line.amount) > 0);
+}
+
+function buildAdditionalTaxLines(plan, subtotal, fixedAmount) {
+  return (plan.taxes || []).map((tax) => {
+    const baseAmount =
+      tax.applicationScope === TaxApplicationScope.CONSUMPTION
+        ? subtotal
+        : tax.applicationScope === TaxApplicationScope.FIXED_CHARGE
+          ? fixedAmount
+          : subtotal + fixedAmount;
+
+    const amount =
+      tax.type === TaxRuleType.PERCENT
+        ? roundTo((baseAmount * tax.value) / 100, 2)
+        : roundTo(tax.value, 2);
+
+    return {
+      type: InvoiceLineType.TAX,
+      label: tax.type === TaxRuleType.PERCENT ? `${tax.name} ${tax.value}%` : tax.name,
+      quantity: quantity(1),
+      unitPrice: quantity(amount),
+      amount: money(amount),
+      meta: {
+        taxRuleCode: tax.code,
+        taxType: tax.type,
+        applicationScope: tax.applicationScope,
+        baseAmount: money(baseAmount),
+        value: tax.value,
+      },
+    };
+  });
+}
+
 function buildInvoiceScenario(params) {
-  const consumptionTotal = roundTo((params.consumptionPrimary || 0) + (params.consumptionSecondary || 0), 3);
-  const consumptionLines = buildConsumptionLines(consumptionTotal, params.tariffPlan);
+  const consumptionLines = buildConsumptionLines(
+    params.consumptionPrimary || 0,
+    params.consumptionSecondary || 0,
+    params.tariffPlan
+  );
   const subtotal = sumMoney(consumptionLines);
   const fixedAmount = params.tariffPlan.fixedCharge;
-  const taxAmount = roundTo((subtotal + fixedAmount) * (params.tariffPlan.taxPercent / 100), 2);
+  const baseTaxAmount = roundTo((subtotal + fixedAmount) * (params.tariffPlan.taxPercent / 100), 2);
+  const additionalTaxLines = buildAdditionalTaxLines(params.tariffPlan, subtotal, fixedAmount);
+  const additionalTaxAmount = sumMoney(additionalTaxLines);
+  const taxAmount = roundTo(baseTaxAmount + additionalTaxAmount, 2);
   const totalAmount = roundTo(subtotal + fixedAmount + taxAmount, 2);
   const paidAmount = roundTo(
     params.paidAmount !== undefined && params.paidAmount !== null
@@ -1463,10 +1729,11 @@ function buildInvoiceScenario(params) {
       type: InvoiceLineType.TAX,
       label: `TVA ${params.tariffPlan.taxPercent}%`,
       quantity: quantity(1),
-      unitPrice: quantity(taxAmount),
-      amount: money(taxAmount),
-      meta: { taxPercent: params.tariffPlan.taxPercent },
+      unitPrice: quantity(baseTaxAmount),
+      amount: money(baseTaxAmount),
+      meta: { taxPercent: params.tariffPlan.taxPercent, taxKind: "BASE" },
     },
+    ...additionalTaxLines,
   ];
 
   return {
@@ -1484,9 +1751,9 @@ function invoiceScenarios(planLookup) {
   return [
     buildInvoiceScenario({
       invoiceNumber: "FAC-CG-2026-02-0001",
-      tariffPlan: planLookup["CG-BT-RES-2026"],
-      tariffPlanCode: "CG-BT-RES-2026",
-      campaignCode: "CG-BILL-2026-02",
+      tariffPlan: planLookup["CG-MKL-RES-STD-2026"],
+      tariffPlanCode: "CG-MKL-RES-STD-2026",
+      campaignCode: "CG-BILL-2026-02-MKL",
       customerUsername: "client001",
       meterSerialNumber: "MF-CG-BZV-0001",
       status: InvoiceStatus.PAID,
@@ -1505,9 +1772,9 @@ function invoiceScenarios(planLookup) {
     }),
     buildInvoiceScenario({
       invoiceNumber: "FAC-CG-2026-02-0002",
-      tariffPlan: planLookup["CG-BT-RES-2026"],
-      tariffPlanCode: "CG-BT-RES-2026",
-      campaignCode: "CG-BILL-2026-02",
+      tariffPlan: planLookup["CG-BCG-RES-TOU-2026"],
+      tariffPlanCode: "CG-BCG-RES-TOU-2026",
+      campaignCode: "CG-BILL-2026-02-BCG",
       customerUsername: "client002",
       meterSerialNumber: "MF-CG-BZV-0002",
       status: InvoiceStatus.DELIVERED,
@@ -1526,9 +1793,9 @@ function invoiceScenarios(planLookup) {
     }),
     buildInvoiceScenario({
       invoiceNumber: "FAC-CG-2026-02-0003",
-      tariffPlan: planLookup["CG-BT-PME-2026"],
-      tariffPlanCode: "CG-BT-PME-2026",
-      campaignCode: "CG-BILL-2026-02",
+      tariffPlan: planLookup["CG-TIE-RES-STD-2026"],
+      tariffPlanCode: "CG-TIE-RES-STD-2026",
+      campaignCode: "CG-BILL-2026-02-TIE",
       customerUsername: "client003",
       meterSerialNumber: "MF-CG-PNR-0003",
       status: InvoiceStatus.OVERDUE,
@@ -1544,9 +1811,9 @@ function invoiceScenarios(planLookup) {
     }),
     buildInvoiceScenario({
       invoiceNumber: "FAC-CG-2026-02-0004",
-      tariffPlan: planLookup["CG-BT-PME-2026"],
-      tariffPlanCode: "CG-BT-PME-2026",
-      campaignCode: "CG-BILL-2026-02",
+      tariffPlan: planLookup["CG-LMB-PRO-TOU-2026"],
+      tariffPlanCode: "CG-LMB-PRO-TOU-2026",
+      campaignCode: "CG-BILL-2026-02-LMB",
       customerUsername: "client004",
       meterSerialNumber: "MF-CG-PNR-0004",
       status: InvoiceStatus.PARTIALLY_PAID,
@@ -1569,9 +1836,9 @@ function invoiceScenarios(planLookup) {
     }),
     buildInvoiceScenario({
       invoiceNumber: "FAC-CG-2026-02-0005",
-      tariffPlan: planLookup["CG-BT-RES-2026"],
-      tariffPlanCode: "CG-BT-RES-2026",
-      campaignCode: "CG-BILL-2026-02",
+      tariffPlan: planLookup["CG-TLG-RES-STD-2026"],
+      tariffPlanCode: "CG-TLG-RES-STD-2026",
+      campaignCode: "CG-BILL-2026-02-TLG",
       customerUsername: "client006",
       meterSerialNumber: "MF-CG-BZV-0006",
       status: InvoiceStatus.ISSUED,
@@ -1590,6 +1857,7 @@ function invoiceScenarios(planLookup) {
 async function cleanupManagedBilling() {
   const campaignCodes = managedBillingCampaigns.map((campaign) => campaign.code);
   const tariffCodes = managedTariffPlans.map((plan) => plan.code);
+  const taxCodes = managedTariffPlans.flatMap((plan) => (plan.taxes || []).map((tax) => tax.code));
   const invoiceNumbers = invoiceScenarios(planByCodeMap(managedTariffPlans)).map((invoice) => invoice.invoiceNumber);
 
   const invoices = await prisma.invoice.findMany({
@@ -1620,6 +1888,7 @@ async function cleanupManagedBilling() {
   ).map((campaign) => campaign.id);
 
   if (campaignIds.length > 0) {
+    await prisma.billingCampaignZone.deleteMany({ where: { campaignId: { in: campaignIds } } });
     await prisma.billingCampaign.deleteMany({ where: { id: { in: campaignIds } } });
   }
 
@@ -1629,7 +1898,11 @@ async function cleanupManagedBilling() {
   });
   const tariffPlanIds = tariffPlans.map((plan) => plan.id);
   if (tariffPlanIds.length > 0) {
+    await prisma.tariffPlanTax.deleteMany({ where: { tariffPlanId: { in: tariffPlanIds } } });
     await prisma.tariffTier.deleteMany({ where: { tariffPlanId: { in: tariffPlanIds } } });
+  }
+  if (taxCodes.length > 0) {
+    await prisma.taxRule.deleteMany({ where: { code: { in: taxCodes } } });
   }
 }
 
@@ -1719,9 +1992,56 @@ async function main() {
     });
   }
 
+  for (const city of managedCities) {
+    await prisma.city.upsert({
+      where: { code: city.code },
+      update: {
+        name: city.name,
+        region: city.region,
+        isActive: true,
+        deletedAt: null,
+      },
+      create: city,
+    });
+  }
+
+  const createdCities = await prisma.city.findMany({
+    where: { code: { in: managedCities.map((city) => city.code) } },
+  });
+  const cityByCode = Object.fromEntries(createdCities.map((city) => [city.code, city]));
+
+  for (const zone of managedZones) {
+    const city = cityByCode[zone.cityCode];
+    if (!city) {
+      throw new Error(`Missing city for zone ${zone.code}`);
+    }
+
+    await prisma.zone.upsert({
+      where: { code: zone.code },
+      update: {
+        name: zone.name,
+        cityId: city.id,
+        isActive: true,
+        deletedAt: null,
+      },
+      create: {
+        code: zone.code,
+        name: zone.name,
+        cityId: city.id,
+      },
+    });
+  }
+
+  const createdZones = await prisma.zone.findMany({
+    where: { code: { in: managedZones.map((zone) => zone.code) } },
+    include: { city: true },
+  });
+  const zoneByCode = Object.fromEntries(createdZones.map((zone) => [zone.code, zone]));
+
   for (const meter of meters) {
     const customer = userByUsername[meter.customerUsername];
     const agent = userByUsername[meter.assignedAgentUsername];
+    const zone = zoneByCode[meter.zoneCode];
 
     if (!customer) {
       throw new Error(`Missing customer for meter ${meter.serialNumber}`);
@@ -1733,6 +2053,7 @@ async function main() {
         meterReference: meter.meterReference,
         customerId: customer.id,
         assignedAgentId: agent?.id ?? null,
+        zoneId: zone?.id ?? null,
         type: meter.type,
         status: meter.status,
         addressLine1: meter.addressLine1,
@@ -1749,6 +2070,7 @@ async function main() {
         meterReference: meter.meterReference,
         customerId: customer.id,
         assignedAgentId: agent?.id ?? null,
+        zoneId: zone?.id ?? null,
         type: meter.type,
         status: meter.status,
         addressLine1: meter.addressLine1,
@@ -1993,12 +2315,18 @@ async function main() {
 
   const managedTariffPlanIds = {};
   for (const plan of managedTariffPlans) {
+    const zone = plan.zoneCode ? zoneByCode[plan.zoneCode] : null;
     const savedPlan = await prisma.tariffPlan.upsert({
       where: { code: plan.code },
       update: {
         name: plan.name,
         description: plan.description,
+        zoneId: zone?.id ?? null,
+        billingMode: plan.billingMode,
         currency: plan.currency,
+        singleUnitPrice: plan.singleUnitPrice,
+        hpUnitPrice: plan.hpUnitPrice,
+        hcUnitPrice: plan.hcUnitPrice,
         fixedCharge: plan.fixedCharge,
         taxPercent: plan.taxPercent,
         lateFeePercent: plan.lateFeePercent,
@@ -2010,7 +2338,12 @@ async function main() {
         code: plan.code,
         name: plan.name,
         description: plan.description,
+        zoneId: zone?.id ?? null,
+        billingMode: plan.billingMode,
         currency: plan.currency,
+        singleUnitPrice: plan.singleUnitPrice,
+        hpUnitPrice: plan.hpUnitPrice,
+        hcUnitPrice: plan.hcUnitPrice,
         fixedCharge: plan.fixedCharge,
         taxPercent: plan.taxPercent,
         lateFeePercent: plan.lateFeePercent,
@@ -2020,19 +2353,46 @@ async function main() {
     });
 
     managedTariffPlanIds[plan.code] = savedPlan.id;
+    await prisma.tariffPlanTax.deleteMany({ where: { tariffPlanId: savedPlan.id } });
     await prisma.tariffTier.deleteMany({ where: { tariffPlanId: savedPlan.id } });
-    await prisma.tariffTier.createMany({
-      data: plan.tiers.map((tier) => ({
-        tariffPlanId: savedPlan.id,
-        minConsumption: tier.minConsumption,
-        maxConsumption: tier.maxConsumption,
-        unitPrice: tier.unitPrice,
-      })),
-    });
+    for (const [index, tax] of (plan.taxes || []).entries()) {
+      const savedTax = await prisma.taxRule.upsert({
+        where: { code: tax.code },
+        update: {
+          name: tax.name,
+          description: tax.description ?? null,
+          zoneId: zone?.id ?? null,
+          type: tax.type,
+          applicationScope: tax.applicationScope,
+          value: tax.value,
+          isActive: true,
+          deletedAt: null,
+        },
+        create: {
+          code: tax.code,
+          name: tax.name,
+          description: tax.description ?? null,
+          zoneId: zone?.id ?? null,
+          type: tax.type,
+          applicationScope: tax.applicationScope,
+          value: tax.value,
+          isActive: true,
+        },
+      });
+
+      await prisma.tariffPlanTax.create({
+        data: {
+          tariffPlanId: savedPlan.id,
+          taxRuleId: savedTax.id,
+          sortOrder: index,
+        },
+      });
+    }
   }
 
   const campaignByCode = {};
   for (const campaign of managedBillingCampaigns) {
+    const selectedZones = (campaign.zoneCodes || []).map((zoneCode) => zoneByCode[zoneCode]).filter(Boolean);
     const savedCampaign = await prisma.billingCampaign.create({
       data: {
         code: campaign.code,
@@ -2043,6 +2403,18 @@ async function main() {
         submissionEndAt: campaign.submissionEndAt ? new Date(campaign.submissionEndAt) : null,
         cutoffAt: campaign.cutoffAt ? new Date(campaign.cutoffAt) : null,
         frequency: campaign.frequency,
+        cityNameSnapshot:
+          selectedZones.length === 1
+            ? selectedZones[0].city.name
+            : selectedZones.length > 1
+              ? "MULTI_ZONE"
+              : null,
+        zoneNameSnapshot:
+          selectedZones.length === 1
+            ? selectedZones[0].name
+            : selectedZones.length > 1
+              ? `${selectedZones.length} zones`
+              : null,
         status: campaign.status,
         tariffPlanId: managedTariffPlanIds[campaign.tariffPlanCode] ?? null,
         createdById: userByUsername[campaign.createdByUsername].id,
@@ -2055,6 +2427,13 @@ async function main() {
           timezone: demoAppSettings.timezone,
           locale: demoAppSettings.locale,
           maxGpsDistanceMeters: demoAppSettings.maxGpsDistanceMeters,
+        },
+        zones: {
+          create: selectedZones.map((zone) => ({
+            zoneId: zone.id,
+            cityNameSnapshot: zone.city.name,
+            zoneNameSnapshot: zone.name,
+          })),
         },
       },
     });

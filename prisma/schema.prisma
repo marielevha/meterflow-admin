@@ -118,6 +118,22 @@ enum BillingCampaignStatus {
   CANCELED
 }
 
+enum TariffBillingMode {
+  SINGLE_RATE
+  TIME_OF_USE
+}
+
+enum TaxRuleType {
+  PERCENT
+  FIXED
+}
+
+enum TaxApplicationScope {
+  CONSUMPTION
+  FIXED_CHARGE
+  SUBTOTAL
+}
+
 enum InvoiceStatus {
   DRAFT
   PENDING_REVIEW
@@ -184,53 +200,53 @@ enum OtpStatus {
 }
 
 model User {
-  id                     String               @id @default(uuid()) @db.Uuid
-  phone                  String               @unique
-  username               String?              @unique
-  email                  String?              @unique
-  passwordHash           String?              @map("password_hash")
-  firstName              String?              @map("first_name")
-  lastName               String?              @map("last_name")
-  role                   UserRole             @default(CLIENT)
-  status                 UserStatus           @default(PENDING)
-  region                 String?
-  city                   String?
-  zone                   String?
-  activatedAt            DateTime?            @map("activated_at")
-  lastLoginAt            DateTime?            @map("last_login_at")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-  deletedAt              DateTime?            @map("deleted_at")
-  customerMeters         Meter[]              @relation("CustomerMeters")
-  assignedMeters         Meter[]              @relation("AgentMeters")
-  submittedReadings      Reading[]            @relation("ReadingSubmittedBy")
-  reviewedReadings       Reading[]            @relation("ReadingReviewedBy")
-  readingEvents          ReadingEvent[]
-  assignedTasks          Task[]               @relation("TaskAssignedTo")
-  createdTasks           Task[]               @relation("TaskCreatedBy")
-  closedTasks            Task[]               @relation("TaskClosedBy")
-  startedTasks           Task[]               @relation("TaskStartedBy")
-  taskEventsAsActor      TaskEvent[]          @relation("TaskEventActor")
-  taskEventsAsRecipient  TaskEvent[]          @relation("TaskEventRecipient")
-  completedTaskItems     TaskItem[]           @relation("TaskItemCompletedBy")
-  taskComments           TaskComment[]
-  taskAttachments        TaskAttachment[]
-  otpCodes               OtpCode[]
-  authSessions           AuthSession[]
-  roleAssignments        UserRoleAssignment[] @relation("UserAssignedRoles")
-  grantedRoleAssignments UserRoleAssignment[] @relation("UserGrantedRoles")
-  billingCampaigns       BillingCampaign[]    @relation("BillingCampaignCreatedBy")
-  billedInvoices         Invoice[]            @relation("InvoiceCustomer")
-  generatedInvoices      Invoice[]            @relation("InvoiceGeneratedBy")
-  approvedInvoices       Invoice[]            @relation("InvoiceApprovedBy")
-  canceledInvoices       Invoice[]            @relation("InvoiceCanceledBy")
-  createdInvoiceEvents   InvoiceEvent[]
-  receivedPayments       Payment[]            @relation("PaymentReceivedBy")
-  deliveryLogs           InvoiceDelivery[]    @relation("InvoiceDeliveryTriggeredBy")
-  readingReminderLogs    ReadingReminderLog[]
-  mobilePushDevices      MobilePushDevice[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  phone                   String                   @unique
+  username                String?                  @unique
+  email                   String?                  @unique
+  passwordHash            String?                  @map("password_hash")
+  firstName               String?                  @map("first_name")
+  lastName                String?                  @map("last_name")
+  role                    UserRole                 @default(CLIENT)
+  status                  UserStatus               @default(PENDING)
+  region                  String?
+  city                    String?
+  zone                    String?
+  activatedAt             DateTime?                @map("activated_at")
+  lastLoginAt             DateTime?                @map("last_login_at")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  deletedAt               DateTime?                @map("deleted_at")
+  customerMeters          Meter[]                  @relation("CustomerMeters")
+  assignedMeters          Meter[]                  @relation("AgentMeters")
+  submittedReadings       Reading[]                @relation("ReadingSubmittedBy")
+  reviewedReadings        Reading[]                @relation("ReadingReviewedBy")
+  readingEvents           ReadingEvent[]
+  assignedTasks           Task[]                   @relation("TaskAssignedTo")
+  createdTasks            Task[]                   @relation("TaskCreatedBy")
+  closedTasks             Task[]                   @relation("TaskClosedBy")
+  startedTasks            Task[]                   @relation("TaskStartedBy")
+  taskEventsAsActor       TaskEvent[]              @relation("TaskEventActor")
+  taskEventsAsRecipient   TaskEvent[]              @relation("TaskEventRecipient")
+  completedTaskItems      TaskItem[]               @relation("TaskItemCompletedBy")
+  taskComments            TaskComment[]
+  taskAttachments         TaskAttachment[]
+  otpCodes                OtpCode[]
+  authSessions            AuthSession[]
+  roleAssignments         UserRoleAssignment[]     @relation("UserAssignedRoles")
+  grantedRoleAssignments  UserRoleAssignment[]     @relation("UserGrantedRoles")
+  billingCampaigns        BillingCampaign[]        @relation("BillingCampaignCreatedBy")
+  billedInvoices          Invoice[]                @relation("InvoiceCustomer")
+  generatedInvoices       Invoice[]                @relation("InvoiceGeneratedBy")
+  approvedInvoices        Invoice[]                @relation("InvoiceApprovedBy")
+  canceledInvoices        Invoice[]                @relation("InvoiceCanceledBy")
+  createdInvoiceEvents    InvoiceEvent[]
+  receivedPayments        Payment[]                @relation("PaymentReceivedBy")
+  deliveryLogs            InvoiceDelivery[]        @relation("InvoiceDeliveryTriggeredBy")
+  readingReminderLogs     ReadingReminderLog[]
+  mobilePushDevices       MobilePushDevice[]
   mobileNotificationReads MobileNotificationRead[]
-  agentNotificationReads AgentNotificationRead[]
+  agentNotificationReads  AgentNotificationRead[]
 
   @@index([role, status])
   @@index([deletedAt])
@@ -309,12 +325,51 @@ model UserRoleAssignment {
   @@map("user_role_assignments")
 }
 
+model City {
+  id        String    @id @default(uuid()) @db.Uuid
+  code      String    @unique
+  name      String
+  region    String?
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  zones     Zone[]
+
+  @@index([name])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("cities")
+}
+
+model Zone {
+  id                  String                @id @default(uuid()) @db.Uuid
+  code                String                @unique
+  name                String
+  cityId              String                @map("city_id") @db.Uuid
+  isActive            Boolean               @default(true) @map("is_active")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+  deletedAt           DateTime?             @map("deleted_at")
+  city                City                  @relation(fields: [cityId], references: [id])
+  meters              Meter[]
+  tariffPlans         TariffPlan[]
+  campaignAssignments BillingCampaignZone[]
+  taxRules            TaxRule[]
+
+  @@index([cityId, name])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("zones")
+}
+
 model Meter {
   id               String       @id @default(uuid()) @db.Uuid
   serialNumber     String       @unique @map("serial_number")
   meterReference   String?      @unique @map("meter_reference")
   customerId       String       @map("customer_id") @db.Uuid
   assignedAgentId  String?      @map("assigned_agent_id") @db.Uuid
+  zoneId           String?      @map("zone_id") @db.Uuid
   type             MeterType    @default(SINGLE_INDEX)
   status           MeterStatus  @default(ACTIVE)
   addressLine1     String?      @map("address_line_1")
@@ -330,6 +385,7 @@ model Meter {
   deletedAt        DateTime?    @map("deleted_at")
   customer         User         @relation("CustomerMeters", fields: [customerId], references: [id])
   assignedAgent    User?        @relation("AgentMeters", fields: [assignedAgentId], references: [id])
+  serviceZone      Zone?        @relation(fields: [zoneId], references: [id])
   states           MeterState[]
   readings         Reading[]
   tasks            Task[]
@@ -338,6 +394,7 @@ model Meter {
 
   @@index([customerId])
   @@index([assignedAgentId])
+  @@index([zoneId])
   @@index([status, city, zone])
   @@index([deletedAt])
   @@map("meters")
@@ -398,8 +455,8 @@ model Reading {
   reviewedBy        User?          @relation("ReadingReviewedBy", fields: [reviewedById], references: [id])
   events            ReadingEvent[]
   meterStates       MeterState[]
-  tasks             Task[]           @relation("TaskSourceReading")
-  reportedTasks     Task[]           @relation("TaskReportedReading")
+  tasks             Task[]         @relation("TaskSourceReading")
+  reportedTasks     Task[]         @relation("TaskReportedReading")
   taskItems         TaskItem[]
   invoices          Invoice[]      @relation("InvoiceSourceReading")
   fromInvoices      Invoice[]      @relation("InvoiceFromReading")
@@ -415,16 +472,16 @@ model Reading {
 }
 
 model ReadingEvent {
-  id        String           @id @default(uuid()) @db.Uuid
-  readingId String           @map("reading_id") @db.Uuid
-  userId    String?          @map("user_id") @db.Uuid
-  type      ReadingEventType
-  payload   Json             @default("{}")
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
-  deletedAt DateTime?        @map("deleted_at")
-  reading   Reading          @relation(fields: [readingId], references: [id])
-  user      User?            @relation(fields: [userId], references: [id])
+  id                String                   @id @default(uuid()) @db.Uuid
+  readingId         String                   @map("reading_id") @db.Uuid
+  userId            String?                  @map("user_id") @db.Uuid
+  type              ReadingEventType
+  payload           Json                     @default("{}")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  deletedAt         DateTime?                @map("deleted_at")
+  reading           Reading                  @relation(fields: [readingId], references: [id])
+  user              User?                    @relation(fields: [userId], references: [id])
   notificationReads MobileNotificationRead[]
 
   @@index([readingId, type, createdAt])
@@ -435,48 +492,48 @@ model ReadingEvent {
 }
 
 model Task {
-  id                   String             @id @default(uuid()) @db.Uuid
-  meterId              String?            @map("meter_id") @db.Uuid
-  readingId            String?            @map("reading_id") @db.Uuid
-  reportedReadingId    String?            @map("reported_reading_id") @db.Uuid
-  assignedToId         String?            @map("assigned_to_id") @db.Uuid
-  createdById          String?            @map("created_by_id") @db.Uuid
-  closedById           String?            @map("closed_by_id") @db.Uuid
-  startedById          String?            @map("started_by_id") @db.Uuid
-  type                 TaskType           @default(GENERAL)
-  status               TaskStatus         @default(OPEN)
-  priority             TaskPriority       @default(MEDIUM)
-  resolutionCode       TaskResolutionCode? @map("resolution_code")
-  title                String
-  description          String?
-  resolutionComment    String?            @map("resolution_comment")
-  dueAt                DateTime?          @map("due_at")
-  startedAt            DateTime?          @map("started_at")
-  fieldSubmittedAt     DateTime?          @map("field_submitted_at")
-  closedAt             DateTime?          @map("closed_at")
-  fieldPrimaryIndex    Decimal?           @map("field_primary_index") @db.Decimal(14, 3)
-  fieldSecondaryIndex  Decimal?           @map("field_secondary_index") @db.Decimal(14, 3)
-  fieldImageUrl        String?            @map("field_image_url")
-  fieldImageHash       String?            @map("field_image_hash")
-  fieldImageMimeType   String?            @map("field_image_mime_type")
-  fieldImageSizeBytes  Int?               @map("field_image_size_bytes")
-  fieldGpsLatitude     Decimal?           @map("field_gps_latitude") @db.Decimal(10, 7)
-  fieldGpsLongitude    Decimal?           @map("field_gps_longitude") @db.Decimal(10, 7)
-  fieldGpsAccuracyMeters Decimal?         @map("field_gps_accuracy_meters") @db.Decimal(10, 2)
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
-  deletedAt            DateTime?          @map("deleted_at")
-  meter                Meter?             @relation(fields: [meterId], references: [id])
-  reading              Reading?           @relation("TaskSourceReading", fields: [readingId], references: [id])
-  reportedReading      Reading?           @relation("TaskReportedReading", fields: [reportedReadingId], references: [id])
-  assignedTo           User?              @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
-  createdBy            User?              @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  closedBy             User?              @relation("TaskClosedBy", fields: [closedById], references: [id])
-  startedBy            User?              @relation("TaskStartedBy", fields: [startedById], references: [id])
-  items                TaskItem[]
-  comments             TaskComment[]
-  attachments          TaskAttachment[]
-  events               TaskEvent[]
+  id                     String              @id @default(uuid()) @db.Uuid
+  meterId                String?             @map("meter_id") @db.Uuid
+  readingId              String?             @map("reading_id") @db.Uuid
+  reportedReadingId      String?             @map("reported_reading_id") @db.Uuid
+  assignedToId           String?             @map("assigned_to_id") @db.Uuid
+  createdById            String?             @map("created_by_id") @db.Uuid
+  closedById             String?             @map("closed_by_id") @db.Uuid
+  startedById            String?             @map("started_by_id") @db.Uuid
+  type                   TaskType            @default(GENERAL)
+  status                 TaskStatus          @default(OPEN)
+  priority               TaskPriority        @default(MEDIUM)
+  resolutionCode         TaskResolutionCode? @map("resolution_code")
+  title                  String
+  description            String?
+  resolutionComment      String?             @map("resolution_comment")
+  dueAt                  DateTime?           @map("due_at")
+  startedAt              DateTime?           @map("started_at")
+  fieldSubmittedAt       DateTime?           @map("field_submitted_at")
+  closedAt               DateTime?           @map("closed_at")
+  fieldPrimaryIndex      Decimal?            @map("field_primary_index") @db.Decimal(14, 3)
+  fieldSecondaryIndex    Decimal?            @map("field_secondary_index") @db.Decimal(14, 3)
+  fieldImageUrl          String?             @map("field_image_url")
+  fieldImageHash         String?             @map("field_image_hash")
+  fieldImageMimeType     String?             @map("field_image_mime_type")
+  fieldImageSizeBytes    Int?                @map("field_image_size_bytes")
+  fieldGpsLatitude       Decimal?            @map("field_gps_latitude") @db.Decimal(10, 7)
+  fieldGpsLongitude      Decimal?            @map("field_gps_longitude") @db.Decimal(10, 7)
+  fieldGpsAccuracyMeters Decimal?            @map("field_gps_accuracy_meters") @db.Decimal(10, 2)
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+  deletedAt              DateTime?           @map("deleted_at")
+  meter                  Meter?              @relation(fields: [meterId], references: [id])
+  reading                Reading?            @relation("TaskSourceReading", fields: [readingId], references: [id])
+  reportedReading        Reading?            @relation("TaskReportedReading", fields: [reportedReadingId], references: [id])
+  assignedTo             User?               @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdBy              User?               @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  closedBy               User?               @relation("TaskClosedBy", fields: [closedById], references: [id])
+  startedBy              User?               @relation("TaskStartedBy", fields: [startedById], references: [id])
+  items                  TaskItem[]
+  comments               TaskComment[]
+  attachments            TaskAttachment[]
+  events                 TaskEvent[]
 
   @@index([status, priority, dueAt])
   @@index([deletedAt, createdAt])
@@ -490,18 +547,18 @@ model Task {
 }
 
 model TaskEvent {
-  id              String         @id @default(uuid()) @db.Uuid
-  taskId          String         @map("task_id") @db.Uuid
-  actorUserId     String?        @map("actor_user_id") @db.Uuid
-  recipientUserId String         @map("recipient_user_id") @db.Uuid
-  type            TaskEventType
-  payload         Json?          @default("{}")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  deletedAt       DateTime?      @map("deleted_at")
-  task            Task           @relation(fields: [taskId], references: [id])
-  actorUser       User?          @relation("TaskEventActor", fields: [actorUserId], references: [id])
-  recipientUser   User           @relation("TaskEventRecipient", fields: [recipientUserId], references: [id])
+  id                String                  @id @default(uuid()) @db.Uuid
+  taskId            String                  @map("task_id") @db.Uuid
+  actorUserId       String?                 @map("actor_user_id") @db.Uuid
+  recipientUserId   String                  @map("recipient_user_id") @db.Uuid
+  type              TaskEventType
+  payload           Json?                   @default("{}")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  deletedAt         DateTime?               @map("deleted_at")
+  task              Task                    @relation(fields: [taskId], references: [id])
+  actorUser         User?                   @relation("TaskEventActor", fields: [actorUserId], references: [id])
+  recipientUser     User                    @relation("TaskEventRecipient", fields: [recipientUserId], references: [id])
   notificationReads AgentNotificationRead[]
 
   @@index([taskId, createdAt])
@@ -644,8 +701,8 @@ model BillingCampaign {
   submissionEndAt   DateTime?             @map("submission_end_at")
   cutoffAt          DateTime?             @map("cutoff_at")
   frequency         String
-  city              String?
-  zone              String?
+  cityNameSnapshot  String?               @map("city")
+  zoneNameSnapshot  String?               @map("zone")
   status            BillingCampaignStatus @default(DRAFT)
   tariffPlanId      String?               @map("tariff_plan_id") @db.Uuid
   createdById       String?               @map("created_by_id") @db.Uuid
@@ -660,35 +717,66 @@ model BillingCampaign {
   deletedAt         DateTime?             @map("deleted_at")
   tariffPlan        TariffPlan?           @relation(fields: [tariffPlanId], references: [id])
   createdBy         User?                 @relation("BillingCampaignCreatedBy", fields: [createdById], references: [id])
+  zones             BillingCampaignZone[]
   invoices          Invoice[]
 
   @@index([status, periodStart, periodEnd])
-  @@index([city, zone, status])
+  @@index([cityNameSnapshot, zoneNameSnapshot, status])
   @@index([tariffPlanId])
   @@index([createdById])
   @@index([deletedAt])
   @@map("billing_campaigns")
 }
 
+model BillingCampaignZone {
+  id               String          @id @default(uuid()) @db.Uuid
+  campaignId       String          @map("campaign_id") @db.Uuid
+  zoneId           String          @map("zone_id") @db.Uuid
+  cityNameSnapshot String?         @map("city_name_snapshot")
+  zoneNameSnapshot String?         @map("zone_name_snapshot")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  deletedAt        DateTime?       @map("deleted_at")
+  campaign         BillingCampaign @relation(fields: [campaignId], references: [id])
+  zone             Zone            @relation(fields: [zoneId], references: [id])
+
+  @@unique([campaignId, zoneId])
+  @@index([campaignId])
+  @@index([zoneId])
+  @@index([deletedAt])
+  @@map("billing_campaign_zones")
+}
+
 model TariffPlan {
-  id             String            @id @default(uuid()) @db.Uuid
-  code           String            @unique
-  name           String
-  description    String?
-  currency       String            @default("XAF")
-  fixedCharge    Decimal           @default(0) @map("fixed_charge") @db.Decimal(14, 2)
-  taxPercent     Decimal           @default(0) @map("tax_percent") @db.Decimal(5, 2)
-  lateFeePercent Decimal           @default(0) @map("late_fee_percent") @db.Decimal(5, 2)
-  isDefault      Boolean           @default(false) @map("is_default")
-  isActive       Boolean           @default(true) @map("is_active")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  deletedAt      DateTime?         @map("deleted_at")
-  tiers          TariffTier[]
-  campaigns      BillingCampaign[]
-  invoices       Invoice[]
+  id              String            @id @default(uuid()) @db.Uuid
+  code            String            @unique
+  name            String
+  description     String?
+  zoneId          String?           @map("zone_id") @db.Uuid
+  billingMode     TariffBillingMode @default(SINGLE_RATE) @map("billing_mode")
+  currency        String            @default("XAF")
+  singleUnitPrice Decimal?          @map("single_unit_price") @db.Decimal(14, 3)
+  hpUnitPrice     Decimal?          @map("hp_unit_price") @db.Decimal(14, 3)
+  hcUnitPrice     Decimal?          @map("hc_unit_price") @db.Decimal(14, 3)
+  fixedCharge     Decimal           @default(0) @map("fixed_charge") @db.Decimal(14, 2)
+  taxPercent      Decimal           @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  lateFeePercent  Decimal           @default(0) @map("late_fee_percent") @db.Decimal(5, 2)
+  effectiveFrom   DateTime?         @map("effective_from")
+  effectiveTo     DateTime?         @map("effective_to")
+  isDefault       Boolean           @default(false) @map("is_default")
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  deletedAt       DateTime?         @map("deleted_at")
+  serviceZone     Zone?             @relation(fields: [zoneId], references: [id])
+  tiers           TariffTier[]
+  taxes           TariffPlanTax[]
+  campaigns       BillingCampaign[]
+  invoices        Invoice[]
 
   @@index([isActive, isDefault])
+  @@index([zoneId, billingMode])
+  @@index([effectiveFrom, effectiveTo])
   @@index([deletedAt])
   @@map("tariff_plans")
 }
@@ -707,6 +795,48 @@ model TariffTier {
   @@index([tariffPlanId, minConsumption, maxConsumption])
   @@index([deletedAt])
   @@map("tariff_tiers")
+}
+
+model TaxRule {
+  id               String              @id @default(uuid()) @db.Uuid
+  code             String              @unique
+  name             String
+  description      String?
+  zoneId           String?             @map("zone_id") @db.Uuid
+  type             TaxRuleType
+  applicationScope TaxApplicationScope @map("application_scope")
+  value            Decimal             @db.Decimal(14, 3)
+  isActive         Boolean             @default(true) @map("is_active")
+  effectiveFrom    DateTime?           @map("effective_from")
+  effectiveTo      DateTime?           @map("effective_to")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  deletedAt        DateTime?           @map("deleted_at")
+  serviceZone      Zone?               @relation(fields: [zoneId], references: [id])
+  tariffPlans      TariffPlanTax[]
+
+  @@index([zoneId, isActive])
+  @@index([effectiveFrom, effectiveTo])
+  @@index([deletedAt])
+  @@map("tax_rules")
+}
+
+model TariffPlanTax {
+  id           String     @id @default(uuid()) @db.Uuid
+  tariffPlanId String     @map("tariff_plan_id") @db.Uuid
+  taxRuleId    String     @map("tax_rule_id") @db.Uuid
+  sortOrder    Int        @default(0) @map("sort_order")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
+  tariffPlan   TariffPlan @relation(fields: [tariffPlanId], references: [id])
+  taxRule      TaxRule    @relation(fields: [taxRuleId], references: [id])
+
+  @@unique([tariffPlanId, taxRuleId])
+  @@index([tariffPlanId, sortOrder])
+  @@index([taxRuleId])
+  @@index([deletedAt])
+  @@map("tariff_plan_taxes")
 }
 
 model Invoice {
@@ -887,16 +1017,16 @@ model ReadingReminderLog {
 }
 
 model MobilePushDevice {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @map("user_id") @db.Uuid
-  expoPushToken String   @unique @map("expo_push_token")
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  expoPushToken String    @unique @map("expo_push_token")
   platform      String
-  appVersion    String?  @map("app_version")
-  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  appVersion    String?   @map("app_version")
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
-  user          User     @relation(fields: [userId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
 
   @@index([userId, deletedAt])
   @@index([deletedAt, lastSeenAt])
@@ -927,7 +1057,7 @@ model AgentNotificationRead {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   user        User      @relation(fields: [userId], references: [id])
-  taskEvent    TaskEvent @relation(fields: [taskEventId], references: [id])
+  taskEvent   TaskEvent @relation(fields: [taskEventId], references: [id])
 
   @@unique([userId, taskEventId])
   @@index([userId, readAt])

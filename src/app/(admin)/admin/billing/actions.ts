@@ -6,6 +6,8 @@ import { DeliveryChannel, PaymentMethod } from "@prisma/client";
 import {
   cancelInvoice,
   createBillingCampaign,
+  createCity,
+  createZone,
   createTariffPlan,
   generateCampaignInvoices,
   issueCampaignInvoices,
@@ -26,6 +28,27 @@ function asNumber(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseTaxes(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [code, name, type, applicationScope, rawValue, description] = line
+        .split(",")
+        .map((entry) => entry.trim());
+
+      return {
+        code,
+        name,
+        type: type || undefined,
+        applicationScope: applicationScope || undefined,
+        value: Number(rawValue),
+        description: description || undefined,
+      };
+    });
+}
+
 async function requireStaff(pathOnFail: string) {
   const user = await getCurrentStaffFromServerAction();
   if (!user) {
@@ -36,20 +59,7 @@ async function requireStaff(pathOnFail: string) {
 
 export async function createTariffPlanAction(formData: FormData) {
   const user = await requireStaff("/admin/billing/tariffs");
-
-  const tiersRaw = asString(formData.get("tiers"));
-  const parsedTiers = tiersRaw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [min, max, price] = line.split(",").map((x) => x.trim());
-      return {
-        minConsumption: Number(min),
-        maxConsumption: max ? Number(max) : null,
-        unitPrice: Number(price),
-      };
-    });
+  const taxes = parseTaxes(asString(formData.get("taxes")));
 
   const result = await createTariffPlan(
     { id: user.id, role: user.role },
@@ -57,12 +67,19 @@ export async function createTariffPlanAction(formData: FormData) {
       code: asString(formData.get("code")),
       name: asString(formData.get("name")),
       description: asString(formData.get("description")),
+      zoneId: asString(formData.get("zoneId")) || null,
+      billingMode: asString(formData.get("billingMode")) || undefined,
       currency: asString(formData.get("currency")),
+      singleUnitPrice: asNumber(formData.get("singleUnitPrice")),
+      hpUnitPrice: asNumber(formData.get("hpUnitPrice")),
+      hcUnitPrice: asNumber(formData.get("hcUnitPrice")),
       fixedCharge: asNumber(formData.get("fixedCharge")),
       taxPercent: asNumber(formData.get("taxPercent")),
       lateFeePercent: asNumber(formData.get("lateFeePercent")),
+      effectiveFrom: asString(formData.get("effectiveFrom")) || null,
+      effectiveTo: asString(formData.get("effectiveTo")) || null,
       isDefault: asString(formData.get("isDefault")) === "on",
-      tiers: parsedTiers,
+      taxes,
     }
   );
 
@@ -92,6 +109,29 @@ export async function toggleTariffPlanAction(formData: FormData) {
   redirect("/admin/billing/tariffs?success=plan_updated");
 }
 
+export async function toggleTariffPlanInlineAction(planId: string, nextActive: boolean) {
+  const user = await requireStaff("/admin/billing/tariffs");
+  if (!planId) {
+    return { ok: false as const, error: "missing_plan_id" };
+  }
+
+  const result = await updateTariffPlan(
+    { id: user.id, role: user.role },
+    planId,
+    { isActive: nextActive }
+  );
+
+  revalidatePath("/admin/billing/tariffs");
+  if (result.status >= 400) {
+    return {
+      ok: false as const,
+      error: (result.body as { error?: string }).error || "update_failed",
+    };
+  }
+
+  return { ok: true as const };
+}
+
 export async function createBillingCampaignAction(formData: FormData) {
   const user = await requireStaff("/admin/billing/campaigns");
   const result = await createBillingCampaign(
@@ -105,8 +145,10 @@ export async function createBillingCampaignAction(formData: FormData) {
       submissionEndAt: asString(formData.get("submissionEndAt")),
       cutoffAt: asString(formData.get("cutoffAt")),
       frequency: asString(formData.get("frequency")),
-      city: asString(formData.get("city")),
-      zone: asString(formData.get("zone")),
+      zoneIds: formData
+        .getAll("zoneIds")
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean),
       tariffPlanId: asString(formData.get("tariffPlanId")),
       notes: asString(formData.get("notes")),
     }
@@ -117,6 +159,47 @@ export async function createBillingCampaignAction(formData: FormData) {
     redirect(`/admin/billing/campaigns?error=${encodeURIComponent((result.body as { error?: string }).error || "create_failed")}`);
   }
   redirect("/admin/billing/campaigns?success=campaign_created");
+}
+
+export async function createCityAction(formData: FormData) {
+  const user = await requireStaff("/admin/billing/cities");
+  const result = await createCity(
+    { id: user.id, role: user.role },
+    {
+      code: asString(formData.get("code")),
+      name: asString(formData.get("name")),
+      region: asString(formData.get("region")),
+    }
+  );
+
+  revalidatePath("/admin/billing/cities");
+  revalidatePath("/admin/billing/zones");
+  revalidatePath("/admin/billing");
+  if (result.status >= 400) {
+    redirect(`/admin/billing/cities?error=${encodeURIComponent((result.body as { error?: string }).error || "create_failed")}`);
+  }
+  redirect("/admin/billing/cities?success=city_created");
+}
+
+export async function createZoneAction(formData: FormData) {
+  const user = await requireStaff("/admin/billing/zones");
+  const result = await createZone(
+    { id: user.id, role: user.role },
+    {
+      code: asString(formData.get("code")),
+      name: asString(formData.get("name")),
+      cityId: asString(formData.get("cityId")) || null,
+    }
+  );
+
+  revalidatePath("/admin/billing/zones");
+  revalidatePath("/admin/billing/tariffs");
+  revalidatePath("/admin/billing/campaigns");
+  revalidatePath("/admin/billing");
+  if (result.status >= 400) {
+    redirect(`/admin/billing/zones?error=${encodeURIComponent((result.body as { error?: string }).error || "create_failed")}`);
+  }
+  redirect("/admin/billing/zones?success=zone_created");
 }
 
 export async function generateCampaignInvoicesAction(formData: FormData) {

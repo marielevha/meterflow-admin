@@ -332,33 +332,75 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - affichage/masquage des graphiques selon les cases cochees dans settings
   - seuil GPS anti-fraude utilise depuis `maxGpsDistanceMeters` configure en settings
 
-### 18) Module billing complet (campagnes, tarifs, factures)
+### 18) Module billing professionnalise (geographie, tarifs, campagnes, factures)
 
 - Nouveau bloc menu `Billing` avec sous-pages:
   - `/admin/billing`
+  - `/admin/billing/cities`
+  - `/admin/billing/zones`
   - `/admin/billing/tariffs`
   - `/admin/billing/campaigns`
   - `/admin/billing/invoices`
   - `/admin/billing/invoices/:id`
+- Couche geographique professionnalisee:
+  - ajout d'un referentiel `cities`
+  - relation `City -> Zone`
+  - `Zone.cityId` remplace l'ancien champ libre `zone.city`
+  - les campagnes conservent des snapshots historises:
+    - `cityNameSnapshot`
+    - `zoneNameSnapshot`
+  - les affectations multi-zones conservent aussi leurs snapshots dans `billing_campaign_zones`
+- Modele billing Prisma refondu:
+  - `cities`, `zones`, `billing_campaign_zones`
+  - `tariff_plans`, `tax_rules`, `tariff_plan_taxes`
+  - `billing_campaigns`, `invoices`, `invoice_lines`, `invoice_events`, `invoice_deliveries`, `payments`
+  - garde-fou: unicite facture par compteur et campagne (`@@unique([campaignId, meterId])`)
+  - robustesse cycle: references `fromReadingId` / `toReadingId` + indexes source/cible et finalisation de cycle
+- Tarification metier alignee avec les compteurs:
+  - `TariffBillingMode`:
+    - `SINGLE_RATE`
+    - `TIME_OF_USE`
+  - support des prix unitaires:
+    - `singleUnitPrice`
+    - `hpUnitPrice`
+    - `hcUnitPrice`
+  - support des taxes additionnelles parametrables:
+    - `TaxRule`
+    - `TariffPlanTax`
+  - compatibilite:
+    - tarif global
+    - tarif restreint a une zone
+- Campagnes de facturation multi-zones:
+  - table de liaison `BillingCampaignZone`
+  - une campagne peut couvrir une ou plusieurs zones
+  - regles de coherence:
+    - un tarif global peut couvrir plusieurs zones
+    - un tarif specifique a une zone ne peut servir qu'a sa zone
 - Backend billing:
   - service metier `src/lib/backoffice/billing.ts`
   - server actions billing `src/app/(admin)/admin/billing/actions.ts`
-  - APIs REST:
-    - `GET/POST /api/v1/billing/tariffs`
-    - `PATCH /api/v1/billing/tariffs/:id`
-    - `GET/POST /api/v1/billing/campaigns`
-    - `POST /api/v1/billing/campaigns/:id/generate`
-    - `POST /api/v1/billing/campaigns/:id/issue`
-    - `GET /api/v1/billing/invoices`
-    - `GET /api/v1/billing/invoices/:id`
-    - `POST /api/v1/billing/invoices/:id/issue`
-    - `POST /api/v1/billing/invoices/:id/deliveries`
-    - `POST /api/v1/billing/invoices/:id/payments`
-    - `POST /api/v1/billing/invoices/:id/cancel`
-- Modele billing Prisma (migrations inclues):
-  - `billing_campaigns`, `tariff_plans`, `tariff_tiers`, `invoices`, `invoice_lines`, `invoice_events`, `invoice_deliveries`, `payments`
-  - robustesse cycle: references `fromReadingId` / `toReadingId` + indexes source/cible et finalisation de cycle
-  - garde-fou: unicite facture par compteur et campagne (`@@unique([campaignId, meterId])`)
+  - creation de villes, zones, tarifs et campagnes alignee sur le nouveau modele
+  - generation des factures compatible:
+    - compteurs simple index
+    - compteurs double index HP/HC
+    - taxes de base + taxes additionnelles
+- Admin billing modernise:
+  - `Tariffs`, `Zones` et `Campaigns` adoptent la meme UX:
+    - formulaire en haut
+    - formulaire masque par defaut
+    - action explicite pour l'ouvrir
+    - table en dessous
+  - suppression des largeurs forcees qui provoquaient le scroll horizontal
+  - tables passees en layout fixe avec meilleur wrapping des contenus longs
+  - `Tariffs`:
+    - switch actif/inactif a la place du bouton `Disable`
+    - confirmation avant bascule
+    - popup de succes apres mise a jour
+- Donnees de demo billing revisees:
+  - seeds Congo-Brazzaville coherents avec villes, zones, tarifs et campagnes
+  - campagnes mono-zone et multi-zones
+  - tarifs globaux et tarifs restreints a une zone
+  - taxes additionnelles de demonstration
 
 ### 19) Rappels automatiques de releve (cron + WhatsApp/Email/Push)
 
