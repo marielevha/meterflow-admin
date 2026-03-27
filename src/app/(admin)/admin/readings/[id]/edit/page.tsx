@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { ReadingStatus, UserRole } from "@prisma/client";
+import { ReadingStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
@@ -11,14 +11,18 @@ import {
   translateReadingStatus,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
 import {
   FLAG_REASON_OPTIONS,
   REJECTION_REASON_OPTIONS,
 } from "@/lib/readings/reviewReasons";
-import { isReadingTransitionAllowed } from "@/lib/workflows/stateMachines";
 import { updateReadingAction } from "./actions";
 import ReadingDecisionFields from "./ReadingDecisionFields";
 
@@ -94,7 +98,8 @@ export default async function EditReadingPage({
   searchParams: SearchParams;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await requireAdminPermissions("/admin/readings", ADMIN_PERMISSION_GROUPS.readingsManage);
+  const staff = await requireAdminPermissions("/admin/readings", ADMIN_PERMISSION_GROUPS.readingsEditPage);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
@@ -159,21 +164,25 @@ export default async function EditReadingPage({
   if (!reading) notFound();
 
   const submit = updateReadingAction.bind(null, reading.id);
-  const canEditGps = staff.role === UserRole.ADMIN || staff.role === UserRole.SUPERVISOR;
+  const canEditGps = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsUpdate);
+  const canValidateReading = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.readingsValidate
+  );
+  const canFlagReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsFlag);
+  const canRejectReading = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.readingsReject
+  );
   const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
   const gpsThreshold = gpsThresholdMeters();
   const gpsExceeded = gpsDistance !== null && gpsDistance > gpsThreshold;
   const allowedReviewStatuses = [
     reading.status,
-    ReadingStatus.VALIDATED,
-    ReadingStatus.FLAGGED,
-    ReadingStatus.REJECTED,
-  ].filter((status, index, source) => {
-    return (
-      source.indexOf(status) === index &&
-      (status === reading.status || isReadingTransitionAllowed(staff.role, reading.status, status))
-    );
-  });
+    ...(canValidateReading ? [ReadingStatus.VALIDATED] : []),
+    ...(canFlagReading ? [ReadingStatus.FLAGGED] : []),
+    ...(canRejectReading ? [ReadingStatus.REJECTED] : []),
+  ].filter((status, index, source) => source.indexOf(status) === index);
 
   return (
     <div>

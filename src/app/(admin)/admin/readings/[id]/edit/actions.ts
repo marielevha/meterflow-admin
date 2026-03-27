@@ -1,9 +1,14 @@
 "use server";
 
-import { Prisma, ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
+import { Prisma, ReadingEventType, ReadingStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
 import { prisma } from "@/lib/prisma";
 import {
@@ -12,7 +17,6 @@ import {
   normalizeFlagReasonCode,
   normalizeRejectionReasonCode,
 } from "@/lib/readings/reviewReasons";
-import { isReadingTransitionAllowed } from "@/lib/workflows/stateMachines";
 
 function asString(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -49,11 +53,18 @@ type PushPayload = {
 };
 
 export async function updateReadingAction(readingId: string, formData: FormData) {
-  const staff = await requireAdminPermissions(
-    `/admin/readings/${readingId}/edit`,
-    ADMIN_PERMISSION_GROUPS.readingsManage
-  );
-  const canEditGps = staff.role === UserRole.ADMIN || staff.role === UserRole.SUPERVISOR;
+  const staff = await requireAdminPermissions(`/admin/readings/${readingId}/edit`, [
+    ...ADMIN_PERMISSION_GROUPS.readingsUpdate,
+    ...ADMIN_PERMISSION_GROUPS.readingsValidate,
+    ...ADMIN_PERMISSION_GROUPS.readingsFlag,
+    ...ADMIN_PERMISSION_GROUPS.readingsReject,
+  ]);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canUpdateReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsUpdate);
+  const canValidateReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsValidate);
+  const canFlagReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsFlag);
+  const canRejectReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsReject);
+  const canEditGps = canUpdateReading;
 
   const status = parseStatus(asString(formData.get("status")));
   const primaryIndex = parseDecimal(asString(formData.get("primaryIndex")));
@@ -127,8 +138,52 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     redirect(`/admin/readings?error=reading_not_found`);
   }
 
-  if (!isReadingTransitionAllowed(staff.role, existing.status, status)) {
-    redirect(`/admin/readings/${readingId}/edit?error=invalid_status_transition`);
+  const indexesChanged =
+    existing.primaryIndex.toString() !== primaryIndex.toString() ||
+    (existing.secondaryIndex ? existing.secondaryIndex.toString() : null) !==
+      (secondaryIndex === null ? null : secondaryIndex.toString());
+  const gpsChanged =
+    (existing.gpsLatitude ? existing.gpsLatitude.toString() : null) !==
+      (gpsLatitude === null ? null : gpsLatitude.toString()) ||
+    (existing.gpsLongitude ? existing.gpsLongitude.toString() : null) !==
+      (gpsLongitude === null ? null : gpsLongitude.toString()) ||
+    (existing.gpsAccuracyMeters ? existing.gpsAccuracyMeters.toString() : null) !==
+      (gpsAccuracy === null ? null : gpsAccuracy.toString()) ||
+    (existing.gpsDistanceMeters ? existing.gpsDistanceMeters.toString() : null) !==
+      (gpsDistance === null ? null : gpsDistance.toString());
+  const effectiveFlagReason = status === ReadingStatus.FLAGGED ? normalizedFlagReason : null;
+  const effectiveRejectionReason =
+    status === ReadingStatus.REJECTED ? normalizedRejectionReason : null;
+  const reasonChanged =
+    existing.flagReason !== effectiveFlagReason ||
+    existing.rejectionReason !== effectiveRejectionReason;
+
+  if ((indexesChanged || gpsChanged) && !canUpdateReading) {
+    redirect(`/admin/readings/${readingId}/edit?error=missing_permission`);
+  }
+
+  if (
+    status === ReadingStatus.VALIDATED &&
+    (existing.status !== ReadingStatus.VALIDATED || reasonChanged) &&
+    !canValidateReading
+  ) {
+    redirect(`/admin/readings/${readingId}/edit?error=missing_permission`);
+  }
+
+  if (
+    status === ReadingStatus.FLAGGED &&
+    (existing.status !== ReadingStatus.FLAGGED || reasonChanged) &&
+    !canFlagReading
+  ) {
+    redirect(`/admin/readings/${readingId}/edit?error=missing_permission`);
+  }
+
+  if (
+    status === ReadingStatus.REJECTED &&
+    (existing.status !== ReadingStatus.REJECTED || reasonChanged) &&
+    !canRejectReading
+  ) {
+    redirect(`/admin/readings/${readingId}/edit?error=missing_permission`);
   }
 
   if (status === ReadingStatus.FLAGGED && !normalizedFlagReason) {

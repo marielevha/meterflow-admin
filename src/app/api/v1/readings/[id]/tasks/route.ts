@@ -7,7 +7,7 @@ async function postCreateReadingTask(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:create"] });
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["reading:task:create"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

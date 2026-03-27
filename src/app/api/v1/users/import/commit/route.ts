@@ -22,12 +22,9 @@ function isImportRow(value: unknown): value is ImportUserRow {
 }
 
 export async function POST(request: Request) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:manage"] });
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:import"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
-  }
-  if (auth.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "admin_only_endpoint" }, { status: 403 });
   }
 
   try {

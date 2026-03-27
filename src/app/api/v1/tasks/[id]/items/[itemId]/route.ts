@@ -6,7 +6,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string; itemId: string }> },
 ) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:item:manage"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

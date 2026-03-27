@@ -10,7 +10,12 @@ import {
   translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 import {
   createBillingCampaignAction,
@@ -80,7 +85,23 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingCampaignsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireAdminPermissions("/admin/billing/campaigns", ADMIN_PERMISSION_GROUPS.billingCampaignsManage);
+  const staff = await requireAdminPermissions(
+    "/admin/billing/campaigns",
+    ADMIN_PERMISSION_GROUPS.billingCampaignsView
+  );
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageCampaigns = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.billingCampaignsManage
+  );
+  const canGenerateCampaignInvoices = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.billingCampaignsGenerate
+  );
+  const canIssueCampaignInvoices = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.billingCampaignsIssue
+  );
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
@@ -188,99 +209,101 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
       ) : null}
 
       <div className="space-y-6">
-        <BillingCreatePanel
-          defaultOpen={Boolean(error)}
-          title={t("billing.campaignCreatePanelTitle")}
-          openDescription={t("billing.campaignCreateOpenDescription")}
-          closedDescription={t("billing.campaignCreateClosedDescription")}
-          openLabel={t("billing.newCampaign")}
-          closeLabel={t("billing.hideForm")}
-        >
-          <ComponentCard
-            title={t("billing.createCampaignCardTitle")}
-            desc={t("billing.createCampaignCardDesc")}
+        {canManageCampaigns ? (
+          <BillingCreatePanel
+            defaultOpen={Boolean(error)}
+            title={t("billing.campaignCreatePanelTitle")}
+            openDescription={t("billing.campaignCreateOpenDescription")}
+            closedDescription={t("billing.campaignCreateClosedDescription")}
+            openLabel={t("billing.newCampaign")}
+            closeLabel={t("billing.hideForm")}
           >
-            <form action={createBillingCampaignAction} className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Field label={t("billing.codeLabel")}>
-                  <Input name="code" placeholder="CG-BILL-2026-03-BCG" required />
-                </Field>
-                <Field label={t("billing.campaignName")}>
-                  <Input name="name" placeholder="Mars 2026 Bacongo" required />
-                </Field>
-                <Field label={t("billing.zonesPageTitle")}>
-                  <select
-                    name="zoneIds"
-                    multiple
-                    size={Math.min(6, Math.max(3, zones.length))}
+            <ComponentCard
+              title={t("billing.createCampaignCardTitle")}
+              desc={t("billing.createCampaignCardDesc")}
+            >
+              <form action={createBillingCampaignAction} className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label={t("billing.codeLabel")}>
+                    <Input name="code" placeholder="CG-BILL-2026-03-BCG" required />
+                  </Field>
+                  <Field label={t("billing.campaignName")}>
+                    <Input name="name" placeholder="Mars 2026 Bacongo" required />
+                  </Field>
+                  <Field label={t("billing.zonesPageTitle")}>
+                    <select
+                      name="zoneIds"
+                      multiple
+                      size={Math.min(6, Math.max(3, zones.length))}
+                      className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    >
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.city.name} - {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      {t("billing.multiZoneHint")}
+                    </p>
+                  </Field>
+                  <Field label={t("billing.tariffPlan")}>
+                    <select
+                      name="tariffPlanId"
+                      className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      required
+                    >
+                      <option value="">{t("billing.chooseTariffPlan")}</option>
+                      {tariffPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.code} - {plan.name}
+                          {plan.serviceZone
+                            ? ` (${plan.serviceZone.city.name} / ${plan.serviceZone.name})`
+                            : ` (${t("billing.globalZone")})`}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={t("billing.periodStart")}>
+                    <Input name="periodStart" type="datetime-local" required />
+                  </Field>
+                  <Field label={t("billing.periodEnd")}>
+                    <Input name="periodEnd" type="datetime-local" required />
+                  </Field>
+                  <Field label={t("billing.submissionStart")}>
+                    <Input name="submissionStartAt" type="datetime-local" />
+                  </Field>
+                  <Field label={t("billing.submissionEnd")}>
+                    <Input name="submissionEndAt" type="datetime-local" />
+                  </Field>
+                  <Field label={t("billing.cutoffDate")}>
+                    <Input name="cutoffAt" type="datetime-local" />
+                  </Field>
+                  <Field label={t("billing.frequency")}>
+                    <Input name="frequency" placeholder="MONTHLY" defaultValue="MONTHLY" />
+                  </Field>
+                </div>
+                <Field label={t("billing.notes")}>
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    placeholder={t("billing.notesPlaceholder")}
                     className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  >
-                    {zones.map((zone) => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.city.name} - {zone.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    {t("billing.multiZoneHint")}
-                  </p>
+                  />
                 </Field>
-                <Field label={t("billing.tariffPlan")}>
-                  <select
-                    name="tariffPlanId"
-                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                    required
-                  >
-                    <option value="">{t("billing.chooseTariffPlan")}</option>
-                    {tariffPlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.code} - {plan.name}
-                        {plan.serviceZone
-                          ? ` (${plan.serviceZone.city.name} / ${plan.serviceZone.name})`
-                          : ` (${t("billing.globalZone")})`}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={t("billing.periodStart")}>
-                  <Input name="periodStart" type="datetime-local" required />
-                </Field>
-                <Field label={t("billing.periodEnd")}>
-                  <Input name="periodEnd" type="datetime-local" required />
-                </Field>
-                <Field label={t("billing.submissionStart")}>
-                  <Input name="submissionStartAt" type="datetime-local" />
-                </Field>
-                <Field label={t("billing.submissionEnd")}>
-                  <Input name="submissionEndAt" type="datetime-local" />
-                </Field>
-                <Field label={t("billing.cutoffDate")}>
-                  <Input name="cutoffAt" type="datetime-local" />
-                </Field>
-                <Field label={t("billing.frequency")}>
-                  <Input name="frequency" placeholder="MONTHLY" defaultValue="MONTHLY" />
-                </Field>
-              </div>
-              <Field label={t("billing.notes")}>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder={t("billing.notesPlaceholder")}
-                  className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                />
-              </Field>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400">
-                {t("billing.tariffCompatibilityHint")}
-              </div>
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-              >
-                {t("billing.createCampaign")}
-              </button>
-            </form>
-          </ComponentCard>
-        </BillingCreatePanel>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400">
+                  {t("billing.tariffCompatibilityHint")}
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+                >
+                  {t("billing.createCampaign")}
+                </button>
+              </form>
+            </ComponentCard>
+          </BillingCreatePanel>
+        ) : null}
 
         <ComponentCard
           title={t("billing.campaignsCardTitle")}
@@ -355,26 +378,32 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <div className="flex flex-wrap gap-2">
-                            <form action={generateCampaignInvoicesAction}>
-                              <input type="hidden" name="campaignId" value={campaign.id} />
-                              <button
-                                type="submit"
-                                disabled={terminalStatuses.has(campaign.status)}
-                                className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-                              >
-                                {t("billing.generateInvoices")}
-                              </button>
-                            </form>
-                            <form action={issueCampaignInvoicesAction}>
-                              <input type="hidden" name="campaignId" value={campaign.id} />
-                              <button
-                                type="submit"
-                                disabled={campaign._count.invoices === 0 || terminalStatuses.has(campaign.status)}
-                                className="inline-flex h-8 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {t("billing.issueInvoices")}
-                              </button>
-                            </form>
+                            {canGenerateCampaignInvoices ? (
+                              <form action={generateCampaignInvoicesAction}>
+                                <input type="hidden" name="campaignId" value={campaign.id} />
+                                <button
+                                  type="submit"
+                                  disabled={terminalStatuses.has(campaign.status)}
+                                  className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                                >
+                                  {t("billing.generateInvoices")}
+                                </button>
+                              </form>
+                            ) : null}
+                            {canIssueCampaignInvoices ? (
+                              <form action={issueCampaignInvoicesAction}>
+                                <input type="hidden" name="campaignId" value={campaign.id} />
+                                <button
+                                  type="submit"
+                                  disabled={
+                                    campaign._count.invoices === 0 || terminalStatuses.has(campaign.status)
+                                  }
+                                  className="inline-flex h-8 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {t("billing.issueInvoices")}
+                                </button>
+                              </form>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

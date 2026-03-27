@@ -12,9 +12,10 @@ import {
 
 type AppSettingsFormProps = {
   initialSettings: AppSettings;
+  canManage?: boolean;
 };
 
-export default function AppSettingsForm({ initialSettings }: AppSettingsFormProps) {
+export default function AppSettingsForm({ initialSettings, canManage = true }: AppSettingsFormProps) {
   const { locale, t } = useAdminI18n();
   const [settings, setSettings] = useState<AppSettings>(initialSettings);
   const [baseline, setBaseline] = useState<AppSettings>(initialSettings);
@@ -67,12 +68,13 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
   };
 
   const resetSettings = () => {
+    if (!canManage) return;
     setSettings(DEFAULT_APP_SETTINGS);
     setSaveError(null);
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${canManage ? "" : "pointer-events-none opacity-70"}`}>
       <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("settingsForm.generalTitle")}</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -457,7 +459,8 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
         </div>
       </section>
 
-      <div className="sticky bottom-4 z-30 rounded-xl border border-gray-200 bg-white/90 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90">
+      {canManage ? (
+        <div className="sticky bottom-4 z-30 rounded-xl border border-gray-200 bg-white/90 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -489,7 +492,8 @@ export default function AppSettingsForm({ initialSettings }: AppSettingsFormProp
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

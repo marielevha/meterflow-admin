@@ -11,7 +11,12 @@ import {
   translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createTariffPlanAction } from "@/app/(admin)/admin/billing/actions";
@@ -58,7 +63,9 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingTariffsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireAdminPermissions("/admin/billing/tariffs", ADMIN_PERMISSION_GROUPS.billingTariffsManage);
+  const staff = await requireAdminPermissions("/admin/billing/tariffs", ADMIN_PERMISSION_GROUPS.billingTariffsView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageTariffs = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingTariffsManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
@@ -141,19 +148,20 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
       ) : null}
 
       <div className="space-y-6">
-        <BillingCreatePanel
-          defaultOpen={Boolean(error)}
-          title={t("billing.tariffCreatePanelTitle")}
-          openDescription={t("billing.tariffCreateOpenDescription")}
-          closedDescription={t("billing.tariffCreateClosedDescription")}
-          openLabel={t("billing.newTariff")}
-          closeLabel={t("billing.hideForm")}
-        >
-          <ComponentCard
-            title={t("billing.createTariffCardTitle")}
-            desc={t("billing.createTariffCardDesc")}
+        {canManageTariffs ? (
+          <BillingCreatePanel
+            defaultOpen={Boolean(error)}
+            title={t("billing.tariffCreatePanelTitle")}
+            openDescription={t("billing.tariffCreateOpenDescription")}
+            closedDescription={t("billing.tariffCreateClosedDescription")}
+            openLabel={t("billing.newTariff")}
+            closeLabel={t("billing.hideForm")}
           >
-            <form action={createTariffPlanAction} className="space-y-4">
+            <ComponentCard
+              title={t("billing.createTariffCardTitle")}
+              desc={t("billing.createTariffCardDesc")}
+            >
+              <form action={createTariffPlanAction} className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Field label={t("billing.codeLabel")}>
                   <Input name="code" placeholder="CG-BZV-BAC-TOU-2026" required />
@@ -251,9 +259,10 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
               >
                 {t("billing.createTariff")}
               </button>
-            </form>
-          </ComponentCard>
-        </BillingCreatePanel>
+              </form>
+            </ComponentCard>
+          </BillingCreatePanel>
+        ) : null}
 
         <ComponentCard
           title={t("billing.tariffsCardTitle")}
@@ -347,11 +356,17 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                           {plan.isActive ? t("billing.active") : t("billing.inactive")}
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          <TariffPlanStatusSwitch
-                            planId={plan.id}
-                            planCode={plan.code}
-                            initialChecked={plan.isActive}
-                          />
+                          {canManageTariffs ? (
+                            <TariffPlanStatusSwitch
+                              planId={plan.id}
+                              planCode={plan.code}
+                              initialChecked={plan.isActive}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {t("common.notAvailable")}
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

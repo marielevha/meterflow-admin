@@ -1,5 +1,6 @@
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { Metadata } from "next";
 import React from "react";
 
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BlankPage() {
+  await requireAdminPermissions("/admin/blank", ADMIN_PERMISSION_GROUPS.showcaseView);
   const { t } = await getAdminTranslator();
   return (
     <div>

@@ -4,7 +4,7 @@ import { listPendingReadings } from "@/lib/backoffice/readings";
 import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
 async function getPendingReadings(request: Request) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["reading:view", "reading:review"] });
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["reading:view"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

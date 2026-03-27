@@ -34,7 +34,7 @@ export default async function CreateMeterPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersManage);
+  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersCreate);
   const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
   const errorCode = Array.isArray(resolvedSearchParams.error)

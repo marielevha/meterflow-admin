@@ -47,9 +47,13 @@ export default async function BillingInvoiceDetailPage({
     ADMIN_PERMISSION_GROUPS.billingInvoicesView
   );
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageInvoices = hasAnyPermissionCode(
+  const canRegisterInvoicePayments = hasAnyPermissionCode(
     permissionCodes,
-    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+    ADMIN_PERMISSION_GROUPS.billingInvoicePaymentCreate
+  );
+  const canRegisterInvoiceDeliveries = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.billingInvoiceDeliveryCreate
   );
   const { t } = await getAdminTranslator();
   const { id } = await params;
@@ -154,36 +158,36 @@ export default async function BillingInvoiceDetailPage({
         </div>
 
         <div className="xl:col-span-4 space-y-6">
-          {canManageInvoices ? (
-            <>
-              <ComponentCard title={t("billing.registerPaymentTitle")} desc={t("billing.registerPaymentDesc")}>
-                <form action={registerInvoicePaymentAction} className="space-y-3">
-                  <input type="hidden" name="invoiceId" value={invoice.id} />
-                  <Input name="amount" type="number" step="0.01" placeholder={t("billing.amountPlaceholder")} required />
-                  <select name="method" className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                    {Object.values(PaymentMethod).map((method) => (
-                      <option key={method} value={method}>{translatePaymentMethod(method, t)}</option>
-                    ))}
-                  </select>
-                  <Input name="reference" placeholder={t("billing.referencePlaceholder")} />
-                  <Input name="paidAt" type="datetime-local" />
-                  <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">{t("billing.addPayment")}</button>
-                </form>
-              </ComponentCard>
+          {canRegisterInvoicePayments ? (
+            <ComponentCard title={t("billing.registerPaymentTitle")} desc={t("billing.registerPaymentDesc")}>
+              <form action={registerInvoicePaymentAction} className="space-y-3">
+                <input type="hidden" name="invoiceId" value={invoice.id} />
+                <Input name="amount" type="number" step="0.01" placeholder={t("billing.amountPlaceholder")} required />
+                <select name="method" className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                  {Object.values(PaymentMethod).map((method) => (
+                    <option key={method} value={method}>{translatePaymentMethod(method, t)}</option>
+                  ))}
+                </select>
+                <Input name="reference" placeholder={t("billing.referencePlaceholder")} />
+                <Input name="paidAt" type="datetime-local" />
+                <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">{t("billing.addPayment")}</button>
+              </form>
+            </ComponentCard>
+          ) : null}
 
-              <ComponentCard title={t("billing.recordDeliveryTitle")} desc={t("billing.recordDeliveryDesc")}>
-                <form action={triggerInvoiceDeliveryAction} className="space-y-3">
-                  <input type="hidden" name="invoiceId" value={invoice.id} />
-                  <select name="channel" className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                    {Object.values(DeliveryChannel).map((channel) => (
-                      <option key={channel} value={channel}>{translateDeliveryChannel(channel, t)}</option>
-                    ))}
-                  </select>
-                  <Input name="recipient" placeholder={t("billing.recipientPlaceholder")} />
-                  <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">{t("billing.recordDelivery")}</button>
-                </form>
-              </ComponentCard>
-            </>
+          {canRegisterInvoiceDeliveries ? (
+            <ComponentCard title={t("billing.recordDeliveryTitle")} desc={t("billing.recordDeliveryDesc")}>
+              <form action={triggerInvoiceDeliveryAction} className="space-y-3">
+                <input type="hidden" name="invoiceId" value={invoice.id} />
+                <select name="channel" className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                  {Object.values(DeliveryChannel).map((channel) => (
+                    <option key={channel} value={channel}>{translateDeliveryChannel(channel, t)}</option>
+                  ))}
+                </select>
+                <Input name="recipient" placeholder={t("billing.recipientPlaceholder")} />
+                <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">{t("billing.recordDelivery")}</button>
+              </form>
+            </ComponentCard>
           ) : null}
 
           <ComponentCard title={t("billing.quickStatsTitle")} desc={t("billing.quickStatsDesc")}>

@@ -404,10 +404,6 @@ export async function listTasks(staff: StaffUser, filters: TaskFilters) {
 }
 
 export async function createTask(staff: StaffUser, payload: CreateTaskPayload) {
-  if (!isManager(staff.role)) {
-    return { status: 403, body: { error: "insufficient_role" } };
-  }
-
   const title = toNullableTrimmed(payload.title);
   const description = toNullableTrimmed(payload.description);
   const meterId = toNullableTrimmed(payload.meterId);
@@ -825,7 +821,6 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
     return { status: 403, body: { error: "insufficient_scope" } };
   }
 
-  const manager = isManager(staff.role);
   const data: Prisma.TaskUpdateInput = {};
   let hasAnyChange = false;
 
@@ -849,7 +844,6 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   }
 
   if (payload.priority !== undefined) {
-    if (!manager) return { status: 403, body: { error: "priority_update_forbidden" } };
     const parsed = parseTaskPriority(payload.priority);
     if (!parsed) return { status: 400, body: { error: "invalid_priority" } };
     data.priority = parsed;
@@ -857,7 +851,6 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   }
 
   if (payload.type !== undefined) {
-    if (!manager) return { status: 403, body: { error: "type_update_forbidden" } };
     const parsed = parseTaskType(payload.type);
     if (!parsed) return { status: 400, body: { error: "invalid_type" } };
     data.type = parsed;
@@ -865,7 +858,6 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   }
 
   if (payload.title !== undefined) {
-    if (!manager) return { status: 403, body: { error: "title_update_forbidden" } };
     const title = toNullableTrimmed(payload.title);
     if (!title) return { status: 400, body: { error: "title_required" } };
     data.title = title;
@@ -873,14 +865,11 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   }
 
   if (payload.description !== undefined) {
-    if (!manager) return { status: 403, body: { error: "description_update_forbidden" } };
     data.description = toNullableTrimmed(payload.description);
     hasAnyChange = true;
   }
 
   if (payload.assignedToId !== undefined) {
-    if (!manager) return { status: 403, body: { error: "assignment_update_forbidden" } };
-
     if (payload.assignedToId === null || payload.assignedToId === "") {
       data.assignedTo = { disconnect: true };
       hasAnyChange = true;
@@ -895,7 +884,6 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   }
 
   if (payload.dueAt !== undefined) {
-    if (!manager) return { status: 403, body: { error: "due_date_update_forbidden" } };
     const dueAt = toNullableDate(payload.dueAt);
     if (payload.dueAt && !dueAt) return { status: 400, body: { error: "invalid_due_at" } };
     data.dueAt = dueAt;

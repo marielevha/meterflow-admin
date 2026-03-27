@@ -215,7 +215,7 @@ export async function createZoneAction(formData: FormData) {
 export async function generateCampaignInvoicesAction(formData: FormData) {
   const user = await requireAdminPermissions(
     "/admin/billing/campaigns",
-    ADMIN_PERMISSION_GROUPS.billingCampaignsManage
+    ADMIN_PERMISSION_GROUPS.billingCampaignsGenerate
   );
   const campaignId = asString(formData.get("campaignId"));
   if (!campaignId) redirect("/admin/billing/campaigns?error=missing_campaign_id");
@@ -232,7 +232,7 @@ export async function generateCampaignInvoicesAction(formData: FormData) {
 export async function issueCampaignInvoicesAction(formData: FormData) {
   const user = await requireAdminPermissions(
     "/admin/billing/campaigns",
-    ADMIN_PERMISSION_GROUPS.billingCampaignsManage
+    ADMIN_PERMISSION_GROUPS.billingCampaignsIssue
   );
   const campaignId = asString(formData.get("campaignId"));
   if (!campaignId) redirect("/admin/billing/campaigns?error=missing_campaign_id");
@@ -249,7 +249,7 @@ export async function issueCampaignInvoicesAction(formData: FormData) {
 export async function issueInvoiceAction(formData: FormData) {
   const user = await requireAdminPermissions(
     "/admin/billing/invoices",
-    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+    ADMIN_PERMISSION_GROUPS.billingInvoiceIssue
   );
   const invoiceId = asString(formData.get("invoiceId"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");
@@ -266,7 +266,7 @@ export async function issueInvoiceAction(formData: FormData) {
 export async function cancelInvoiceAction(formData: FormData) {
   const user = await requireAdminPermissions(
     "/admin/billing/invoices",
-    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+    ADMIN_PERMISSION_GROUPS.billingInvoiceCancel
   );
   const invoiceId = asString(formData.get("invoiceId"));
   const reason = asString(formData.get("reason"));
@@ -284,7 +284,7 @@ export async function cancelInvoiceAction(formData: FormData) {
 export async function registerInvoicePaymentAction(formData: FormData) {
   const user = await requireAdminPermissions(
     "/admin/billing/invoices",
-    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+    ADMIN_PERMISSION_GROUPS.billingInvoicePaymentCreate
   );
   const invoiceId = asString(formData.get("invoiceId"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");
@@ -316,7 +316,7 @@ export async function registerInvoicePaymentAction(formData: FormData) {
 export async function triggerInvoiceDeliveryAction(formData: FormData) {
   const user = await requireAdminPermissions(
     "/admin/billing/invoices",
-    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+    ADMIN_PERMISSION_GROUPS.billingInvoiceDeliveryCreate
   );
   const invoiceId = asString(formData.get("invoiceId"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");

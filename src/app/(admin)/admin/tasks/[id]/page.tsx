@@ -4,7 +4,11 @@ import { Prisma, ReadingStatus, TaskEventType, TaskItemStatus, TaskPriority, Tas
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
 import {
   translateMeterType,
   translateReadingStatus,
@@ -16,6 +20,7 @@ import {
   translateTaskType,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
 import {
   addTaskAttachmentAction,
@@ -203,7 +208,19 @@ export default async function TaskDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksManage);
+  const staff = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canEditTask = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksEditPage);
+  const canUpdateTaskStatus = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksUpdate);
+  const canCommentOnTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksComment);
+  const canManageTaskAttachments = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.tasksAttachmentManage
+  );
+  const canManageTaskItems = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.tasksItemManage
+  );
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
@@ -251,35 +268,39 @@ export default async function TaskDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <Badge size="sm" color={statusBadge(task.status)}>{translateTaskStatus(task.status, t)}</Badge>
-          <Link
-            href={`/admin/tasks/${task.id}/edit`}
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-          >
-            {t("common.edit")}
-          </Link>
+          {canEditTask ? (
+            <Link
+              href={`/admin/tasks/${task.id}/edit`}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+            >
+              {t("common.edit")}
+            </Link>
+          ) : null}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <section className="space-y-6 xl:col-span-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.quickStatusActions")}</h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {[TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.DONE].map((status) => {
-                const action = quickUpdateTaskStatusAction.bind(null, task.id, status);
-                return (
-                  <form key={status} action={action}>
-                    <button
-                      type="submit"
-                      className="inline-flex h-9 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-                    >
-                      {translateTaskStatus(status, t)}
-                    </button>
-                  </form>
-                );
-              })}
+          {canUpdateTaskStatus ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.quickStatusActions")}</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.DONE].map((status) => {
+                  const action = quickUpdateTaskStatusAction.bind(null, task.id, status);
+                  return (
+                    <form key={status} action={action}>
+                      <button
+                        type="submit"
+                        className="inline-flex h-9 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                      >
+                        {translateTaskStatus(status, t)}
+                      </button>
+                    </form>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -377,14 +398,16 @@ export default async function TaskDetailPage({
                         <Badge size="sm" color={itemStatusBadge(item.status)}>{translateTaskItemStatus(item.status, t)}</Badge>
                       </div>
                       <div className="mt-3 flex items-center gap-2">
-                        <form action={toggleAction}>
-                          <button
-                            type="submit"
-                            className="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-                          >
-                            {t("tasks.markAs", { status: translateTaskItemStatus(nextStatus, t) })}
-                          </button>
-                        </form>
+                        {canManageTaskItems ? (
+                          <form action={toggleAction}>
+                            <button
+                              type="submit"
+                              className="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                            >
+                              {t("tasks.markAs", { status: translateTaskItemStatus(nextStatus, t) })}
+                            </button>
+                          </form>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -392,28 +415,30 @@ export default async function TaskDetailPage({
               )}
             </div>
 
-            <form action={addItem} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
-              <input
-                name="title"
-                placeholder={t("tasks.checklistTitlePlaceholder")}
-                className="h-11 rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-5"
-                required
-              />
-              <input
-                name="details"
-                placeholder={t("tasks.checklistDetailsPlaceholder")}
-                className="h-11 rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-5"
-              />
-              <input
-                name="sortOrder"
-                type="number"
-                defaultValue={0}
-                className="h-11 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-1"
-              />
-              <button type="submit" className="h-11 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 md:col-span-1">
-                {t("tasks.addItem")}
-              </button>
-            </form>
+            {canManageTaskItems ? (
+              <form action={addItem} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
+                <input
+                  name="title"
+                  placeholder={t("tasks.checklistTitlePlaceholder")}
+                  className="h-11 rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-5"
+                  required
+                />
+                <input
+                  name="details"
+                  placeholder={t("tasks.checklistDetailsPlaceholder")}
+                  className="h-11 rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-5"
+                />
+                <input
+                  name="sortOrder"
+                  type="number"
+                  defaultValue={0}
+                  className="h-11 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 md:col-span-1"
+                />
+                <button type="submit" className="h-11 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 md:col-span-1">
+                  {t("tasks.addItem")}
+                </button>
+              </form>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -434,22 +459,24 @@ export default async function TaskDetailPage({
               )}
             </div>
 
-            <form action={addComment} className="mt-4 space-y-3">
-              <textarea
-                name="comment"
-                rows={3}
-                placeholder={t("tasks.writeComment")}
-                className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                required
-              />
-              <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <input type="checkbox" name="isInternal" value="1" defaultChecked className="h-3.5 w-3.5" />
-                {t("tasks.internalComment")}
-              </label>
-              <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
-                {t("tasks.addComment")}
-              </button>
-            </form>
+            {canCommentOnTasks ? (
+              <form action={addComment} className="mt-4 space-y-3">
+                <textarea
+                  name="comment"
+                  rows={3}
+                  placeholder={t("tasks.writeComment")}
+                  className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  required
+                />
+                <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <input type="checkbox" name="isInternal" value="1" defaultChecked className="h-3.5 w-3.5" />
+                  {t("tasks.internalComment")}
+                </label>
+                <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
+                  {t("tasks.addComment")}
+                </button>
+              </form>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -473,41 +500,43 @@ export default async function TaskDetailPage({
               )}
             </div>
 
-            <form action={addAttachment} className="mt-4 space-y-2">
-              <input
-                name="fileUrl"
-                placeholder={t("tasks.fileUrlPlaceholder")}
-                className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                required
-              />
-              <input
-                name="fileName"
-                placeholder={t("tasks.fileNamePlaceholder")}
-                className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                required
-              />
-              <div className="grid grid-cols-2 gap-2">
+            {canManageTaskAttachments ? (
+              <form action={addAttachment} className="mt-4 space-y-2">
                 <input
-                  name="mimeType"
-                  placeholder={t("tasks.mimeTypePlaceholder")}
-                  className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  name="fileUrl"
+                  placeholder={t("tasks.fileUrlPlaceholder")}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  required
                 />
                 <input
-                  name="fileSizeBytes"
-                  type="number"
-                  placeholder={t("tasks.fileSizeBytesPlaceholder")}
-                  className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  name="fileName"
+                  placeholder={t("tasks.fileNamePlaceholder")}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  required
                 />
-              </div>
-              <input
-                name="fileHash"
-                placeholder={t("tasks.fileHashPlaceholder")}
-                className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
-              <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
-                {t("tasks.addAttachment")}
-              </button>
-            </form>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    name="mimeType"
+                    placeholder={t("tasks.mimeTypePlaceholder")}
+                    className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  />
+                  <input
+                    name="fileSizeBytes"
+                    type="number"
+                    placeholder={t("tasks.fileSizeBytesPlaceholder")}
+                    className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  />
+                </div>
+                <input
+                  name="fileHash"
+                  placeholder={t("tasks.fileHashPlaceholder")}
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+                <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
+                  {t("tasks.addAttachment")}
+                </button>
+              </form>
+            ) : null}
           </div>
         </section>
 

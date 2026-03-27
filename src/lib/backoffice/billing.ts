@@ -119,7 +119,6 @@ const DELIVERABLE_INVOICE_STATUSES = new Set<InvoiceStatus>([
   InvoiceStatus.PARTIALLY_PAID,
   InvoiceStatus.PAID,
 ]);
-const FINANCE_STAFF_ROLES = new Set<UserRole>([UserRole.ADMIN, UserRole.SUPERVISOR]);
 const BASELINE_INVOICE_STATUSES = [
   InvoiceStatus.ISSUED,
   InvoiceStatus.DELIVERED,
@@ -196,13 +195,6 @@ function normalizeTiers(tiers: CreateTariffTierInput[]) {
   }
 
   return { ok: true as const, tiers: sanitized };
-}
-
-function assertAdmin(user: StaffUser) {
-  if (user.role !== UserRole.ADMIN) {
-    return { ok: false as const, status: 403, body: { error: "admin_only_endpoint" } };
-  }
-  return { ok: true as const };
 }
 
 async function resolveZone(inputZoneId?: string | null) {
@@ -549,9 +541,6 @@ export async function listCities() {
 }
 
 export async function createCity(staff: StaffUser, payload: CreateCityInput) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const code = toTrimmed(payload.code)?.toUpperCase();
   const name = toTrimmed(payload.name);
   const region = toTrimmed(payload.region);
@@ -579,9 +568,6 @@ export async function createCity(staff: StaffUser, payload: CreateCityInput) {
 }
 
 export async function createZone(staff: StaffUser, payload: CreateZoneInput) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const code = toTrimmed(payload.code)?.toUpperCase();
   const name = toTrimmed(payload.name);
   const cityId = toTrimmed(payload.cityId);
@@ -657,9 +643,6 @@ export async function listTariffPlans() {
 }
 
 export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPlanInput) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const code = toTrimmed(payload.code)?.toUpperCase();
   const name = toTrimmed(payload.name);
   const description = toTrimmed(payload.description);
@@ -814,9 +797,6 @@ export async function updateTariffPlan(
   tariffPlanId: string,
   payload: UpdateTariffPlanInput
 ) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const existing = await prisma.tariffPlan.findFirst({
     where: { id: tariffPlanId, deletedAt: null },
     select: { id: true },
@@ -943,9 +923,6 @@ export async function listBillingCampaigns() {
 }
 
 export async function createBillingCampaign(staff: StaffUser, payload: CreateCampaignInput) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const code = toTrimmed(payload.code)?.toUpperCase();
   const name = toTrimmed(payload.name);
   const periodStart = toDate(payload.periodStart);
@@ -1069,9 +1046,6 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
 }
 
 export async function generateCampaignInvoices(staff: StaffUser, campaignId: string) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const campaign = await prisma.billingCampaign.findFirst({
     where: { id: campaignId, deletedAt: null },
     include: {
@@ -1487,9 +1461,6 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
 }
 
 export async function issueCampaignInvoices(staff: StaffUser, campaignId: string) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const campaign = await prisma.billingCampaign.findFirst({
     where: { id: campaignId, deletedAt: null },
     select: { id: true, status: true },
@@ -1635,9 +1606,6 @@ export async function getInvoiceDetail(invoiceId: string) {
 }
 
 export async function issueInvoice(staff: StaffUser, invoiceId: string) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, deletedAt: null },
     select: { id: true, status: true },
@@ -1673,9 +1641,6 @@ export async function issueInvoice(staff: StaffUser, invoiceId: string) {
 }
 
 export async function cancelInvoice(staff: StaffUser, invoiceId: string, reason?: string) {
-  const admin = assertAdmin(staff);
-  if (!admin.ok) return admin;
-
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, deletedAt: null },
     select: { id: true, status: true },
@@ -1718,10 +1683,6 @@ export async function registerInvoicePayment(
   invoiceId: string,
   payload: RegisterPaymentPayload
 ) {
-  if (!FINANCE_STAFF_ROLES.has(staff.role)) {
-    return { status: 403, body: { error: "insufficient_role" } };
-  }
-
   const amount = Math.max(0, toNumber(payload.amount));
   if (amount <= 0) return { status: 400, body: { error: "amount_must_be_positive" } };
 
@@ -1793,10 +1754,6 @@ export async function triggerInvoiceDelivery(
   invoiceId: string,
   payload: TriggerDeliveryPayload
 ) {
-  if (!FINANCE_STAFF_ROLES.has(staff.role)) {
-    return { status: 403, body: { error: "insufficient_role" } };
-  }
-
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, deletedAt: null },
     include: {

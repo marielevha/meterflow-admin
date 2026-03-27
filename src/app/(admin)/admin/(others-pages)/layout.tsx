@@ -6,6 +6,10 @@ export default async function AdminOtherPagesLayout({
 }: {
   children: ReactNode;
 }) {
-  await requireAdminPermissions("/admin/overview", ADMIN_PERMISSION_GROUPS.staffUtilities);
+  await requireAdminPermissions("/admin/overview", [
+    ...ADMIN_PERMISSION_GROUPS.calendarView,
+    ...ADMIN_PERMISSION_GROUPS.profileView,
+    ...ADMIN_PERMISSION_GROUPS.showcaseView,
+  ]);
   return children;
 }

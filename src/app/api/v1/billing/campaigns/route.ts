@@ -5,7 +5,7 @@ import { createBillingCampaign, listBillingCampaigns } from "@/lib/backoffice/bi
 
 export async function GET(request: Request) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsManage],
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsView],
   });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 

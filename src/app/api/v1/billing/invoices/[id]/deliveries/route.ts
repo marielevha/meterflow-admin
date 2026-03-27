@@ -8,7 +8,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesManage],
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoiceDeliveryCreate],
   });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 

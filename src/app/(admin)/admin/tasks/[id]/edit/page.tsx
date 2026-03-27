@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { TaskPriority, TaskStatus, TaskType, UserRole, UserStatus } from "@prisma/client";
+import { TaskPriority, TaskStatus, TaskType, UserStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Label from "@/components/form/Label";
@@ -12,7 +12,12 @@ import {
   translateTaskType,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
 import { prisma } from "@/lib/prisma";
 import { updateTaskAction } from "./actions";
@@ -66,7 +71,10 @@ export default async function EditTaskPage({
   searchParams: SearchParams;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksManage);
+  const staff = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksEditPage);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canUpdateTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksUpdate);
+  const canAssignTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksAssign);
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
@@ -93,7 +101,6 @@ export default async function EditTaskPage({
   const task = taskResult.body.task;
   if (!task) notFound();
 
-  const isManager = staff.role === UserRole.ADMIN || staff.role === UserRole.SUPERVISOR;
   const submit = updateTaskAction.bind(null, task.id);
 
   return (
@@ -107,7 +114,7 @@ export default async function EditTaskPage({
           </div>
         ) : null}
 
-        {!isManager ? (
+        {!canUpdateTasks && !canAssignTasks ? (
           <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
             {t("tasks.managerOnlyWarning")}
           </div>
@@ -135,6 +142,7 @@ export default async function EditTaskPage({
                 id="status"
                 name="status"
                 defaultValue={task.status}
+                disabled={!canUpdateTasks}
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
                 {Object.values(TaskStatus).map((item) => (
@@ -150,9 +158,9 @@ export default async function EditTaskPage({
                 name="dueAt"
                 type="datetime-local"
                 defaultValue={toDatetimeLocal(task.dueAt)}
-                disabled={!isManager}
+                disabled={!canUpdateTasks}
               />
-              {!isManager ? null : (
+              {!canUpdateTasks ? null : (
                 <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                   <input type="checkbox" name="clearDueAt" value="1" className="h-3.5 w-3.5" />
                   {t("tasks.clearDueDate")}
@@ -162,7 +170,7 @@ export default async function EditTaskPage({
 
             <div>
               <Label htmlFor="assignedToId">{t("tasks.assignedAgentLabel")}</Label>
-              {isManager ? (
+              {canAssignTasks ? (
                 <SearchableSelect
                   id="assignedToId"
                   name="assignedToId"
@@ -179,7 +187,7 @@ export default async function EditTaskPage({
               ) : (
                 <Input id="assignedToId_readonly" value={personLabel(task.assignedTo) || t("tasks.unassigned")} disabled />
               )}
-              {!isManager ? null : (
+              {!canAssignTasks ? null : (
                 <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                   <input type="checkbox" name="clearAssignee" value="1" className="h-3.5 w-3.5" />
                   {t("tasks.unassignTask")}
@@ -193,7 +201,7 @@ export default async function EditTaskPage({
                 id="priority"
                 name="priority"
                 defaultValue={task.priority}
-                disabled={!isManager}
+                disabled={!canUpdateTasks}
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
                 {Object.values(TaskPriority).map((item) => (
@@ -215,7 +223,7 @@ export default async function EditTaskPage({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="title">{t("common.title")}</Label>
-              <Input id="title" name="title" defaultValue={task.title} disabled={!isManager} />
+              <Input id="title" name="title" defaultValue={task.title} disabled={!canUpdateTasks} />
             </div>
 
             <div>
@@ -224,7 +232,7 @@ export default async function EditTaskPage({
                 id="type"
                 name="type"
                 defaultValue={task.type}
-                disabled={!isManager}
+                disabled={!canUpdateTasks}
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
                 {Object.values(TaskType).map((item) => (
@@ -240,7 +248,7 @@ export default async function EditTaskPage({
                 name="description"
                 rows={4}
                 defaultValue={task.description || ""}
-                disabled={!isManager}
+                disabled={!canUpdateTasks}
                 className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               />
             </div>
@@ -264,7 +272,13 @@ export default async function EditTaskPage({
             </p>
             <div className="flex items-center justify-end gap-2">
               <Link href={`/admin/tasks/${task.id}`} className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]">{t("common.cancel")}</Link>
-              <button type="submit" className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">{t("tasks.saveChanges")}</button>
+              <button
+                type="submit"
+                disabled={!canUpdateTasks && !canAssignTasks}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t("tasks.saveChanges")}
+              </button>
             </div>
           </div>
         </div>

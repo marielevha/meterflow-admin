@@ -6,7 +6,12 @@ import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createCityAction } from "@/app/(admin)/admin/billing/actions";
@@ -24,7 +29,9 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingCitiesPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireAdminPermissions("/admin/billing/cities", ADMIN_PERMISSION_GROUPS.billingCitiesManage);
+  const staff = await requireAdminPermissions("/admin/billing/cities", ADMIN_PERMISSION_GROUPS.billingCitiesView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageCities = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCitiesManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
@@ -78,19 +85,20 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
       ) : null}
 
       <div className="space-y-6">
-        <BillingCreatePanel
-          defaultOpen={Boolean(error)}
-          title={t("billing.cityCreatePanelTitle")}
-          openDescription={t("billing.cityCreateOpenDescription")}
-          closedDescription={t("billing.cityCreateClosedDescription")}
-          openLabel={t("billing.newCity")}
-          closeLabel={t("billing.hideForm")}
-        >
-          <ComponentCard
-            title={t("billing.createCity")}
-            desc={t("billing.citiesCardDescription")}
+        {canManageCities ? (
+          <BillingCreatePanel
+            defaultOpen={Boolean(error)}
+            title={t("billing.cityCreatePanelTitle")}
+            openDescription={t("billing.cityCreateOpenDescription")}
+            closedDescription={t("billing.cityCreateClosedDescription")}
+            openLabel={t("billing.newCity")}
+            closeLabel={t("billing.hideForm")}
           >
-            <form action={createCityAction} className="space-y-4">
+            <ComponentCard
+              title={t("billing.createCity")}
+              desc={t("billing.citiesCardDescription")}
+            >
+              <form action={createCityAction} className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <Field label={t("billing.codeLabel")}>
                   <Input name="code" placeholder="CG-CITY-BZV" required />
@@ -108,9 +116,10 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
               >
                 {t("billing.createCity")}
               </button>
-            </form>
-          </ComponentCard>
-        </BillingCreatePanel>
+              </form>
+            </ComponentCard>
+          </BillingCreatePanel>
+        ) : null}
 
         <ComponentCard title={t("billing.citiesCardTitle")} desc={t("billing.citiesCardDesc")}>
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">

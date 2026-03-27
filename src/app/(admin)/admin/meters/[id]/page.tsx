@@ -43,7 +43,7 @@ export default async function MeterDetailsPage({
 }) {
   const staff = await requireAdminPermissions("/admin/meters", ADMIN_PERMISSION_GROUPS.metersView);
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersManage);
+  const canEditMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersEdit);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const meter = await prisma.meter.findFirst({
@@ -112,7 +112,7 @@ export default async function MeterDetailsPage({
         >
           {t("common.back")}
         </Link>
-        {canManageMeters ? (
+        {canEditMeters ? (
           <Link
             href={`/admin/meters/${meter.id}/edit`}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"

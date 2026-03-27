@@ -12,7 +12,7 @@ function asString(value: FormDataEntryValue | null) {
 export async function addTaskCommentAction(taskId: string, formData: FormData) {
   const staff = await requireAdminPermissions(
     `/admin/tasks/${taskId}`,
-    ADMIN_PERMISSION_GROUPS.tasksManage
+    ADMIN_PERMISSION_GROUPS.tasksComment
   );
 
   const result = await addTaskComment(
@@ -35,7 +35,7 @@ export async function addTaskCommentAction(taskId: string, formData: FormData) {
 export async function addTaskAttachmentAction(taskId: string, formData: FormData) {
   const staff = await requireAdminPermissions(
     `/admin/tasks/${taskId}`,
-    ADMIN_PERMISSION_GROUPS.tasksManage
+    ADMIN_PERMISSION_GROUPS.tasksAttachmentManage
   );
 
   const result = await addTaskAttachment(
@@ -61,7 +61,7 @@ export async function addTaskAttachmentAction(taskId: string, formData: FormData
 export async function addTaskItemAction(taskId: string, formData: FormData) {
   const staff = await requireAdminPermissions(
     `/admin/tasks/${taskId}`,
-    ADMIN_PERMISSION_GROUPS.tasksManage
+    ADMIN_PERMISSION_GROUPS.tasksItemManage
   );
 
   const result = await addTaskItem(
@@ -85,7 +85,7 @@ export async function addTaskItemAction(taskId: string, formData: FormData) {
 export async function toggleTaskItemStatusAction(taskId: string, itemId: string, nextStatus: string) {
   const staff = await requireAdminPermissions(
     `/admin/tasks/${taskId}`,
-    ADMIN_PERMISSION_GROUPS.tasksManage
+    ADMIN_PERMISSION_GROUPS.tasksItemManage
   );
 
   const result = await updateTaskItem(
@@ -106,7 +106,7 @@ export async function toggleTaskItemStatusAction(taskId: string, itemId: string,
 export async function quickUpdateTaskStatusAction(taskId: string, status: string) {
   const staff = await requireAdminPermissions(
     `/admin/tasks/${taskId}`,
-    ADMIN_PERMISSION_GROUPS.tasksManage
+    ADMIN_PERMISSION_GROUPS.tasksUpdate
   );
 
   const result = await updateTask(

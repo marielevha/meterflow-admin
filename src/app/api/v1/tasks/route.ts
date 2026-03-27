@@ -4,7 +4,7 @@ import { createTask, listTasks } from "@/lib/backoffice/tasks";
 import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
 async function getTasks(request: Request) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:update", "task:assign"] });
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["task:view"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

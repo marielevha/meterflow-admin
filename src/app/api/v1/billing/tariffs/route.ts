@@ -5,7 +5,7 @@ import { createTariffPlan, listTariffPlans } from "@/lib/backoffice/billing";
 
 export async function GET(request: Request) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingTariffsManage],
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingTariffsView],
   });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 

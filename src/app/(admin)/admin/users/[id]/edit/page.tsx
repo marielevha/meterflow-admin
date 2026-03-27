@@ -12,7 +12,12 @@ import UserPhoneInput from "@/components/users/UserPhoneInput";
 import { EnvelopeIcon, MailIcon, UserIcon } from "@/icons";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 import { updateUserAction } from "./actions";
 
@@ -39,8 +44,17 @@ export default async function EditUserPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminPermissions("/admin/users", ADMIN_PERMISSION_GROUPS.usersManage);
+  const staff = await requireAdminPermissions("/admin/users", [
+    ...ADMIN_PERMISSION_GROUPS.usersEdit,
+    ...ADMIN_PERMISSION_GROUPS.usersRoleManage,
+  ]);
   const { t } = await getAdminTranslator();
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canEditUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersEdit);
+  const canManageUserRoles = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.usersRoleManage
+  );
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const errorCode = Array.isArray(resolvedSearchParams.error)
@@ -91,7 +105,7 @@ export default async function EditUserPage({
                 {t("users.identityDescription")}
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${canEditUsers ? "" : "pointer-events-none opacity-60"}`}>
               <FormInput
                 label={t("users.firstName")}
                 name="firstName"
@@ -134,44 +148,48 @@ export default async function EditUserPage({
                 {t("users.accessControlDescription")}
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormSelect
-                label={t("users.statusLabel")}
-                name="status"
-                defaultValue={user.status}
-                options={Object.values(UserStatus).map((status) => ({
-                  value: status,
-                  label: translateUserStatus(status, t),
-                }))}
-                placeholder={t("userFilters.allStatuses")}
-              />
-            </div>
-
-            <div className="mt-5">
-              <Label>{t("users.assignedRoles")}</Label>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {availableRoles.map((role) => (
-                  <label
-                    key={role.id}
-                    className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.03]"
-                  >
-                    <input
-                      type="checkbox"
-                      name="roleIds"
-                      value={role.id}
-                      defaultChecked={assignedRoleIds.has(role.id)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/30 dark:border-gray-700"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">{translateUserRole(role.code, t)}</span> - {role.name}
-                    </span>
-                  </label>
-                ))}
+            {canEditUsers ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormSelect
+                  label={t("users.statusLabel")}
+                  name="status"
+                  defaultValue={user.status}
+                  options={Object.values(UserStatus).map((status) => ({
+                    value: status,
+                    label: translateUserStatus(status, t),
+                  }))}
+                  placeholder={t("userFilters.allStatuses")}
+                />
               </div>
-            </div>
+            ) : null}
+
+            {canManageUserRoles ? (
+              <div className="mt-5">
+                <Label>{t("users.assignedRoles")}</Label>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {availableRoles.map((role) => (
+                    <label
+                      key={role.id}
+                      className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.03]"
+                    >
+                      <input
+                        type="checkbox"
+                        name="roleIds"
+                        value={role.id}
+                        defaultChecked={assignedRoleIds.has(role.id)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/30 dark:border-gray-700"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        <span className="font-medium">{translateUserRole(role.code, t)}</span> - {role.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <section className={`rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] ${canEditUsers ? "" : "pointer-events-none opacity-60"}`}>
             <div className="mb-5">
               <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.location")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -195,6 +213,7 @@ export default async function EditUserPage({
               </Link>
               <button
                 type="submit"
+                disabled={!canEditUsers && !canManageUserRoles}
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
               >
                 {t("users.saveChanges")}

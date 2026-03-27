@@ -67,7 +67,7 @@ const navItems: NavItem[] = [
     name: "Meter management",
     subItems: [
       { name: "Meters", path: "/admin/meters", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.metersView] },
-      { name: "Add meter", path: "/admin/meters/create", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.metersManage] },
+      { name: "Add meter", path: "/admin/meters/create", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.metersCreate] },
       {
         name: "Import meters",
         path: "/admin/meters/import",
@@ -88,11 +88,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Billing",
     subItems: [
-      { name: "Overview", path: "/admin/billing", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingEntry] },
-      { name: "Cities", path: "/admin/billing/cities", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCitiesManage] },
-      { name: "Zones", path: "/admin/billing/zones", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingZonesManage] },
-      { name: "Tariffs", path: "/admin/billing/tariffs", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingTariffsManage] },
-      { name: "Campaigns", path: "/admin/billing/campaigns", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsManage] },
+      { name: "Overview", path: "/admin/billing", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingOverviewView] },
+      { name: "Cities", path: "/admin/billing/cities", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCitiesView] },
+      { name: "Zones", path: "/admin/billing/zones", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingZonesView] },
+      { name: "Tariffs", path: "/admin/billing/tariffs", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingTariffsView] },
+      { name: "Campaigns", path: "/admin/billing/campaigns", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsView] },
       { name: "Invoices", path: "/admin/billing/invoices", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesView] },
     ],
   },
@@ -100,19 +100,19 @@ const navItems: NavItem[] = [
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/admin/calendar",
-    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.staffUtilities],
+    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.calendarView],
   },
   {
     icon: <UserCircleIcon />,
     name: "User Profile",
     path: "/admin/profile",
-    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.staffUtilities],
+    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.profileView],
   },
   {
     icon: <PlugInIcon />,
     name: "Settings",
     path: "/admin/settings",
-    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.settingsManage],
+    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.settingsView],
   },
 
 ];
@@ -121,19 +121,19 @@ const demoMainItems: NavItem[] = [
   {
     name: "Forms",
     icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/admin/form-elements", pro: false }],
+    subItems: [{ name: "Form Elements", path: "/admin/form-elements", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] }],
   },
   {
     name: "Tables",
     icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/admin/basic-tables", pro: false }],
+    subItems: [{ name: "Basic Tables", path: "/admin/basic-tables", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] }],
   },
   {
     name: "Pages",
     icon: <PageIcon />,
     subItems: [
-      { name: "Blank Page", path: "/admin/blank", pro: false },
-      { name: "404 Error", path: "/error-404", pro: false },
+      { name: "Blank Page", path: "/admin/blank", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "404 Error", path: "/error-404", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
     ],
   },
 ];
@@ -143,28 +143,28 @@ const demoOtherItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Charts",
     subItems: [
-      { name: "Line Chart", path: "/admin/line-chart", pro: false },
-      { name: "Bar Chart", path: "/admin/bar-chart", pro: false },
+      { name: "Line Chart", path: "/admin/line-chart", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Bar Chart", path: "/admin/bar-chart", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
     ],
   },
   {
     icon: <BoxCubeIcon />,
     name: "UI Elements",
     subItems: [
-      { name: "Alerts", path: "/admin/alerts", pro: false },
-      { name: "Avatar", path: "/admin/avatars", pro: false },
-      { name: "Badge", path: "/admin/badge", pro: false },
-      { name: "Buttons", path: "/admin/buttons", pro: false },
-      { name: "Images", path: "/admin/images", pro: false },
-      { name: "Videos", path: "/admin/videos", pro: false },
+      { name: "Alerts", path: "/admin/alerts", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Avatar", path: "/admin/avatars", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Badge", path: "/admin/badge", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Buttons", path: "/admin/buttons", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Images", path: "/admin/images", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Videos", path: "/admin/videos", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
     ],
   },
   {
     icon: <PlugInIcon />,
     name: "Authentication",
     subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-      { name: "Sign Up", path: "/signup", pro: false },
+      { name: "Sign In", path: "/signin", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
+      { name: "Sign Up", path: "/signup", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.showcaseView] },
     ],
   },
 ];

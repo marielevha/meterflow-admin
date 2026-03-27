@@ -7,7 +7,7 @@ async function postValidateReading(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["reading:review"] });
+  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["reading:validate"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

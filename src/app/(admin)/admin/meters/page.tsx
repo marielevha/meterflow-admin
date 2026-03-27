@@ -38,7 +38,7 @@ function statusBadge(status: MeterStatus) {
 export default async function MetersPage({ searchParams }: { searchParams: SearchParams }) {
   const staff = await requireAdminPermissions("/admin/meters", ADMIN_PERMISSION_GROUPS.metersView);
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersManage);
+  const canEditMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersEdit);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const q = firstValue(resolved.q).trim();
@@ -195,7 +195,7 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
                             >
                               <EyeIcon className="h-4 w-4 fill-current" />
                             </Link>
-                            {canManageMeters ? (
+                            {canEditMeters ? (
                               <Link
                                 href={`/admin/meters/${meter.id}/edit`}
                                 title={t("common.edit")}

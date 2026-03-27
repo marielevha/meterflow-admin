@@ -104,10 +104,7 @@ export async function getCurrentStaffUser(request: Request, options?: StaffAuthO
   }
 
   const requiredPermissions = (options?.anyOfPermissions || []).filter(Boolean);
-  if (
-    requiredPermissions.length > 0 &&
-    (options?.requireExplicitPermissions === true || user.role !== UserRole.ADMIN)
-  ) {
+  if (requiredPermissions.length > 0) {
     const allowed = await hasAnyPermission(user.id, requiredPermissions);
     if (!allowed) {
       return {

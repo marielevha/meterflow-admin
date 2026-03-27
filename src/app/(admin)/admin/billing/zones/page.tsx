@@ -6,7 +6,12 @@ import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createZoneAction } from "@/app/(admin)/admin/billing/actions";
@@ -24,7 +29,9 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingZonesPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireAdminPermissions("/admin/billing/zones", ADMIN_PERMISSION_GROUPS.billingZonesManage);
+  const staff = await requireAdminPermissions("/admin/billing/zones", ADMIN_PERMISSION_GROUPS.billingZonesView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageZones = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingZonesManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
@@ -86,19 +93,20 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
       ) : null}
 
       <div className="space-y-6">
-        <BillingCreatePanel
-          defaultOpen={Boolean(error)}
-          title={t("billing.zoneCreatePanelTitle")}
-          openDescription={t("billing.zoneCreateOpenDescription")}
-          closedDescription={t("billing.zoneCreateClosedDescription")}
-          openLabel={t("billing.newZone")}
-          closeLabel={t("billing.hideForm")}
-        >
-          <ComponentCard
-            title={t("billing.createZone")}
-            desc={t("billing.zonesCardDescription")}
+        {canManageZones ? (
+          <BillingCreatePanel
+            defaultOpen={Boolean(error)}
+            title={t("billing.zoneCreatePanelTitle")}
+            openDescription={t("billing.zoneCreateOpenDescription")}
+            closedDescription={t("billing.zoneCreateClosedDescription")}
+            openLabel={t("billing.newZone")}
+            closeLabel={t("billing.hideForm")}
           >
-            <form action={createZoneAction} className="space-y-4">
+            <ComponentCard
+              title={t("billing.createZone")}
+              desc={t("billing.zonesCardDescription")}
+            >
+              <form action={createZoneAction} className="space-y-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <Field label={t("billing.codeLabel")}>
                   <Input name="code" placeholder="CG-BZV-BCG" required />
@@ -128,9 +136,10 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
               >
                 {t("billing.createZone")}
               </button>
-            </form>
-          </ComponentCard>
-        </BillingCreatePanel>
+              </form>
+            </ComponentCard>
+          </BillingCreatePanel>
+        ) : null}
 
         <ComponentCard
           title={t("billing.zonesCardTitle")}

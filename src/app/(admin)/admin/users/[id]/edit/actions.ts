@@ -3,7 +3,12 @@
 import { Prisma, UserStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 import { syncUserRoles } from "@/lib/backoffice/rbac";
 
@@ -16,7 +21,16 @@ function nullable(value: string) {
 }
 
 export async function updateUserAction(userId: string, formData: FormData) {
-  await requireAdminPermissions(`/admin/users/${userId}/edit`, ADMIN_PERMISSION_GROUPS.usersManage);
+  const staff = await requireAdminPermissions(`/admin/users/${userId}/edit`, [
+    ...ADMIN_PERMISSION_GROUPS.usersEdit,
+    ...ADMIN_PERMISSION_GROUPS.usersRoleManage,
+  ]);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canEditUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersEdit);
+  const canManageUserRoles = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.usersRoleManage
+  );
 
   const firstName = asString(formData.get("firstName"));
   const lastName = asString(formData.get("lastName"));
@@ -31,47 +45,55 @@ export async function updateUserAction(userId: string, formData: FormData) {
     .filter((value): value is string => typeof value === "string");
   const status = asString(formData.get("status"));
 
-  if (!phone) {
+  if (!canEditUsers && !canManageUserRoles) {
+    redirect(`/admin/users/${userId}/edit?error=missing_permission`);
+  }
+
+  if (canEditUsers && !phone) {
     redirect(`/admin/users/${userId}/edit?error=phone_required`);
   }
 
-  if (!(Object.values(UserStatus) as string[]).includes(status)) {
+  if (canEditUsers && !(Object.values(UserStatus) as string[]).includes(status)) {
     redirect(`/admin/users/${userId}/edit?error=invalid_status`);
   }
 
-  const rolesSync = await syncUserRoles({
-    userId,
-    roleIds,
-    assignedById: null,
-  });
-  if (!rolesSync.ok) {
-    redirect(`/admin/users/${userId}/edit?error=${rolesSync.error}`);
+  if (canManageUserRoles) {
+    const rolesSync = await syncUserRoles({
+      userId,
+      roleIds,
+      assignedById: null,
+    });
+    if (!rolesSync.ok) {
+      redirect(`/admin/users/${userId}/edit?error=${rolesSync.error}`);
+    }
   }
 
-  try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        firstName: nullable(firstName),
-        lastName: nullable(lastName),
-        username: nullable(username),
-        email: nullable(email),
-        phone,
-        region: nullable(region),
-        city: nullable(city),
-        zone: nullable(zone),
-        status: status as UserStatus,
-      },
-    });
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      redirect(`/admin/users/${userId}/edit?error=unique_violation`);
-    }
+  if (canEditUsers) {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          firstName: nullable(firstName),
+          lastName: nullable(lastName),
+          username: nullable(username),
+          email: nullable(email),
+          phone,
+          region: nullable(region),
+          city: nullable(city),
+          zone: nullable(zone),
+          status: status as UserStatus,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        redirect(`/admin/users/${userId}/edit?error=unique_violation`);
+      }
 
-    redirect(`/admin/users/${userId}/edit?error=update_failed`);
+      redirect(`/admin/users/${userId}/edit?error=update_failed`);
+    }
   }
 
   revalidatePath("/admin/users");

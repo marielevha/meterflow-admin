@@ -27,7 +27,7 @@ function nullableDecimal(value: string) {
 }
 
 export async function createMeterAction(formData: FormData) {
-  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersManage);
+  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersCreate);
 
   const serialNumber = asString(formData.get("serialNumber"));
   const meterReference = asString(formData.get("meterReference"));

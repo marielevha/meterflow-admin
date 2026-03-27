@@ -9,7 +9,7 @@ async function postRegisterPayment(
   context: { params: Promise<{ id: string }> }
 ) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesManage],
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicePaymentCreate],
   });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 

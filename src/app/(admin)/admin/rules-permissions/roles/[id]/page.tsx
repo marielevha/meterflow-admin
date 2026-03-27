@@ -5,7 +5,12 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { translateUserRole } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 import { updateRolePermissionsAction } from "./actions";
 
@@ -34,7 +39,9 @@ export default async function RolePermissionsPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminPermissions("/admin/rules-permissions", ADMIN_PERMISSION_GROUPS.rbacManage);
+  const staff = await requireAdminPermissions("/admin/rules-permissions", ADMIN_PERMISSION_GROUPS.rbacView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageRbac = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.rbacManage);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
@@ -115,7 +122,7 @@ export default async function RolePermissionsPage({
           </div>
         ) : null}
 
-        <div className="space-y-6">
+        <div className={canManageRbac ? "space-y-6" : "pointer-events-none space-y-6 opacity-70"}>
           {Object.entries(grouped).map(([resource, permissions]) => (
             <section key={resource} className="rounded-xl border border-gray-100 p-4 dark:border-gray-800">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
@@ -132,6 +139,7 @@ export default async function RolePermissionsPage({
                       name="permissionIds"
                       value={permission.id}
                       defaultChecked={selectedIds.has(permission.id)}
+                      disabled={!canManageRbac}
                       className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/30 dark:border-gray-700"
                     />
                     <div>
@@ -154,12 +162,14 @@ export default async function RolePermissionsPage({
           >
             {t("common.back")}
           </Link>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            {t("rbac.savePermissions")}
-          </button>
+          {canManageRbac ? (
+            <button
+              type="submit"
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+            >
+              {t("rbac.savePermissions")}
+            </button>
+          ) : null}
         </div>
       </form>
     </div>

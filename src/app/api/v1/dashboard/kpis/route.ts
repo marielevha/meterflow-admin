@@ -1,4 +1,3 @@
-import { UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { getDashboardKpis } from "@/lib/backoffice/dashboard";
@@ -8,10 +7,6 @@ async function getKpis(request: Request) {
   const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["dashboard:view"] });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
-  }
-
-  if (auth.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ error: "admin_only_endpoint" }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);

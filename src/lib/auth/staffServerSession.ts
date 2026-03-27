@@ -16,7 +16,6 @@ export async function staffHasAnyPermissionFromServerComponent(
 ) {
   const requiredPermissions = permissionCodes.filter(Boolean);
   if (requiredPermissions.length === 0) return true;
-  if (!options?.requireExplicitPermissions && staff.role === UserRole.ADMIN) return true;
 
   const assignment = await prisma.userRoleAssignment.findFirst({
     where: {

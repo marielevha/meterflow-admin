@@ -9,13 +9,10 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersManage],
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersRoleManage],
   });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
-  }
-  if (auth.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "admin_only_endpoint" }, { status: 403 });
   }
 
   const { id } = await context.params;
@@ -56,13 +53,10 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersManage],
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersRoleManage],
   });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
-  }
-  if (auth.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "admin_only_endpoint" }, { status: 403 });
   }
 
   const { id } = await context.params;

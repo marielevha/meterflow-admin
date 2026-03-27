@@ -1,5 +1,6 @@
 import Calendar from "@/components/calendar/Calendar";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { Metadata } from "next";
 import React from "react";
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
   // other metadata
 };
 export default async function page() {
+  await requireAdminPermissions("/admin/calendar", ADMIN_PERMISSION_GROUPS.calendarView);
   const { t } = await getAdminTranslator();
   return (
     <div>

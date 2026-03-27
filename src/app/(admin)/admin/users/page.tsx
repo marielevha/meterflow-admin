@@ -85,7 +85,13 @@ export default async function UsersPage({
 }) {
   const staff = await requireAdminPermissions("/admin/users", ADMIN_PERMISSION_GROUPS.usersView);
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersManage);
+  const canImportUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersImport);
+  const canEditUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersEdit);
+  const canManageUserRoles = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.usersRoleManage
+  );
+  const canOpenUserEditor = canEditUsers || canManageUserRoles;
   const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
 
@@ -192,7 +198,7 @@ export default async function UsersPage({
         </div>
       </div>
 
-      {canManageUsers ? (
+      {canImportUsers ? (
         <div className="mb-4 flex justify-end">
           <ImportUsersModal />
         </div>
@@ -308,7 +314,7 @@ export default async function UsersPage({
                             >
                               <EyeIcon className="h-4 w-4 fill-current" />
                             </Link>
-                            {canManageUsers ? (
+                            {canOpenUserEditor ? (
                               <Link
                                 href={`/admin/users/${user.id}/edit`}
                                 title={t("common.edit")}

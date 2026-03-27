@@ -35,9 +35,13 @@ export default async function BillingInvoicesPage({ searchParams }: { searchPara
     ADMIN_PERMISSION_GROUPS.billingInvoicesView
   );
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageInvoices = hasAnyPermissionCode(
+  const canIssueInvoices = hasAnyPermissionCode(
     permissionCodes,
-    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+    ADMIN_PERMISSION_GROUPS.billingInvoiceIssue
+  );
+  const canCancelInvoices = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.billingInvoiceCancel
   );
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
@@ -186,30 +190,30 @@ export default async function BillingInvoicesPage({ searchParams }: { searchPara
                             >
                               {t("billing.viewInvoice")}
                             </Link>
-                            {canManageInvoices ? (
-                              <>
-                                <form action={issueInvoiceAction}>
-                                  <input type="hidden" name="invoiceId" value={invoice.id} />
-                                  <button
-                                    type="submit"
-                                    disabled={!issuableStatuses.has(invoice.status)}
-                                    className="inline-flex h-8 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {t("billing.issueInvoice")}
-                                  </button>
-                                </form>
-                                <form action={cancelInvoiceAction} className="flex items-center gap-2">
-                                  <input type="hidden" name="invoiceId" value={invoice.id} />
-                                  <input name="reason" placeholder={t("billing.cancelReasonPlaceholder")} className="h-8 w-28 rounded border border-gray-300 px-2 text-xs dark:border-gray-700 dark:bg-gray-900" />
-                                  <button
-                                    type="submit"
-                                    disabled={invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.CANCELED}
-                                    className="inline-flex h-8 items-center justify-center rounded-lg border border-error-300 px-3 text-xs font-medium text-error-700 hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-error-500/40 dark:text-error-300 dark:hover:bg-error-500/10"
-                                  >
-                                    {t("billing.cancelInvoice")}
-                                  </button>
-                                </form>
-                              </>
+                            {canIssueInvoices ? (
+                              <form action={issueInvoiceAction}>
+                                <input type="hidden" name="invoiceId" value={invoice.id} />
+                                <button
+                                  type="submit"
+                                  disabled={!issuableStatuses.has(invoice.status)}
+                                  className="inline-flex h-8 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {t("billing.issueInvoice")}
+                                </button>
+                              </form>
+                            ) : null}
+                            {canCancelInvoices ? (
+                              <form action={cancelInvoiceAction} className="flex items-center gap-2">
+                                <input type="hidden" name="invoiceId" value={invoice.id} />
+                                <input name="reason" placeholder={t("billing.cancelReasonPlaceholder")} className="h-8 w-28 rounded border border-gray-300 px-2 text-xs dark:border-gray-700 dark:bg-gray-900" />
+                                <button
+                                  type="submit"
+                                  disabled={invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.CANCELED}
+                                  className="inline-flex h-8 items-center justify-center rounded-lg border border-error-300 px-3 text-xs font-medium text-error-700 hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-error-500/40 dark:text-error-300 dark:hover:bg-error-500/10"
+                                >
+                                  {t("billing.cancelInvoice")}
+                                </button>
+                              </form>
                             ) : null}
                           </div>
                         </TableCell>

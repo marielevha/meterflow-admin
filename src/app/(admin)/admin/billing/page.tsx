@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BillingPage() {
-  const staff = await requireAdminPermissions("/admin/billing", ADMIN_PERMISSION_GROUPS.billingEntry);
+  const staff = await requireAdminPermissions("/admin/billing", ADMIN_PERMISSION_GROUPS.billingOverviewView);
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
   const { t } = await getAdminTranslator();
   let cityCount = 0;
@@ -90,7 +90,7 @@ export default async function BillingPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCitiesManage) ? (
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCitiesView) ? (
           <QuickLink
             title={t("billing.statCities")}
             description={t("billing.citiesCardDescription")}
@@ -98,7 +98,7 @@ export default async function BillingPage() {
             actionLabel={t("billing.manageCities")}
           />
         ) : null}
-        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingZonesManage) ? (
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingZonesView) ? (
           <QuickLink
             title={t("billing.statZones")}
             description={t("billing.zonesCardDescription")}
@@ -106,7 +106,7 @@ export default async function BillingPage() {
             actionLabel={t("billing.manageZones")}
           />
         ) : null}
-        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingTariffsManage) ? (
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingTariffsView) ? (
           <QuickLink
             title={t("billing.tariffsCardTitle")}
             description={t("billing.tariffsCardDescription")}
@@ -114,7 +114,7 @@ export default async function BillingPage() {
             actionLabel={t("billing.manageTariffs")}
           />
         ) : null}
-        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCampaignsManage) ? (
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCampaignsView) ? (
           <QuickLink
             title={t("billing.campaignsPageTitle")}
             description={t("billing.campaignsCardDescription")}

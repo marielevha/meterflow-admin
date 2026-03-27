@@ -2,6 +2,7 @@ import UserAddressCard from "@/components/user-profile/UserAddressCard";
 import UserInfoCard from "@/components/user-profile/UserInfoCard";
 import UserMetaCard from "@/components/user-profile/UserMetaCard";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { Metadata } from "next";
 import React from "react";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Profile() {
+  await requireAdminPermissions("/admin/profile", ADMIN_PERMISSION_GROUPS.profileView);
   const { t } = await getAdminTranslator();
   return (
     <div>

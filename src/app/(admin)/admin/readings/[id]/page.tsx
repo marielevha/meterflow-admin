@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
-import { ReadingEventType, ReadingStatus, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
+import { ReadingEventType, ReadingStatus, TaskPriority, TaskStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
@@ -95,10 +95,6 @@ function personLabel(person?: {
   );
 }
 
-function canEdit(role: UserRole) {
-  return role === UserRole.ADMIN || role === UserRole.SUPERVISOR || role === UserRole.AGENT;
-}
-
 function humanizeKey(key: string) {
   return key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -165,10 +161,12 @@ export default async function ReadingDetailPage({
   const { t } = await getAdminTranslator();
   const staff = await requireAdminPermissions("/admin/readings", ADMIN_PERMISSION_GROUPS.readingsView);
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsManage);
-  const canViewReadingEventsAuditTrail = await staffHasAnyPermissionFromServerComponent(staff, [
-    "reading-event:view",
-  ], { requireExplicitPermissions: true });
+  const canEditReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsEditPage);
+  const canViewReadingEventsAuditTrail = await staffHasAnyPermissionFromServerComponent(
+    staff,
+    [...ADMIN_PERMISSION_GROUPS.readingEventsView],
+    { requireExplicitPermissions: true }
+  );
 
   const { id } = await params;
 
@@ -294,14 +292,14 @@ export default async function ReadingDetailPage({
         >
           {t("common.back")}
         </Link>
-              {canManageReading && canEdit(staff.role) ? (
+              {canEditReading ? (
                 <Link
                   href={`/admin/readings/${reading.id}/edit`}
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            {t("readings.editReading")}
-          </Link>
-        ) : null}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+                >
+                  {t("readings.editReading")}
+                </Link>
+              ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

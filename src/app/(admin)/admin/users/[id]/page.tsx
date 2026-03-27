@@ -44,7 +44,12 @@ export default async function UserDetailsPage({
 }) {
   const staff = await requireAdminPermissions("/admin/users", ADMIN_PERMISSION_GROUPS.usersView);
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
-  const canManageUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersManage);
+  const canEditUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersEdit);
+  const canManageUserRoles = hasAnyPermissionCode(
+    permissionCodes,
+    ADMIN_PERMISSION_GROUPS.usersRoleManage
+  );
+  const canOpenUserEditor = canEditUsers || canManageUserRoles;
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const user = await prisma.user.findFirst({
@@ -68,7 +73,7 @@ export default async function UserDetailsPage({
         >
           {t("common.back")}
         </Link>
-        {canManageUsers ? (
+        {canOpenUserEditor ? (
           <Link
             href={`/admin/users/${user.id}/edit`}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"

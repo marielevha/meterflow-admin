@@ -123,7 +123,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
   const authUser = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksView);
   const permissionCodes = await getCurrentStaffPermissionCodes(authUser.id);
   const canCreateTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksCreate);
-  const canManageTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksManage);
+  const canEditTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksEditPage);
 
   const resolvedSearchParams = await searchParams;
   const now = new Date();
@@ -454,7 +454,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                           >
                             <EyeIcon className="h-4 w-4 fill-current" />
                           </Link>
-                          {canManageTasks ? (
+                          {canEditTasks ? (
                             <Link
                               href={`/admin/tasks/${task.id}/edit`}
                               title={t("tasks.editTask")}
@@ -594,7 +594,7 @@ function TaskMobileCard({
           >
             <EyeIcon className="h-4 w-4 fill-current" />
           </Link>
-          {canManageTasks ? (
+          {canEditTasks ? (
             <Link
               href={`/admin/tasks/${task.id}/edit`}
               title={t("tasks.editTask")}

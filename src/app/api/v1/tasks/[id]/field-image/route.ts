@@ -10,7 +10,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const auth = await getCurrentStaffUser(request, {
-    anyOfPermissions: ["task:update", "task:assign", "audit:view"],
+    anyOfPermissions: ["task:view", "audit:view"],
   });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
