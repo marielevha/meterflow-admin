@@ -11,6 +11,7 @@ import {
   translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createTariffPlanAction } from "@/app/(admin)/admin/billing/actions";
@@ -57,6 +58,7 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingTariffsPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAdminPermissions("/admin/billing/tariffs", ADMIN_PERMISSION_GROUPS.billingTariffsManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);

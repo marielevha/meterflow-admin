@@ -11,7 +11,7 @@ import {
   translateReadingStatus,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
 import {
@@ -94,8 +94,7 @@ export default async function EditReadingPage({
   searchParams: SearchParams;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions("/admin/readings", ADMIN_PERMISSION_GROUPS.readingsManage);
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;

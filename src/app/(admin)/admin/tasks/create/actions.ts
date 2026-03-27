@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { createTask } from "@/lib/backoffice/tasks";
 
 function asString(value: FormDataEntryValue | null) {
@@ -14,8 +14,7 @@ function nullable(value: string) {
 }
 
 export async function createTaskAction(formData: FormData) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions("/admin/tasks/create", ADMIN_PERMISSION_GROUPS.tasksCreate);
 
   const payload = {
     title: asString(formData.get("title")),

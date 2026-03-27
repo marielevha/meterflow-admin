@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { syncUserRoles } from "@/lib/backoffice/rbac";
@@ -7,7 +8,9 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:manage"] });
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersManage],
+  });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -52,7 +55,9 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:manage"] });
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersManage],
+  });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

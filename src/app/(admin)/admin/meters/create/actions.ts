@@ -3,6 +3,7 @@
 import { Prisma, MeterStatus, MeterType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 
 function asString(value: FormDataEntryValue | null) {
@@ -26,6 +27,8 @@ function nullableDecimal(value: string) {
 }
 
 export async function createMeterAction(formData: FormData) {
+  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersManage);
+
   const serialNumber = asString(formData.get("serialNumber"));
   const meterReference = asString(formData.get("meterReference"));
   const type = asString(formData.get("type"));

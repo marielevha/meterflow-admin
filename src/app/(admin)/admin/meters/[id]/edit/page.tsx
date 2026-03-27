@@ -8,6 +8,7 @@ import Input from "@/components/form/input/InputField";
 import SearchableSelect from "@/components/form/SearchableSelect";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateMeterStatus, translateMeterType } from "@/lib/admin-i18n/labels";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { updateMeterAction } from "./actions";
 
@@ -36,6 +37,7 @@ export default async function EditMeterPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdminPermissions("/admin/meters", ADMIN_PERMISSION_GROUPS.metersManage);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearchParams = await searchParams;

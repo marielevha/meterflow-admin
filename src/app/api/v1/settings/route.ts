@@ -1,10 +1,13 @@
 import { UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { getAppSettings, saveAppSettings } from "@/lib/settings/serverSettings";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["dashboard:view"] });
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.settingsManage],
+  });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }
@@ -14,7 +17,9 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await getCurrentStaffUser(request, { anyOfPermissions: ["user:manage"] });
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.settingsManage],
+  });
   if (!auth.ok) {
     return NextResponse.json(auth.body, { status: auth.status });
   }

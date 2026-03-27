@@ -1,11 +1,11 @@
 "use client";
 import AdminLanguageSwitcher from "@/components/admin-i18n/AdminLanguageSwitcher";
+import { E2CAdminBrand } from "@/components/brand/E2CAdminBrand";
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useAdminI18n } from "@/hooks/use-admin-i18n";
 import { useSidebar } from "@/context/SidebarContext";
-import Image from "next/image";
 import Link from "next/link";
 import React, { useState ,useEffect,useRef} from "react";
 
@@ -86,20 +86,11 @@ const AppHeader: React.FC = () => {
             {/* Cross Icon */}
           </button>
 
-          <Link href="/admin" className="lg:hidden">
-            <Image
-              width={154}
-              height={32}
-              className="dark:hidden"
-              src="./images/logo/logo.svg"
-              alt="Logo"
-            />
-            <Image
-              width={154}
-              height={32}
-              className="hidden dark:block"
-              src="./images/logo/logo-dark.svg"
-              alt="Logo"
+          <Link href="/admin" className="lg:hidden" aria-label="E2C Admin">
+            <E2CAdminBrand
+              markSize={22}
+              frameClassName="h-10 w-10 rounded-xl"
+              titleClassName="text-xs tracking-[0.22em]"
             />
           </Link>
 

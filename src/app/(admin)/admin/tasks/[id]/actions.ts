@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { addTaskAttachment, addTaskComment, addTaskItem, updateTask, updateTaskItem } from "@/lib/backoffice/tasks";
 
 function asString(value: FormDataEntryValue | null) {
@@ -10,8 +10,10 @@ function asString(value: FormDataEntryValue | null) {
 }
 
 export async function addTaskCommentAction(taskId: string, formData: FormData) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/tasks/${taskId}`,
+    ADMIN_PERMISSION_GROUPS.tasksManage
+  );
 
   const result = await addTaskComment(
     { id: staff.id, role: staff.role },
@@ -31,8 +33,10 @@ export async function addTaskCommentAction(taskId: string, formData: FormData) {
 }
 
 export async function addTaskAttachmentAction(taskId: string, formData: FormData) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/tasks/${taskId}`,
+    ADMIN_PERMISSION_GROUPS.tasksManage
+  );
 
   const result = await addTaskAttachment(
     { id: staff.id, role: staff.role },
@@ -55,8 +59,10 @@ export async function addTaskAttachmentAction(taskId: string, formData: FormData
 }
 
 export async function addTaskItemAction(taskId: string, formData: FormData) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/tasks/${taskId}`,
+    ADMIN_PERMISSION_GROUPS.tasksManage
+  );
 
   const result = await addTaskItem(
     { id: staff.id, role: staff.role },
@@ -77,8 +83,10 @@ export async function addTaskItemAction(taskId: string, formData: FormData) {
 }
 
 export async function toggleTaskItemStatusAction(taskId: string, itemId: string, nextStatus: string) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/tasks/${taskId}`,
+    ADMIN_PERMISSION_GROUPS.tasksManage
+  );
 
   const result = await updateTaskItem(
     { id: staff.id, role: staff.role },
@@ -96,8 +104,10 @@ export async function toggleTaskItemStatusAction(taskId: string, itemId: string,
 }
 
 export async function quickUpdateTaskStatusAction(taskId: string, status: string) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/tasks/${taskId}`,
+    ADMIN_PERMISSION_GROUPS.tasksManage
+  );
 
   const result = await updateTask(
     { id: staff.id, role: staff.role },

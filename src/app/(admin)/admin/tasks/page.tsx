@@ -10,7 +10,12 @@ import TasksFilters from "@/components/tasks/TasksFilters";
 import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { listTasks } from "@/lib/backoffice/tasks";
 import { prisma } from "@/lib/prisma";
 
@@ -115,8 +120,10 @@ function taskTypeLabel(type: TaskType, t: AdminTranslatorFn) {
 export default async function TasksPage({ searchParams }: { searchParams: SearchParams }) {
   const { locale, t } = await getAdminTranslator();
   const localeCode = locale === "fr" ? "fr-FR" : locale === "ln" ? "ln-CG" : "en-US";
-  const authUser = await getCurrentStaffFromServerAction();
-  if (!authUser) redirect("/signin");
+  const authUser = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(authUser.id);
+  const canCreateTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksCreate);
+  const canManageTasks = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.tasksManage);
 
   const resolvedSearchParams = await searchParams;
   const now = new Date();
@@ -292,14 +299,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
         />
       </div>
 
-      <div className="mb-4 flex justify-end">
-        <Link
-          href="/admin/tasks/create"
-          className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 sm:h-10 sm:w-auto"
-        >
-          {t("tasks.createTask")}
-        </Link>
-      </div>
+      {canCreateTasks ? (
+        <div className="mb-4 flex justify-end">
+          <Link
+            href="/admin/tasks/create"
+            className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 sm:h-10 sm:w-auto"
+          >
+            {t("tasks.createTask")}
+          </Link>
+        </div>
+      ) : null}
 
       <ComponentCard title={t("tasks.queueTitle")} desc={t("tasks.queueDesc")}>
         <TasksFilters
@@ -445,14 +454,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                           >
                             <EyeIcon className="h-4 w-4 fill-current" />
                           </Link>
-                          <Link
-                            href={`/admin/tasks/${task.id}/edit`}
-                            title={t("tasks.editTask")}
-                            aria-label={t("tasks.editTask")}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-                          >
-                            <PencilIcon className="h-4 w-4 fill-current" />
-                          </Link>
+                          {canManageTasks ? (
+                            <Link
+                              href={`/admin/tasks/${task.id}/edit`}
+                              title={t("tasks.editTask")}
+                              aria-label={t("tasks.editTask")}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                            >
+                              <PencilIcon className="h-4 w-4 fill-current" />
+                            </Link>
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -583,14 +594,16 @@ function TaskMobileCard({
           >
             <EyeIcon className="h-4 w-4 fill-current" />
           </Link>
-          <Link
-            href={`/admin/tasks/${task.id}/edit`}
-            title={t("tasks.editTask")}
-            aria-label={t("tasks.editTask")}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-          >
-            <PencilIcon className="h-4 w-4 fill-current" />
-          </Link>
+          {canManageTasks ? (
+            <Link
+              href={`/admin/tasks/${task.id}/edit`}
+              title={t("tasks.editTask")}
+              aria-label={t("tasks.editTask")}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+            >
+              <PencilIcon className="h-4 w-4 fill-current" />
+            </Link>
+          ) : null}
         </div>
       </div>
 

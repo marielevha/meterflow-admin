@@ -6,6 +6,12 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -36,6 +42,9 @@ export default async function UserDetailsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const staff = await requireAdminPermissions("/admin/users", ADMIN_PERMISSION_GROUPS.usersView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersManage);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const user = await prisma.user.findFirst({
@@ -59,12 +68,14 @@ export default async function UserDetailsPage({
         >
           {t("common.back")}
         </Link>
-        <Link
-          href={`/admin/users/${user.id}/edit`}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          {t("common.edit")}
-        </Link>
+        {canManageUsers ? (
+          <Link
+            href={`/admin/users/${user.id}/edit`}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+          >
+            {t("common.edit")}
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

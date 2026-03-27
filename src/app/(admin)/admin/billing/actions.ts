@@ -16,7 +16,7 @@ import {
   triggerInvoiceDelivery,
   updateTariffPlan,
 } from "@/lib/backoffice/billing";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 
 function asString(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -49,16 +49,11 @@ function parseTaxes(value: string) {
     });
 }
 
-async function requireStaff(pathOnFail: string) {
-  const user = await getCurrentStaffFromServerAction();
-  if (!user) {
-    redirect(`/signin?next=${encodeURIComponent(pathOnFail)}`);
-  }
-  return user;
-}
-
 export async function createTariffPlanAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/tariffs");
+  const user = await requireAdminPermissions(
+    "/admin/billing/tariffs",
+    ADMIN_PERMISSION_GROUPS.billingTariffsManage
+  );
   const taxes = parseTaxes(asString(formData.get("taxes")));
 
   const result = await createTariffPlan(
@@ -91,7 +86,10 @@ export async function createTariffPlanAction(formData: FormData) {
 }
 
 export async function toggleTariffPlanAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/tariffs");
+  const user = await requireAdminPermissions(
+    "/admin/billing/tariffs",
+    ADMIN_PERMISSION_GROUPS.billingTariffsManage
+  );
   const planId = asString(formData.get("planId"));
   const nextActive = asString(formData.get("nextActive")) === "true";
   if (!planId) redirect("/admin/billing/tariffs?error=missing_plan_id");
@@ -110,7 +108,10 @@ export async function toggleTariffPlanAction(formData: FormData) {
 }
 
 export async function toggleTariffPlanInlineAction(planId: string, nextActive: boolean) {
-  const user = await requireStaff("/admin/billing/tariffs");
+  const user = await requireAdminPermissions(
+    "/admin/billing/tariffs",
+    ADMIN_PERMISSION_GROUPS.billingTariffsManage
+  );
   if (!planId) {
     return { ok: false as const, error: "missing_plan_id" };
   }
@@ -133,7 +134,10 @@ export async function toggleTariffPlanInlineAction(planId: string, nextActive: b
 }
 
 export async function createBillingCampaignAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/campaigns");
+  const user = await requireAdminPermissions(
+    "/admin/billing/campaigns",
+    ADMIN_PERMISSION_GROUPS.billingCampaignsManage
+  );
   const result = await createBillingCampaign(
     { id: user.id, role: user.role },
     {
@@ -162,7 +166,10 @@ export async function createBillingCampaignAction(formData: FormData) {
 }
 
 export async function createCityAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/cities");
+  const user = await requireAdminPermissions(
+    "/admin/billing/cities",
+    ADMIN_PERMISSION_GROUPS.billingCitiesManage
+  );
   const result = await createCity(
     { id: user.id, role: user.role },
     {
@@ -182,7 +189,10 @@ export async function createCityAction(formData: FormData) {
 }
 
 export async function createZoneAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/zones");
+  const user = await requireAdminPermissions(
+    "/admin/billing/zones",
+    ADMIN_PERMISSION_GROUPS.billingZonesManage
+  );
   const result = await createZone(
     { id: user.id, role: user.role },
     {
@@ -203,7 +213,10 @@ export async function createZoneAction(formData: FormData) {
 }
 
 export async function generateCampaignInvoicesAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/campaigns");
+  const user = await requireAdminPermissions(
+    "/admin/billing/campaigns",
+    ADMIN_PERMISSION_GROUPS.billingCampaignsManage
+  );
   const campaignId = asString(formData.get("campaignId"));
   if (!campaignId) redirect("/admin/billing/campaigns?error=missing_campaign_id");
 
@@ -217,7 +230,10 @@ export async function generateCampaignInvoicesAction(formData: FormData) {
 }
 
 export async function issueCampaignInvoicesAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/campaigns");
+  const user = await requireAdminPermissions(
+    "/admin/billing/campaigns",
+    ADMIN_PERMISSION_GROUPS.billingCampaignsManage
+  );
   const campaignId = asString(formData.get("campaignId"));
   if (!campaignId) redirect("/admin/billing/campaigns?error=missing_campaign_id");
 
@@ -231,7 +247,10 @@ export async function issueCampaignInvoicesAction(formData: FormData) {
 }
 
 export async function issueInvoiceAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/invoices");
+  const user = await requireAdminPermissions(
+    "/admin/billing/invoices",
+    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+  );
   const invoiceId = asString(formData.get("invoiceId"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");
 
@@ -245,7 +264,10 @@ export async function issueInvoiceAction(formData: FormData) {
 }
 
 export async function cancelInvoiceAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/invoices");
+  const user = await requireAdminPermissions(
+    "/admin/billing/invoices",
+    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+  );
   const invoiceId = asString(formData.get("invoiceId"));
   const reason = asString(formData.get("reason"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");
@@ -260,7 +282,10 @@ export async function cancelInvoiceAction(formData: FormData) {
 }
 
 export async function registerInvoicePaymentAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/invoices");
+  const user = await requireAdminPermissions(
+    "/admin/billing/invoices",
+    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+  );
   const invoiceId = asString(formData.get("invoiceId"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");
 
@@ -289,7 +314,10 @@ export async function registerInvoicePaymentAction(formData: FormData) {
 }
 
 export async function triggerInvoiceDeliveryAction(formData: FormData) {
-  const user = await requireStaff("/admin/billing/invoices");
+  const user = await requireAdminPermissions(
+    "/admin/billing/invoices",
+    ADMIN_PERMISSION_GROUPS.billingInvoicesManage
+  );
   const invoiceId = asString(formData.get("invoiceId"));
   if (!invoiceId) redirect("/admin/billing/invoices?error=missing_invoice_id");
 

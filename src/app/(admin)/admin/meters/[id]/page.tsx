@@ -6,6 +6,12 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateMeterStatus, translateMeterType } from "@/lib/admin-i18n/labels";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -35,6 +41,9 @@ export default async function MeterDetailsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const staff = await requireAdminPermissions("/admin/meters", ADMIN_PERMISSION_GROUPS.metersView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersManage);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const meter = await prisma.meter.findFirst({
@@ -103,12 +112,14 @@ export default async function MeterDetailsPage({
         >
           {t("common.back")}
         </Link>
-        <Link
-          href={`/admin/meters/${meter.id}/edit`}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          {t("common.edit")}
-        </Link>
+        {canManageMeters ? (
+          <Link
+            href={`/admin/meters/${meter.id}/edit`}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+          >
+            {t("common.edit")}
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

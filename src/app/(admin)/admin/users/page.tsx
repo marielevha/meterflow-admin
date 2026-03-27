@@ -10,6 +10,12 @@ import ImportUsersModal from "@/components/users/ImportUsersModal";
 import { EyeIcon, PencilIcon } from "@/icons";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -77,6 +83,9 @@ export default async function UsersPage({
 }: {
   searchParams: SearchParams;
 }) {
+  const staff = await requireAdminPermissions("/admin/users", ADMIN_PERMISSION_GROUPS.usersView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageUsers = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.usersManage);
   const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
 
@@ -183,9 +192,11 @@ export default async function UsersPage({
         </div>
       </div>
 
-      <div className="mb-4 flex justify-end">
-        <ImportUsersModal />
-      </div>
+      {canManageUsers ? (
+        <div className="mb-4 flex justify-end">
+          <ImportUsersModal />
+        </div>
+      ) : null}
 
       <ComponentCard
         title={t("users.directoryTitle")}
@@ -297,14 +308,16 @@ export default async function UsersPage({
                             >
                               <EyeIcon className="h-4 w-4 fill-current" />
                             </Link>
-                            <Link
-                              href={`/admin/users/${user.id}/edit`}
-                              title={t("common.edit")}
-                              aria-label={t("common.edit")}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-                            >
-                              <PencilIcon className="h-4 w-4 fill-current" />
-                            </Link>
+                            {canManageUsers ? (
+                              <Link
+                                href={`/admin/users/${user.id}/edit`}
+                                title={t("common.edit")}
+                                aria-label={t("common.edit")}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                              >
+                                <PencilIcon className="h-4 w-4 fill-current" />
+                              </Link>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

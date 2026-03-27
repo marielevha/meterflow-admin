@@ -8,6 +8,12 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import ReadingsFilters from "@/components/readings/ReadingsFilters";
 import { EyeIcon, PencilIcon } from "@/icons";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -58,6 +64,9 @@ function readingStatusLabel(
 }
 
 export default async function ReadingsPage({ searchParams }: { searchParams: SearchParams }) {
+  const staff = await requireAdminPermissions("/admin/readings", ADMIN_PERMISSION_GROUPS.readingsView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageReadings = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsManage);
   const { locale, t } = await getAdminTranslator();
   const localeCode = locale === "fr" ? "fr-FR" : locale === "ln" ? "ln-CG" : "en-US";
   const resolved = await searchParams;
@@ -228,9 +237,11 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                             <Link href={`/admin/readings/${reading.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title={t("readings.viewReading")} aria-label={t("readings.viewReading")}>
                               <EyeIcon className="h-4 w-4" />
                             </Link>
-                            <Link href={`/admin/readings/${reading.id}/edit`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title={t("readings.editReading")} aria-label={t("readings.editReading")}>
-                              <PencilIcon className="h-4 w-4" />
-                            </Link>
+                            {canManageReadings ? (
+                              <Link href={`/admin/readings/${reading.id}/edit`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]" title={t("readings.editReading")} aria-label={t("readings.editReading")}>
+                                <PencilIcon className="h-4 w-4" />
+                              </Link>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

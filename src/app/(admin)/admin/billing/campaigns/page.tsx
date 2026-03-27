@@ -10,6 +10,7 @@ import {
   translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import {
   createBillingCampaignAction,
@@ -79,6 +80,7 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingCampaignsPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAdminPermissions("/admin/billing/campaigns", ADMIN_PERMISSION_GROUPS.billingCampaignsManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);

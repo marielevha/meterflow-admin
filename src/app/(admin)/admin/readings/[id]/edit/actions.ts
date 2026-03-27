@@ -3,7 +3,7 @@
 import { Prisma, ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
 import { prisma } from "@/lib/prisma";
 import {
@@ -49,8 +49,10 @@ type PushPayload = {
 };
 
 export async function updateReadingAction(readingId: string, formData: FormData) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/readings/${readingId}/edit`,
+    ADMIN_PERMISSION_GROUPS.readingsManage
+  );
   const canEditGps = staff.role === UserRole.ADMIN || staff.role === UserRole.SUPERVISOR;
 
   const status = parseStatus(asString(formData.get("status")));

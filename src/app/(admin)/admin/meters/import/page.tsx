@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ImportMetersPanel from "@/components/meters/ImportMetersPanel";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
-import { staffHasAnyPermissionFromServerComponent } from "@/lib/auth/staffServerSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 
 export const metadata: Metadata = {
   title: "Import meters",
@@ -12,17 +11,11 @@ export const metadata: Metadata = {
 };
 
 export default async function ImportMetersPage() {
-  const { t } = await getAdminTranslator();
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
-
-  const canImportMeters = await staffHasAnyPermissionFromServerComponent(staff, ["meter:import"], {
+  await requireAdminPermissions("/admin/meters/import", ADMIN_PERMISSION_GROUPS.metersImport, {
     requireExplicitPermissions: true,
+    redirectOnForbidden: "/admin/meters",
   });
-
-  if (!canImportMeters) {
-    redirect("/admin/meters");
-  }
+  const { t } = await getAdminTranslator();
 
   return (
     <div>

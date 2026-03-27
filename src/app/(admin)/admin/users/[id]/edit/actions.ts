@@ -3,6 +3,7 @@
 import { Prisma, UserStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { syncUserRoles } from "@/lib/backoffice/rbac";
 
@@ -15,6 +16,8 @@ function nullable(value: string) {
 }
 
 export async function updateUserAction(userId: string, formData: FormData) {
+  await requireAdminPermissions(`/admin/users/${userId}/edit`, ADMIN_PERMISSION_GROUPS.usersManage);
+
   const firstName = asString(formData.get("firstName"));
   const lastName = asString(formData.get("lastName"));
   const username = asString(formData.get("username"));

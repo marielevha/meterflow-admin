@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { E2CAdminBrand } from "@/components/brand/E2CAdminBrand";
 import { useAdminI18n } from "@/hooks/use-admin-i18n";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissionGroups";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BoxCubeIcon,
@@ -24,6 +25,7 @@ type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
+  requiredAnyOfPermissions?: string[];
   subItems?: {
     name: string;
     path: string;
@@ -39,38 +41,38 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Dashboard",
     subItems: [
-      { name: "Ecommerce", path: "/admin", pro: false },
-      { name: "Overview", path: "/admin/overview", pro: false },
+      { name: "Ecommerce", path: "/admin", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.dashboardView] },
+      { name: "Overview", path: "/admin/overview", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.dashboardView] },
     ],
   },
   {
     icon: <UserCircleIcon />,
     name: "User management",
     subItems: [
-      { name: "Users", path: "/admin/users", pro: false },
-      { name: "Rules & Permissions", path: "/admin/rules-permissions", pro: false },
+      { name: "Users", path: "/admin/users", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.usersView] },
+      { name: "Rules & Permissions", path: "/admin/rules-permissions", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.rbacView] },
     ],
   },
   {
     icon: <ListIcon />,
     name: "Reading management",
     subItems: [
-      { name: "Readings", path: "/admin/readings", pro: false },
-      { name: "History", path: "/admin/history", pro: false },
-      { name: "Consumption", path: "/admin/consumption", pro: false },
+      { name: "Readings", path: "/admin/readings", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.readingsView] },
+      { name: "History", path: "/admin/history", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.historyView] },
+      { name: "Consumption", path: "/admin/consumption", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.consumptionView] },
     ],
   },
   {
     icon: <BoxCubeIcon />,
     name: "Meter management",
     subItems: [
-      { name: "Meters", path: "/admin/meters", pro: false },
-      { name: "Add meter", path: "/admin/meters/create", pro: false },
+      { name: "Meters", path: "/admin/meters", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.metersView] },
+      { name: "Add meter", path: "/admin/meters/create", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.metersManage] },
       {
         name: "Import meters",
         path: "/admin/meters/import",
         pro: false,
-        requiredAnyOfPermissions: ["meter:import"],
+        requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.metersImport],
       },
     ],
   },
@@ -78,36 +80,39 @@ const navItems: NavItem[] = [
     icon: <TaskIcon />,
     name: "Tasks management",
     subItems: [
-      { name: "Tasks", path: "/admin/tasks", pro: false },
-      { name: "Add task", path: "/admin/tasks/create", pro: false },
+      { name: "Tasks", path: "/admin/tasks", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.tasksView] },
+      { name: "Add task", path: "/admin/tasks/create", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.tasksCreate] },
     ],
   },
   {
     icon: <PieChartIcon />,
     name: "Billing",
     subItems: [
-      { name: "Overview", path: "/admin/billing", pro: false },
-      { name: "Cities", path: "/admin/billing/cities", pro: false },
-      { name: "Zones", path: "/admin/billing/zones", pro: false },
-      { name: "Tariffs", path: "/admin/billing/tariffs", pro: false },
-      { name: "Campaigns", path: "/admin/billing/campaigns", pro: false },
-      { name: "Invoices", path: "/admin/billing/invoices", pro: false },
+      { name: "Overview", path: "/admin/billing", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingEntry] },
+      { name: "Cities", path: "/admin/billing/cities", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCitiesManage] },
+      { name: "Zones", path: "/admin/billing/zones", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingZonesManage] },
+      { name: "Tariffs", path: "/admin/billing/tariffs", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingTariffsManage] },
+      { name: "Campaigns", path: "/admin/billing/campaigns", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsManage] },
+      { name: "Invoices", path: "/admin/billing/invoices", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesView] },
     ],
   },
   {
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/admin/calendar",
+    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.staffUtilities],
   },
   {
     icon: <UserCircleIcon />,
     name: "User Profile",
     path: "/admin/profile",
+    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.staffUtilities],
   },
   {
     icon: <PlugInIcon />,
     name: "Settings",
     path: "/admin/settings",
+    requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.settingsManage],
   },
 
 ];
@@ -179,7 +184,9 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
   const filterNavItems = useCallback(
     (items: NavItem[]) =>
       items.flatMap((nav) => {
-        if (!nav.subItems) return [nav];
+        if (!nav.subItems) {
+          return hasAnyPermission(nav.requiredAnyOfPermissions) ? [nav] : [];
+        }
         const allowedSubItems = nav.subItems.filter((subItem) =>
           hasAnyPermission(subItem.requiredAnyOfPermissions)
         );
@@ -441,30 +448,15 @@ const AppSidebar: React.FC<{ permissionCodes?: string[] }> = ({ permissionCodes 
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/admin">
+        <Link href="/admin" aria-label="E2C Admin">
           {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-            </>
+            <E2CAdminBrand subtitle={t("layout.backoffice")} />
           ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              width={32}
-              height={32}
+            <E2CAdminBrand
+              showText={false}
+              className="align-middle"
+              frameClassName="h-10 w-10 rounded-xl"
+              markSize={24}
             />
           )}
         </Link>

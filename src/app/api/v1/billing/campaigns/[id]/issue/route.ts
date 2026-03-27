@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { issueCampaignInvoices } from "@/lib/backoffice/billing";
 import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
@@ -7,7 +8,9 @@ async function postIssueCampaignInvoices(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsManage],
+  });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 
   const { id } = await context.params;

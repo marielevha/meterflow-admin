@@ -6,13 +6,13 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import SearchableSelect from "@/components/form/SearchableSelect";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
 import {
   translateTaskPriority,
   translateTaskStatus,
   translateTaskType,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
 import { prisma } from "@/lib/prisma";
 import { updateTaskAction } from "./actions";
@@ -66,8 +66,7 @@ export default async function EditTaskPage({
   searchParams: SearchParams;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksManage);
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;

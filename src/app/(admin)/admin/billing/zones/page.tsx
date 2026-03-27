@@ -6,6 +6,7 @@ import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 import { prisma } from "@/lib/prisma";
 import { createZoneAction } from "@/app/(admin)/admin/billing/actions";
@@ -23,6 +24,7 @@ function firstValue(input: string | string[] | undefined) {
 }
 
 export default async function BillingZonesPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAdminPermissions("/admin/billing/zones", ADMIN_PERMISSION_GROUPS.billingZonesManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const error = firstValue(resolved.error);

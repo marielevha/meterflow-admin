@@ -50,6 +50,8 @@ export const adminMessages = {
       searchPlaceholder: "Rechercher ou taper une commande...",
       searchShortcutHint: "Raccourci de recherche",
       toggleSidebar: "Basculer le menu",
+      backoffice: "Backoffice",
+      authBackdropTagline: "Backoffice supervision",
     },
     nav: {
       dashboard: "Tableau de bord",
@@ -1214,6 +1216,8 @@ export const adminMessages = {
       searchPlaceholder: "Search or type command...",
       searchShortcutHint: "Search shortcut",
       toggleSidebar: "Toggle sidebar",
+      backoffice: "Backoffice",
+      authBackdropTagline: "Backoffice supervision",
     },
     nav: {
       dashboard: "Dashboard",
@@ -2378,6 +2382,8 @@ export const adminMessages = {
       searchPlaceholder: "Luka to koma commande...",
       searchShortcutHint: "Raccourci ya recherche",
       toggleSidebar: "Fungola to kanga menu",
+      backoffice: "Backoffice",
+      authBackdropTagline: "Backoffice supervision",
     },
     nav: {
       dashboard: "Tableau de bord",

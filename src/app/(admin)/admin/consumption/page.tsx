@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import ConsumptionFilters from "@/components/consumption/ConsumptionFilters";
 import ConsumptionPerPage from "@/components/consumption/ConsumptionPerPage";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -34,6 +35,7 @@ export default async function ConsumptionPage({
 }: {
   searchParams: SearchParams;
 }) {
+  await requireAdminPermissions("/admin/consumption", ADMIN_PERMISSION_GROUPS.consumptionView);
   const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
   const q = firstValue(resolvedSearchParams.q).trim();

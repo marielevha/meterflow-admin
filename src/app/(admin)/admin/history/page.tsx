@@ -12,6 +12,7 @@ import {
   translateReadingStatus,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default async function HistoryPage({
 }: {
   searchParams: SearchParams;
 }) {
+  await requireAdminPermissions("/admin/history", ADMIN_PERMISSION_GROUPS.historyView);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
 

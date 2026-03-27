@@ -7,6 +7,7 @@ import Input from "@/components/form/input/InputField";
 import SearchableSelect from "@/components/form/SearchableSelect";
 import { translateMeterStatus, translateMeterType } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { createMeterAction } from "./actions";
 
@@ -33,6 +34,7 @@ export default async function CreateMeterPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersManage);
   const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
   const errorCode = Array.isArray(resolvedSearchParams.error)

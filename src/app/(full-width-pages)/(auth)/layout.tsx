@@ -1,16 +1,18 @@
+import { E2CAdminBrand } from "@/components/brand/E2CAdminBrand";
 import GridShape from "@/components/common/GridShape";
 import ThemeTogglerTwo from "@/components/common/ThemeTogglerTwo";
-
+import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { ThemeProvider } from "@/context/ThemeContext";
-import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = await getAdminTranslator();
+
   return (
     <div className="relative p-6 bg-white z-1 dark:bg-gray-900 sm:p-0">
       <ThemeProvider>
@@ -21,17 +23,16 @@ export default function AuthLayout({
               {/* <!-- ===== Common Grid Shape Start ===== --> */}
               <GridShape />
               <div className="flex flex-col items-center max-w-xs">
-                <Link href="/" className="block mb-4">
-                  <Image
-                    width={231}
-                    height={48}
-                    src="./images/logo/auth-logo.svg"
-                    alt="Logo"
+                <Link href="/" className="block mb-4" aria-label="E2C Admin">
+                  <E2CAdminBrand
+                    className="justify-center"
+                    frameClassName="h-16 w-16 rounded-[22px]"
+                    markSize={38}
+                    titleClassName="text-lg tracking-[0.28em]"
+                    subtitle={t("layout.authBackdropTagline")}
+                    subtitleClassName="text-center text-[10px] tracking-[0.3em]"
                   />
                 </Link>
-                <p className="text-center text-gray-400 dark:text-white/60">
-                  Free and Open-Source Tailwind CSS Admin Dashboard Template
-                </p>
               </div>
             </div>
           </div>

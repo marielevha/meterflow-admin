@@ -8,6 +8,12 @@ import Badge from "@/components/ui/badge/Badge";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateMeterStatus } from "@/lib/admin-i18n/labels";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -30,6 +36,9 @@ function statusBadge(status: MeterStatus) {
 }
 
 export default async function MetersPage({ searchParams }: { searchParams: SearchParams }) {
+  const staff = await requireAdminPermissions("/admin/meters", ADMIN_PERMISSION_GROUPS.metersView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersManage);
   const { t } = await getAdminTranslator();
   const resolved = await searchParams;
   const q = firstValue(resolved.q).trim();
@@ -186,14 +195,16 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
                             >
                               <EyeIcon className="h-4 w-4 fill-current" />
                             </Link>
-                            <Link
-                              href={`/admin/meters/${meter.id}/edit`}
-                              title={t("common.edit")}
-                              aria-label={t("common.edit")}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
-                            >
-                              <PencilIcon className="h-4 w-4 fill-current" />
-                            </Link>
+                            {canManageMeters ? (
+                              <Link
+                                href={`/admin/meters/${meter.id}/edit`}
+                                title={t("common.edit")}
+                                aria-label={t("common.edit")}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.03]"
+                              >
+                                <PencilIcon className="h-4 w-4 fill-current" />
+                              </Link>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

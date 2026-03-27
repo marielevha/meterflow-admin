@@ -13,7 +13,7 @@ import {
   translateTaskType,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { createTaskAction } from "./actions";
 
@@ -46,8 +46,7 @@ function mapError(code: string, t: (key: string) => string) {
 
 export default async function CreateTaskPage({ searchParams }: { searchParams: SearchParams }) {
   const { t } = await getAdminTranslator();
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  await requireAdminPermissions("/admin/tasks/create", ADMIN_PERMISSION_GROUPS.tasksCreate);
 
   const resolved = await searchParams;
   const errorCode = firstValue(resolved.error);

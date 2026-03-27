@@ -17,8 +17,15 @@ import {
   translateTaskStatus,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
-import { staffHasAnyPermissionFromServerComponent } from "@/lib/auth/staffServerSession";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import {
+  getCurrentStaffPermissionCodes,
+  staffHasAnyPermissionFromServerComponent,
+} from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { prisma } from "@/lib/prisma";
 
@@ -156,8 +163,9 @@ export default async function ReadingDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions("/admin/readings", ADMIN_PERMISSION_GROUPS.readingsView);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
+  const canManageReading = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsManage);
   const canViewReadingEventsAuditTrail = await staffHasAnyPermissionFromServerComponent(staff, [
     "reading-event:view",
   ], { requireExplicitPermissions: true });
@@ -286,9 +294,9 @@ export default async function ReadingDetailPage({
         >
           {t("common.back")}
         </Link>
-        {canEdit(staff.role) ? (
-          <Link
-            href={`/admin/readings/${reading.id}/edit`}
+              {canManageReading && canEdit(staff.role) ? (
+                <Link
+                  href={`/admin/readings/${reading.id}/edit`}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
           >
             {t("readings.editReading")}

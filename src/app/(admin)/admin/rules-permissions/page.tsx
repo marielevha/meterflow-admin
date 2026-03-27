@@ -9,6 +9,7 @@ import RolesFilters from "@/components/rbac/RolesFilters";
 import PermissionsFilters from "@/components/rbac/PermissionsFilters";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateUserRole } from "@/lib/admin-i18n/labels";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default async function RulesPermissionsPage({
 }: {
   searchParams: SearchParams;
 }) {
+  await requireAdminPermissions("/admin/rules-permissions", ADMIN_PERMISSION_GROUPS.rbacView);
   const { t } = await getAdminTranslator();
   const resolvedSearchParams = await searchParams;
 

@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { createBillingCampaign, listBillingCampaigns } from "@/lib/backoffice/billing";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsManage],
+  });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 
   const result = await listBillingCampaigns();
@@ -11,7 +14,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsManage],
+  });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 
   try {

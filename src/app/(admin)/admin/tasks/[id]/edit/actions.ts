@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { updateTask } from "@/lib/backoffice/tasks";
 
 function asString(value: FormDataEntryValue | null) {
@@ -15,8 +15,10 @@ function asOptionalString(value: FormDataEntryValue | null) {
 }
 
 export async function updateTaskAction(taskId: string, formData: FormData) {
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions(
+    `/admin/tasks/${taskId}/edit`,
+    ADMIN_PERMISSION_GROUPS.tasksManage
+  );
 
   const payload = {
     title: asOptionalString(formData.get("title")),

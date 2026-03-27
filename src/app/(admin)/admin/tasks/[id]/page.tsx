@@ -4,7 +4,7 @@ import { Prisma, ReadingStatus, TaskEventType, TaskItemStatus, TaskPriority, Tas
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
-import { getCurrentStaffFromServerAction } from "@/lib/auth/staffActionSession";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import {
   translateMeterType,
   translateReadingStatus,
@@ -203,8 +203,7 @@ export default async function TaskDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { t } = await getAdminTranslator();
-  const staff = await getCurrentStaffFromServerAction();
-  if (!staff) redirect("/signin");
+  const staff = await requireAdminPermissions("/admin/tasks", ADMIN_PERMISSION_GROUPS.tasksManage);
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;

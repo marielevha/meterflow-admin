@@ -12,6 +12,7 @@ import UserPhoneInput from "@/components/users/UserPhoneInput";
 import { EnvelopeIcon, MailIcon, UserIcon } from "@/icons";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateUserRole, translateUserStatus } from "@/lib/admin-i18n/labels";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { updateUserAction } from "./actions";
 
@@ -38,6 +39,7 @@ export default async function EditUserPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdminPermissions("/admin/users", ADMIN_PERMISSION_GROUPS.usersManage);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearchParams = await searchParams;

@@ -4,6 +4,12 @@ import { InvoiceStatus } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import {
+  ADMIN_PERMISSION_GROUPS,
+  hasAnyPermissionCode,
+  requireAdminPermissions,
+} from "@/lib/auth/adminPermissions";
+import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 import { getBillingPageErrorState } from "@/lib/backoffice/billingPageErrors";
 
@@ -13,6 +19,8 @@ export const metadata: Metadata = {
 };
 
 export default async function BillingPage() {
+  const staff = await requireAdminPermissions("/admin/billing", ADMIN_PERMISSION_GROUPS.billingEntry);
+  const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
   const { t } = await getAdminTranslator();
   let cityCount = 0;
   let zoneCount = 0;
@@ -82,36 +90,46 @@ export default async function BillingPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-        <QuickLink
-          title={t("billing.statCities")}
-          description={t("billing.citiesCardDescription")}
-          href="/admin/billing/cities"
-          actionLabel={t("billing.manageCities")}
-        />
-        <QuickLink
-          title={t("billing.statZones")}
-          description={t("billing.zonesCardDescription")}
-          href="/admin/billing/zones"
-          actionLabel={t("billing.manageZones")}
-        />
-        <QuickLink
-          title={t("billing.tariffsCardTitle")}
-          description={t("billing.tariffsCardDescription")}
-          href="/admin/billing/tariffs"
-          actionLabel={t("billing.manageTariffs")}
-        />
-        <QuickLink
-          title={t("billing.campaignsPageTitle")}
-          description={t("billing.campaignsCardDescription")}
-          href="/admin/billing/campaigns"
-          actionLabel={t("billing.manageCampaigns")}
-        />
-        <QuickLink
-          title={t("billing.statInvoices")}
-          description={t("billing.invoicesCardDescription")}
-          href="/admin/billing/invoices"
-          actionLabel={t("billing.manageInvoices")}
-        />
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCitiesManage) ? (
+          <QuickLink
+            title={t("billing.statCities")}
+            description={t("billing.citiesCardDescription")}
+            href="/admin/billing/cities"
+            actionLabel={t("billing.manageCities")}
+          />
+        ) : null}
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingZonesManage) ? (
+          <QuickLink
+            title={t("billing.statZones")}
+            description={t("billing.zonesCardDescription")}
+            href="/admin/billing/zones"
+            actionLabel={t("billing.manageZones")}
+          />
+        ) : null}
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingTariffsManage) ? (
+          <QuickLink
+            title={t("billing.tariffsCardTitle")}
+            description={t("billing.tariffsCardDescription")}
+            href="/admin/billing/tariffs"
+            actionLabel={t("billing.manageTariffs")}
+          />
+        ) : null}
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCampaignsManage) ? (
+          <QuickLink
+            title={t("billing.campaignsPageTitle")}
+            description={t("billing.campaignsCardDescription")}
+            href="/admin/billing/campaigns"
+            actionLabel={t("billing.manageCampaigns")}
+          />
+        ) : null}
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingInvoicesView) ? (
+          <QuickLink
+            title={t("billing.statInvoices")}
+            description={t("billing.invoicesCardDescription")}
+            href="/admin/billing/invoices"
+            actionLabel={t("billing.manageInvoices")}
+          />
+        ) : null}
       </div>
     </div>
   );

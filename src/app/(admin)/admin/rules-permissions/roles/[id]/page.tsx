@@ -5,6 +5,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { translateUserRole } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { prisma } from "@/lib/prisma";
 import { updateRolePermissionsAction } from "./actions";
 
@@ -33,6 +34,7 @@ export default async function RolePermissionsPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdminPermissions("/admin/rules-permissions", ADMIN_PERMISSION_GROUPS.rbacManage);
   const { t } = await getAdminTranslator();
   const { id } = await params;
   const resolvedSearchParams = await searchParams;

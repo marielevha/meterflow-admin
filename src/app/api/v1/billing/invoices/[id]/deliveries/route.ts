@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { triggerInvoiceDelivery } from "@/lib/backoffice/billing";
 
@@ -6,7 +7,9 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesManage],
+  });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 
   const { id } = await context.params;

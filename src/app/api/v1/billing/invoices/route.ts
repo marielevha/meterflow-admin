@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { ADMIN_PERMISSION_GROUPS } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffUser } from "@/lib/auth/staffSession";
 import { listInvoices } from "@/lib/backoffice/billing";
 
 export async function GET(request: Request) {
-  const auth = await getCurrentStaffUser(request);
+  const auth = await getCurrentStaffUser(request, {
+    anyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesView],
+  });
   if (!auth.ok) return NextResponse.json(auth.body, { status: auth.status });
 
   const { searchParams } = new URL(request.url);

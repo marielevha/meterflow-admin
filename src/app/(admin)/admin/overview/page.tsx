@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import OverviewActivityCharts from "@/components/overview/OverviewActivityCharts";
 import ValidationRateTrendChart from "@/components/overview/ValidationRateTrendChart";
 import OperationsKpisSection from "@/components/overview/OperationsKpisSection";
+import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { getOverviewDashboardData } from "@/lib/backoffice/overview";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 
@@ -80,6 +81,7 @@ function taskStatusLabel(
 }
 
 export default async function OverviewPage() {
+  await requireAdminPermissions("/admin/overview", ADMIN_PERMISSION_GROUPS.dashboardView);
   const { locale, t } = await getAdminTranslator();
   const localeCode = locale === "fr" ? "fr-FR" : locale === "ln" ? "ln-CG" : "en-US";
   const overview = await getOverviewDashboardData(localeCode);
