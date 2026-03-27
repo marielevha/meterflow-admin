@@ -39,6 +39,20 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'drawer.releves': 'Releves',
 
     'tabs.readings': 'Releves',
+    'readings.windowLoadingTitle': 'Preparation du releve',
+    'readings.windowLoadingDescription': "Nous verifions si la periode d'auto-releve est ouverte.",
+    'readings.windowClosedTitle': 'Auto-releve ferme',
+    'readings.windowClosedSubtitle': 'Periode de soumission',
+    'readings.windowClosedDescription':
+      "Les nouveaux releves clients sont acceptes uniquement pendant la fenetre mensuelle prevue.",
+    'readings.windowRangeLabel': 'Prochaine fenetre : {range}',
+    'readings.windowClosedHistoryAction': 'Voir mes releves',
+    'readings.windowOpenBadge': 'Ouverte',
+    'readings.windowClosedBadge': 'Fermee',
+    'readings.windowCardTitle': 'Fenetre de soumission',
+    'readings.windowMeterClosedHint':
+      "Ce compteur n'accepte pas de nouveau releve pour le moment. Choisissez un autre compteur ouvert ou attendez la prochaine fenetre.",
+    'readings.windowMeterOpenHint': 'Ce compteur peut recevoir un auto-releve sur la fenetre courante.',
 
     'settings.title': 'Parametres',
     'settings.subtitle': "Preferences de l'application",
@@ -205,6 +219,20 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'drawer.releves': 'Readings',
 
     'tabs.readings': 'Readings',
+    'readings.windowLoadingTitle': 'Preparing reading flow',
+    'readings.windowLoadingDescription': 'We are checking whether the self-reading window is open.',
+    'readings.windowClosedTitle': 'Self-reading closed',
+    'readings.windowClosedSubtitle': 'Submission period',
+    'readings.windowClosedDescription':
+      'New customer readings are only accepted during the scheduled monthly window.',
+    'readings.windowRangeLabel': 'Next window: {range}',
+    'readings.windowClosedHistoryAction': 'View my readings',
+    'readings.windowOpenBadge': 'Open',
+    'readings.windowClosedBadge': 'Closed',
+    'readings.windowCardTitle': 'Submission window',
+    'readings.windowMeterClosedHint':
+      'This meter is not accepting a new reading right now. Pick another open meter or wait for the next window.',
+    'readings.windowMeterOpenHint': 'This meter can receive a self-reading during the current window.',
 
     'settings.title': 'Settings',
     'settings.subtitle': 'App preferences',
@@ -371,6 +399,20 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'drawer.releves': 'Ba releve',
 
     'tabs.readings': 'Ba releve',
+    'readings.windowLoadingTitle': 'Preparation ya releve',
+    'readings.windowLoadingDescription': 'Tozali kotala soki fenetre ya auto-releve efungwami.',
+    'readings.windowClosedTitle': 'Auto-releve ekangami',
+    'readings.windowClosedSubtitle': 'Tango ya kotinda',
+    'readings.windowClosedDescription':
+      'Ba releve ya sika ya ba clients endimami kaka na fenetre mensuelle oyo ebongisami.',
+    'readings.windowRangeLabel': 'Fenetre ekolanda: {range}',
+    'readings.windowClosedHistoryAction': 'Tala ba releve na ngai',
+    'readings.windowOpenBadge': 'Efungwami',
+    'readings.windowClosedBadge': 'Ekangami',
+    'readings.windowCardTitle': 'Fenetre ya kotinda',
+    'readings.windowMeterClosedHint':
+      'Compteur oyo endimi te releve ya sika sikoyo. Pona compteur mosusu oyo efungwami to zela fenetre ekolanda.',
+    'readings.windowMeterOpenHint': 'Compteur oyo akoki koyamba auto-releve na fenetre ya lelo.',
 
     'settings.title': 'Parametre',
     'settings.subtitle': 'Ba preference ya app',

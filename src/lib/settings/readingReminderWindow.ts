@@ -37,9 +37,7 @@ function isReminderDay(day: number, cadence: AppSettings["readingReminderCadence
   return day % 3 === 0;
 }
 
-export function isWithinReadingReminderWindow(date: Date, settings: AppSettings) {
-  if (!settings.readingReminderEnabled) return false;
-
+export function isWithinReadingSubmissionWindow(date: Date, settings: AppSettings) {
   const parts = getUtcPartsInTimezone(date, settings.readingReminderTimezone || "UTC");
   const start = normalizeDay(settings.readingWindowStartDay);
   const end = normalizeDay(settings.readingWindowEndDay);
@@ -47,6 +45,11 @@ export function isWithinReadingReminderWindow(date: Date, settings: AppSettings)
 
   if (start <= end) return day >= start && day <= end;
   return day >= start || day <= end;
+}
+
+export function isWithinReadingReminderWindow(date: Date, settings: AppSettings) {
+  if (!settings.readingReminderEnabled) return false;
+  return isWithinReadingSubmissionWindow(date, settings);
 }
 
 export function shouldTriggerReadingReminder(date: Date, settings: AppSettings) {
@@ -63,7 +66,7 @@ function lastDayOfMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-export function getReminderWindowBounds(date: Date, settings: AppSettings) {
+export function getReadingWindowBounds(date: Date, settings: AppSettings) {
   const tz = settings.readingReminderTimezone || "UTC";
   const parts = getUtcPartsInTimezone(date, tz);
   const startDay = normalizeDay(settings.readingWindowStartDay);
@@ -110,4 +113,8 @@ export function getReminderWindowBounds(date: Date, settings: AppSettings) {
     windowEnd,
     reminderWindowKey: `${prevYear}-${String(prevMonth).padStart(2, "0")}-${startDay}-${endDay}`,
   };
+}
+
+export function getReminderWindowBounds(date: Date, settings: AppSettings) {
+  return getReadingWindowBounds(date, settings);
 }

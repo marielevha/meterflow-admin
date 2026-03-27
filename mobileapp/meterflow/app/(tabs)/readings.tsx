@@ -21,6 +21,7 @@ import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AuthInput } from '@/components/auth/auth-input';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
@@ -47,9 +48,19 @@ type CapturedReadingPhotoLocation = {
   gpsAccuracyMeters: number | null;
 };
 
+type ReadingSubmissionWindow = {
+  isOpen: boolean;
+  windowStart: string;
+  windowEnd: string;
+  timeZone: string;
+  startDay: number;
+  endDay: number;
+};
+
 export default function ReadingsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const params = useLocalSearchParams<{ resubmitReadingId?: string; meterId?: string }>();
   const { openDrawer } = useMobileDrawer();
   const { preferences } = useMobilePreferences();
@@ -71,10 +82,33 @@ export default function ReadingsScreen() {
   const [requireGpsForReading, setRequireGpsForReading] = useState(true);
   const [gpsThresholdMeters, setGpsThresholdMeters] = useState(200);
   const [maxImageSizeMb, setMaxImageSizeMb] = useState(8);
+  const [loadingAppConfig, setLoadingAppConfig] = useState(true);
+  const [readingSubmissionWindow, setReadingSubmissionWindow] =
+    useState<ReadingSubmissionWindow | null>(null);
   const resubmitReadingId =
     typeof params.resubmitReadingId === 'string' ? params.resubmitReadingId : null;
   const forcedMeterId = typeof params.meterId === 'string' ? params.meterId : null;
   const isResubmissionFlow = Boolean(resubmitReadingId);
+  const selectedSubmissionWindow = selectedMeter?.readingSubmissionWindow ?? readingSubmissionWindow;
+  const selectedSubmissionWindowClosed =
+    !isResubmissionFlow &&
+    Boolean(selectedSubmissionWindow) &&
+    !selectedSubmissionWindow?.isOpen;
+  const hasAnyOpenSubmissionWindow =
+    isResubmissionFlow || meters.some((meter) => meter.readingSubmissionWindow?.isOpen);
+  const shouldBlockEntireFlow =
+    !isResubmissionFlow &&
+    !loadingMeters &&
+    !metersError &&
+    meters.length > 0 &&
+    !hasAnyOpenSubmissionWindow;
+  const submissionWindowLabel = selectedSubmissionWindow
+    ? formatSubmissionWindowRange(
+        selectedSubmissionWindow.windowStart,
+        selectedSubmissionWindow.windowEnd,
+        locale
+      )
+    : null;
 
   const selectedMeter = meters.find((meter) => meter.id === selectedMeterId) ?? null;
   const isResubmissionMeterLocked =
@@ -112,6 +146,10 @@ export default function ReadingsScreen() {
           }
           if (forcedMeterId && result.meters.some((meter) => meter.id === forcedMeterId)) {
             return forcedMeterId;
+          }
+          const firstOpenMeter = result.meters.find((meter) => meter.readingSubmissionWindow?.isOpen);
+          if (firstOpenMeter) {
+            return firstOpenMeter.id;
           }
           return result.meters[0]?.id ?? null;
         });
@@ -154,8 +192,13 @@ export default function ReadingsScreen() {
         if (typeof result.config.maxImageSizeMb === 'number' && result.config.maxImageSizeMb > 0) {
           setMaxImageSizeMb(result.config.maxImageSizeMb);
         }
+        setReadingSubmissionWindow(result.config.readingSubmissionWindow);
       } catch {
         if (!active) return;
+      } finally {
+        if (active) {
+          setLoadingAppConfig(false);
+        }
       }
     }
 
@@ -229,6 +272,14 @@ export default function ReadingsScreen() {
 
   async function handleSubmitReading() {
     if (isSubmitting || loadingMeters) {
+      return;
+    }
+
+    if (selectedSubmissionWindowClosed) {
+      Alert.alert(
+        t('readings.windowClosedTitle'),
+        t('readings.windowClosedDescription')
+      );
       return;
     }
 
@@ -352,6 +403,67 @@ export default function ReadingsScreen() {
     setPrimaryIndex('');
     setSecondaryIndex('');
     setShowHelp(false);
+  }
+
+  if (!isResubmissionFlow && loadingAppConfig) {
+    return (
+      <RequireMobileAuth>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
+          <View style={styles.centerState}>
+            <ActivityIndicator size="small" color={palette.primary} />
+            <Text style={[styles.stateTitle, { color: palette.headline }]}>
+              {t('readings.windowLoadingTitle')}
+            </Text>
+            <Text style={[styles.stateText, { color: palette.muted }]}>
+              {t('readings.windowLoadingDescription')}
+            </Text>
+          </View>
+        </SafeAreaView>
+      </RequireMobileAuth>
+    );
+  }
+
+  if (shouldBlockEntireFlow) {
+    return (
+      <RequireMobileAuth>
+        <AppPage
+          title={t('readings.windowClosedTitle')}
+          subtitle={t('readings.windowClosedSubtitle')}
+          topBarMode="drawer"
+        >
+          <View style={[styles.detailsCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <View style={[styles.permissionIcon, { backgroundColor: palette.accentSoft, alignSelf: 'center' }]}>
+              <Ionicons name="time-outline" size={28} color={palette.primary} />
+            </View>
+            <Text style={[styles.stateTitle, { color: palette.headline }]}>
+              {t('readings.windowClosedTitle')}
+            </Text>
+            <Text style={[styles.stateText, { color: palette.muted }]}>
+              {t('readings.windowClosedDescription')}
+            </Text>
+
+            {submissionWindowLabel ? (
+              <View style={[styles.windowBadge, { backgroundColor: palette.accentSoft }]}>
+                <Ionicons name="calendar-outline" size={16} color={palette.accent} />
+                <Text style={[styles.windowBadgeText, { color: palette.primary }]}>
+                  {t('readings.windowRangeLabel', { range: submissionWindowLabel })}
+                </Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={() => safePush('/readings-history')}
+              style={[styles.inlineRetryButton, styles.closedStateButton, { backgroundColor: palette.accentSoft }]}
+            >
+              <Ionicons name="list-outline" size={16} color={palette.accent} />
+              <Text style={[styles.inlineRetryButtonText, { color: palette.primary }]}>
+                {t('readings.windowClosedHistoryAction')}
+              </Text>
+            </Pressable>
+          </View>
+        </AppPage>
+      </RequireMobileAuth>
+    );
   }
 
   if (!permission) {
@@ -488,6 +600,19 @@ export default function ReadingsScreen() {
                         <Text style={[styles.meterChoiceType, { color: selected ? palette.primary : palette.muted }]}>
                           {meter.type === 'DUAL_INDEX' ? 'Double' : 'Simple'}
                         </Text>
+                        <Text
+                          style={[
+                            styles.meterChoiceStatus,
+                            {
+                              color: meter.readingSubmissionWindow?.isOpen
+                                ? palette.success
+                                : palette.muted,
+                            },
+                          ]}>
+                          {meter.readingSubmissionWindow?.isOpen
+                            ? t('readings.windowOpenBadge')
+                            : t('readings.windowClosedBadge')}
+                        </Text>
                         {selected ? <Ionicons name="checkmark-circle" size={20} color={palette.accent} /> : null}
                       </View>
                     </Pressable>
@@ -496,6 +621,58 @@ export default function ReadingsScreen() {
               </View>
             )}
           </View>
+
+          {selectedSubmissionWindow && !isResubmissionFlow ? (
+            <View
+              style={[
+                styles.gpsCard,
+                {
+                  backgroundColor: selectedSubmissionWindowClosed ? '#fff4e8' : palette.surface,
+                  borderColor: selectedSubmissionWindowClosed ? '#f3c98b' : palette.border,
+                },
+              ]}>
+              <View style={styles.gpsCardHeader}>
+                <View
+                  style={[
+                    styles.gpsCardIcon,
+                    {
+                      backgroundColor: selectedSubmissionWindowClosed
+                        ? 'rgba(255,255,255,0.72)'
+                        : palette.accentSoft,
+                    },
+                  ]}>
+                  <Ionicons
+                    name={selectedSubmissionWindowClosed ? 'time-outline' : 'calendar-outline'}
+                    size={18}
+                    color={selectedSubmissionWindowClosed ? '#c77c11' : palette.accent}
+                  />
+                </View>
+
+                <View style={styles.gpsCardBody}>
+                  <Text style={[styles.gpsCardTitle, { color: palette.headline }]}>
+                    {t('readings.windowCardTitle')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.gpsCardMeta,
+                      { color: selectedSubmissionWindowClosed ? '#9a6514' : palette.muted },
+                    ]}>
+                    {t('readings.windowRangeLabel', { range: submissionWindowLabel || '' })}
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[
+                  styles.gpsCardHint,
+                  { color: selectedSubmissionWindowClosed ? '#9a6514' : palette.muted },
+                ]}>
+                {selectedSubmissionWindowClosed
+                  ? t('readings.windowMeterClosedHint')
+                  : t('readings.windowMeterOpenHint')}
+              </Text>
+            </View>
+          ) : null}
 
           {selectedMeter ? (
             <View
@@ -585,11 +762,14 @@ export default function ReadingsScreen() {
 
             <Pressable
               onPress={() => void handleSubmitReading()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || selectedSubmissionWindowClosed}
               style={[
                 styles.submitButton,
                 {
-                  backgroundColor: isSubmitting ? `${palette.primary}99` : palette.primary,
+                  backgroundColor:
+                    isSubmitting || selectedSubmissionWindowClosed
+                      ? `${palette.primary}99`
+                      : palette.primary,
                 },
               ]}>
               {isSubmitting ? (
@@ -1140,6 +1320,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  closedStateButton: {
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: 16,
+  },
+  windowBadge: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  windowBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   metersStack: {
     gap: 10,
   },
@@ -1176,6 +1376,10 @@ const styles = StyleSheet.create({
   },
   meterChoiceType: {
     fontSize: 12,
+    fontWeight: '700',
+  },
+  meterChoiceStatus: {
+    fontSize: 11,
     fontWeight: '700',
   },
   indexHeader: {
@@ -1233,6 +1437,22 @@ function calculateGpsDistanceMeters(
 
 function formatMeters(value: number) {
   return `${Math.round(value)} m`;
+}
+
+function formatSubmissionWindowRange(windowStart: string, windowEnd: string, locale: string) {
+  const start = new Date(windowStart);
+  const end = new Date(windowEnd);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return '';
+  }
+
+  const formatter = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'long',
+  });
+
+  return `${formatter.format(start)} - ${formatter.format(end)}`;
 }
 
 async function getReadingLocationWithTimeout(): Promise<CapturedReadingPhotoLocation> {

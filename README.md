@@ -901,6 +901,78 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - les routes purement showcase du template TailAdmin (`ui-elements`, `forms`, `tables`, `charts`) ne sont pas encore integralement localisees
   - le backoffice metier, lui, est maintenant largement couvert par le systeme i18n admin
 
+### 28) RBAC admin durci + branding backoffice + fenetre de soumission des auto-releves
+
+- Renforcement du controle d'acces admin:
+  - nouvelles permissions seedees pour couvrir plus finement:
+    - consultation utilisateurs
+    - consultation / gestion RBAC
+    - consultation compteurs / historique / consommation
+    - gestion settings
+    - consultation / gestion billing (`cities`, `zones`, `tariffs`, `campaigns`, `invoices`)
+  - nouveaux helpers partages:
+    - `src/lib/auth/adminPermissionGroups.ts`
+    - `src/lib/auth/adminPermissions.ts`
+  - protections ajoutees sur:
+    - sidebar admin (entrees masquees sans permission)
+    - pages backoffice sensibles
+    - actions serveur
+    - endpoints API admin
+
+- Branding du backoffice aligne sur `E2C`:
+  - nouveau composant de marque web:
+    - `src/components/brand/E2CAdminBrand.tsx`
+  - remplacement des anciens logos statiques dans:
+    - `src/layout/AppSidebar.tsx`
+    - `src/layout/AppHeader.tsx`
+    - `src/app/(full-width-pages)/(auth)/layout.tsx`
+  - le backoffice utilise maintenant le meme langage visuel que les apps mobiles, avec monogramme `E2C` et point haut
+
+- Regle metier d'auto-releve complete:
+  - `App settings` = fenetre mensuelle par defaut
+  - `Campaign` = fenetre specifique si besoin, prioritaire pour les compteurs rattaches a ses zones
+  - `Backend` = source de verite
+  - `Mobile` = affiche la fenetre effective et bloque l'UI, mais le vrai blocage reste serveur
+
+- Resolution de fenetre de soumission:
+  - helper metier:
+    - `src/lib/mobile/readingSubmissionWindow.ts`
+  - priorite:
+    1. campagne courante de la zone si sa fenetre est active
+    2. prochaine campagne de la zone si aucune n'est courante
+    3. fallback sur la fenetre globale des settings
+
+- Blocage serveur des releves client:
+  - `src/lib/mobile/readings.ts`
+  - nouvelles regles:
+    - un nouveau releve client n'est accepte que dans la fenetre effective du compteur
+    - un seul releve client par compteur et par fenetre
+    - si un releve de la fenetre a ete rejete ou demande en resoumission:
+      - il faut reutiliser le flow de resoumission
+    - la resoumission reste autorisee hors fenetre
+
+- Exposition de la fenetre effective au mobile:
+  - `GET /api/v1/mobile/app-config`
+  - `GET /api/v1/mobile/meters`
+  - `GET /api/v1/mobile/meters/:meterId`
+  - chaque compteur recoit maintenant sa `readingSubmissionWindow` resolue par zone/campagne
+
+- UX mobile de soumission du releve ajustee:
+  - `mobileapp/meterflow/app/(tabs)/readings.tsx`
+  - l'app:
+    - prefere un compteur ouvert quand elle initialise la selection
+    - bloque tout le flow si aucun compteur n'a de fenetre ouverte
+    - affiche l'etat `ouverte / fermee` par compteur
+    - affiche la fenetre de soumission courante ou a venir
+    - bloque le bouton d'envoi si le compteur selectionne est hors fenetre
+
+- Wording admin des settings clarifie:
+  - le bloc settings a ete renomme pour parler explicitement de:
+    - `Reading submission window`
+  - le texte indique maintenant clairement:
+    - fenetre par defaut
+    - surcharge possible par campagne
+
 
 ## Overview
 

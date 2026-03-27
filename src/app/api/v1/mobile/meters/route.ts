@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentMobileClient } from "@/lib/auth/mobileSession";
+import {
+  resolveClientReadingSubmissionWindows,
+  serializeClientReadingSubmissionWindow,
+} from "@/lib/mobile/readingSubmissionWindow";
 
 export async function GET(request: Request) {
   const auth = await getCurrentMobileClient(request);
@@ -15,6 +19,7 @@ export async function GET(request: Request) {
     },
     select: {
       id: true,
+      zoneId: true,
       serialNumber: true,
       meterReference: true,
       type: true,
@@ -55,5 +60,17 @@ export async function GET(request: Request) {
     orderBy: [{ createdAt: "desc" }],
   });
 
-  return NextResponse.json({ meters }, { status: 200 });
+  const windows = await resolveClientReadingSubmissionWindows(meters.map((meter) => meter.zoneId));
+
+  return NextResponse.json(
+    {
+      meters: meters.map(({ zoneId, ...meter }) => ({
+        ...meter,
+        readingSubmissionWindow: serializeClientReadingSubmissionWindow(
+          zoneId ? windows.byZoneId.get(zoneId) ?? windows.defaultWindow : windows.defaultWindow
+        ),
+      })),
+    },
+    { status: 200 }
+  );
 }

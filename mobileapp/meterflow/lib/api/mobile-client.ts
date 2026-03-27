@@ -156,6 +156,12 @@ function mapMobileApiError(code?: string, status?: number) {
       return 'Ce compteur nécessite aussi un index secondaire.';
     case 'gps_required_for_reading':
       return 'La localisation est requise pour transmettre ce relevé.';
+    case 'reading_submission_window_closed':
+      return "La période d'auto-relevé est actuellement fermée.";
+    case 'reading_already_submitted_for_current_window':
+      return 'Un relevé a déjà été transmis pour ce compteur sur la période en cours.';
+    case 'reading_resubmission_required_for_current_window':
+      return "Un relevé existe déjà pour cette période. Utilisez le renvoi du relevé demandé au lieu d'en créer un nouveau.";
     case 'current_and_new_password_required':
       return 'Renseignez le mot de passe actuel et le nouveau mot de passe.';
     case 'password_too_short':

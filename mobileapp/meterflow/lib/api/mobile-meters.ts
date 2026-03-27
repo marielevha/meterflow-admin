@@ -33,6 +33,19 @@ export type MobileMeter = {
     phone: string | null;
   } | null;
   states: MobileMeterState[];
+  readingSubmissionWindow: {
+    isOpen: boolean;
+    windowStart: string;
+    windowEnd: string;
+    timeZone: string;
+    startDay: number;
+    endDay: number;
+    submissionWindowKey: string;
+    source: 'settings' | 'campaign';
+    campaignId: string | null;
+    campaignCode: string | null;
+    campaignName: string | null;
+  };
 };
 
 export async function listClientMeters(accessToken: string) {

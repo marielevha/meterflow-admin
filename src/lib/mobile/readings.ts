@@ -14,6 +14,7 @@ import {
   getReviewReasonLabel,
 } from "@/lib/readings/reviewReasons";
 import { getAppSettings } from "@/lib/settings/serverSettings";
+import { getMeterReadingSubmissionWindow } from "@/lib/mobile/readingSubmissionWindow";
 
 type CreateReadingPayload = {
   meterId?: string;
@@ -119,6 +120,7 @@ export async function createClientReading(userId: string, payload: CreateReading
     },
     select: {
       id: true,
+      zoneId: true,
       type: true,
       serialNumber: true,
       meterReference: true,
@@ -135,7 +137,60 @@ export async function createClientReading(userId: string, payload: CreateReading
     return { status: 400, body: { error: "secondary_index_required_for_dual_meter" } };
   }
 
+  const submissionWindow = await getMeterReadingSubmissionWindow(meter.zoneId, new Date());
+  if (!submissionWindow.isOpen) {
+    return {
+      status: 409,
+      body: {
+        error: "reading_submission_window_closed",
+        windowStart: submissionWindow.windowStart.toISOString(),
+        windowEnd: submissionWindow.windowEnd.toISOString(),
+      },
+    };
+  }
+
   const appSettings = await getAppSettings();
+
+  const currentWindowReading = await prisma.reading.findFirst({
+    where: {
+      meterId: meter.id,
+      submittedById: userId,
+      deletedAt: null,
+      createdAt: {
+        gte: submissionWindow.windowStart,
+        lte: submissionWindow.windowEnd,
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+    },
+    orderBy: { readingAt: "desc" },
+  });
+
+  if (currentWindowReading) {
+    if (
+      currentWindowReading.status === ReadingStatus.REJECTED ||
+      currentWindowReading.status === ReadingStatus.RESUBMISSION_REQUESTED
+    ) {
+      return {
+        status: 409,
+        body: {
+          error: "reading_resubmission_required_for_current_window",
+          readingId: currentWindowReading.id,
+        },
+      };
+    }
+
+    return {
+      status: 409,
+      body: {
+        error: "reading_already_submitted_for_current_window",
+        readingId: currentWindowReading.id,
+      },
+    };
+  }
+
   const meterLat = toNumberOrNull(meter.latitude);
   const meterLng = toNumberOrNull(meter.longitude);
   const readLat = toNumberOrNull(gpsLatitude);

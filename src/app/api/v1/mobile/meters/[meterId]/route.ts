@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentMobileClient } from "@/lib/auth/mobileSession";
+import {
+  getMeterReadingSubmissionWindow,
+  serializeClientReadingSubmissionWindow,
+} from "@/lib/mobile/readingSubmissionWindow";
 
 export async function GET(
   request: Request,
@@ -24,6 +28,7 @@ export async function GET(
     },
     select: {
       id: true,
+      zoneId: true,
       serialNumber: true,
       meterReference: true,
       type: true,
@@ -67,5 +72,17 @@ export async function GET(
     return NextResponse.json({ error: "meter_not_found" }, { status: 404 });
   }
 
-  return NextResponse.json({ meter }, { status: 200 });
+  const readingSubmissionWindow = await getMeterReadingSubmissionWindow(meter.zoneId);
+
+  const { zoneId, ...meterPayload } = meter;
+
+  return NextResponse.json(
+    {
+      meter: {
+        ...meterPayload,
+        readingSubmissionWindow: serializeClientReadingSubmissionWindow(readingSubmissionWindow),
+      },
+    },
+    { status: 200 }
+  );
 }
