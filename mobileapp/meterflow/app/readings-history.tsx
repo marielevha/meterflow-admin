@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppPage } from '@/components/app/app-page';
@@ -8,6 +8,7 @@ import { AppStateCard } from '@/components/app/app-state-card';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientReadings, type MobileReading } from '@/lib/api/mobile-readings';
@@ -24,21 +25,35 @@ type HistoryFilter =
 export default function ReadingsHistoryScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const { session, logout } = useMobileSession();
   const { safePush } = useSafePush();
   const [readings, setReadings] = useState<MobileReading[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>('ALL');
   const [showFilterSelect, setShowFilterSelect] = useState(false);
+  const hasReadingsData = readings.length > 0;
 
-  const loadReadings = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
+  const loadReadings = useCallback(async (
+      activeRef: { current: boolean } = { current: true },
+      options: { mode?: 'initial' | 'refresh' | 'background' } = {}
+    ) => {
       if (!session?.accessToken) {
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
-      setLoading(true);
+      const mode = options.mode ?? 'initial';
+
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      } else if (mode === 'initial') {
+        setLoading(true);
+      }
+
       setError(null);
 
       try {
@@ -47,7 +62,7 @@ export default function ReadingsHistoryScreen() {
         setReadings(result.readings);
       } catch (loadError) {
         if (!activeRef.current) return;
-        const message = toMobileErrorMessage(loadError, 'Impossible de charger les relevés.');
+        const message = toMobileErrorMessage(loadError, t('history.fallback'));
         setError(message);
 
         if (isMobileAuthError(loadError)) {
@@ -55,20 +70,24 @@ export default function ReadingsHistoryScreen() {
         }
       } finally {
         if (activeRef.current) {
-          setLoading(false);
+          if (mode === 'refresh') {
+            setRefreshing(false);
+          } else if (mode === 'initial') {
+            setLoading(false);
+          }
         }
       }
-    }, [logout, session?.accessToken]);
+    }, [logout, session?.accessToken, t]);
 
   useFocusEffect(
     useCallback(() => {
       const activeRef = { current: true };
-      void loadReadings(activeRef);
+      void loadReadings(activeRef, { mode: hasReadingsData ? 'background' : 'initial' });
 
       return () => {
         activeRef.current = false;
       };
-    }, [loadReadings])
+    }, [hasReadingsData, loadReadings])
   );
 
   const filteredReadings =
@@ -76,42 +95,55 @@ export default function ReadingsHistoryScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Relevés" subtitle="Historique de soumission" topBarMode="back" backHref="/(tabs)">
+      <AppPage
+        title={t('history.title')}
+        subtitle={t('history.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadReadings({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
         <Pressable
           onPress={() => setShowFilterSelect(true)}
           style={[styles.filterSelect, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <View style={styles.filterSelectLeft}>
             <Ionicons name="filter-outline" size={18} color={palette.icon} />
-            <Text style={[styles.filterSelectLabel, { color: palette.muted }]}>Statut</Text>
+            <Text style={[styles.filterSelectLabel, { color: palette.muted }]}>{t('history.filterLabel')}</Text>
           </View>
           <View style={styles.filterSelectRight}>
             <Text style={[styles.filterSelectValue, { color: palette.headline }]}>
-              {HISTORY_FILTERS.find((item) => item.value === filter)?.label ?? 'Tous'}
+              {getHistoryFilters(t).find((item) => item.value === filter)?.label ?? t('history.filter.all')}
             </Text>
             <Ionicons name="chevron-down" size={18} color={palette.icon} />
           </View>
         </Pressable>
 
-        {loading ? (
+        {loading && !hasReadingsData ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
-        ) : error ? (
+        ) : error && !hasReadingsData ? (
           <AppStateCard
             palette={palette}
             icon="cloud-offline-outline"
-            title="Historique indisponible"
+            title={t('history.unavailableTitle')}
             description={error}
             tone="danger"
-            actionLabel="Réessayer"
+            actionLabel={t('common.retry')}
             onActionPress={() => void loadReadings()}
           />
         ) : filteredReadings.length === 0 ? (
           <AppStateCard
             palette={palette}
             icon="receipt-outline"
-            title="Aucun relevé trouvé"
-            description="Les relevés envoyés apparaîtront ici avec leur statut et les éventuelles actions à faire."
+            title={t('history.emptyTitle')}
+            description={t('history.emptyDescription')}
           />
         ) : (
           <View style={styles.stack}>
@@ -124,7 +156,7 @@ export default function ReadingsHistoryScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.code, { color: palette.headline }]}>{reading.meter.serialNumber}</Text>
                     <Text style={[styles.meta, { color: palette.muted }]}>
-                      {formatDisplayDate(reading.readingAt)}
+                      {formatDisplayDate(reading.readingAt, locale)}
                     </Text>
                     {reading.reasonLabel ? (
                       <Text style={[styles.reasonText, { color: palette.muted }]}>
@@ -145,7 +177,7 @@ export default function ReadingsHistoryScreen() {
                       <View style={styles.indexRow}>
                         <View style={styles.indexLabelRow}>
                           <Ionicons name="flash-outline" size={14} color={palette.accent} />
-                          <Text style={[styles.indexLabel, { color: palette.muted }]}>P1</Text>
+                          <Text style={[styles.indexLabel, { color: palette.muted }]}>{t('common.primaryShort')}</Text>
                         </View>
                         <Text style={[styles.indexValue, { color: palette.headline }]}>
                           {reading.primaryIndex ?? '--'}
@@ -155,7 +187,7 @@ export default function ReadingsHistoryScreen() {
                       <View style={styles.indexRow}>
                         <View style={styles.indexLabelRow}>
                           <Ionicons name="flash-outline" size={14} color={palette.accent} />
-                          <Text style={[styles.indexLabel, { color: palette.muted }]}>P2</Text>
+                          <Text style={[styles.indexLabel, { color: palette.muted }]}>{t('common.secondaryShort')}</Text>
                         </View>
                         <Text style={[styles.indexValue, { color: palette.headline }]}>
                           {reading.secondaryIndex ?? '--'}
@@ -166,7 +198,7 @@ export default function ReadingsHistoryScreen() {
                     <View style={styles.indexRow}>
                       <View style={styles.indexLabelRow}>
                         <Ionicons name="flash-outline" size={14} color={palette.accent} />
-                        <Text style={[styles.indexLabel, { color: palette.muted }]}>Index</Text>
+                        <Text style={[styles.indexLabel, { color: palette.muted }]}>{t('common.index')}</Text>
                       </View>
                       <Text style={[styles.indexValue, { color: palette.headline }]}>
                         {reading.primaryIndex ?? '--'}
@@ -190,7 +222,7 @@ export default function ReadingsHistoryScreen() {
                     style={[styles.resubmitButton, { backgroundColor: palette.accentSoft }]}>
                     <Ionicons name="camera-outline" size={16} color={palette.accent} />
                     <Text style={[styles.resubmitButtonText, { color: palette.primary }]}>
-                      Refaire le relevé
+                      {t('history.resubmit')}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -212,7 +244,7 @@ export default function ReadingsHistoryScreen() {
                 { backgroundColor: palette.surface, borderColor: palette.border },
               ]}>
               <View style={styles.filterModalHeader}>
-                <Text style={[styles.filterModalTitle, { color: palette.headline }]}>Filtrer les relevés</Text>
+                <Text style={[styles.filterModalTitle, { color: palette.headline }]}>{t('history.filterModalTitle')}</Text>
                 <Pressable
                   onPress={() => setShowFilterSelect(false)}
                   style={[styles.filterModalClose, { backgroundColor: palette.surfaceMuted }]}>
@@ -221,7 +253,7 @@ export default function ReadingsHistoryScreen() {
               </View>
 
               <View style={styles.filterOptions}>
-                {HISTORY_FILTERS.map((item) => {
+                {getHistoryFilters(t).map((item) => {
                   const active = filter === item.value;
                   return (
                     <Pressable
@@ -273,10 +305,10 @@ function statusTextStyle(status: string, palette: (typeof Colors)['light']) {
   return { color: palette.primary };
 }
 
-function formatDisplayDate(value: string) {
+function formatDisplayDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -455,11 +487,13 @@ const styles = StyleSheet.create({
   },
 });
 
-const HISTORY_FILTERS: { label: string; value: HistoryFilter }[] = [
-  { label: 'Tous', value: 'ALL' },
-  { label: 'En attente', value: 'PENDING' },
-  { label: 'Validé', value: 'VALIDATED' },
-  { label: 'En vérification', value: 'FLAGGED' },
-  { label: 'Rejeté', value: 'REJECTED' },
-  { label: 'Nouvelle soumission demandée', value: 'RESUBMISSION_REQUESTED' },
-];
+function getHistoryFilters(t: (key: string) => string): { label: string; value: HistoryFilter }[] {
+  return [
+    { label: t('history.filter.all'), value: 'ALL' },
+    { label: t('history.filter.pending'), value: 'PENDING' },
+    { label: t('history.filter.validated'), value: 'VALIDATED' },
+    { label: t('history.filter.flagged'), value: 'FLAGGED' },
+    { label: t('history.filter.rejected'), value: 'REJECTED' },
+    { label: t('history.filter.resubmissionRequested'), value: 'RESUBMISSION_REQUESTED' },
+  ];
+}

@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { AppPage } from '@/components/app/app-page';
@@ -13,11 +14,36 @@ export default function AboutScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
   const { t } = useI18n();
-  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const [refreshing, setRefreshing] = useState(false);
+  const [appVersion, setAppVersion] = useState(() => readAppVersion());
+
+  const refreshAbout = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await Promise.resolve();
+      setAppVersion(readAppVersion());
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   return (
     <RequireMobileAuth>
-      <AppPage title={t('common.about')} subtitle={t('about.subtitle')} topBarMode="back" backHref="/(tabs)">
+      <AppPage
+        title={t('common.about')}
+        subtitle={t('about.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void refreshAbout()}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
         <View style={styles.container}>
           <View style={[styles.heroCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <View style={[styles.logoBox, { backgroundColor: palette.accentSoft }]}>
@@ -30,7 +56,7 @@ export default function AboutScreen() {
                 accentColor={palette.accent}
               />
             </View>
-            <Text style={[styles.title, { color: palette.headline }]}>MeterFlow Mobile</Text>
+            <Text style={[styles.title, { color: palette.headline }]}>{t('about.appName')}</Text>
             <Text style={[styles.text, { color: palette.muted }]}>
               {t('about.appDescription')}
             </Text>
@@ -67,7 +93,7 @@ export default function AboutScreen() {
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('about.productInfo')}</Text>
 
-            <InfoRow label={t('about.appLabel')} value="MeterFlow Mobile" palette={palette} />
+            <InfoRow label={t('about.appLabel')} value={t('about.appName')} palette={palette} />
             <InfoRow label={t('common.version')} value={appVersion} palette={palette} />
             <InfoRow label={t('about.targetLabel')} value={t('about.targetValue')} palette={palette} />
             <InfoRow label={t('about.mainFunctionLabel')} value={t('about.mainFunctionValue')} palette={palette} />
@@ -89,6 +115,10 @@ export default function AboutScreen() {
       </AppPage>
     </RequireMobileAuth>
   );
+}
+
+function readAppVersion() {
+  return Constants.expoConfig?.version ?? '1.0.0';
 }
 
 function FeatureItem({

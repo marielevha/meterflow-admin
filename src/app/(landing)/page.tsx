@@ -46,8 +46,8 @@ const stats = [
 ];
 
 export const metadata: Metadata = {
-  title: "Landing",
-  description: "Plateforme metier pour capture compteur, controle qualite et orchestration des equipes terrain.",
+  title: "E2C",
+  description: "Plateforme metier pour E2C Client, E2C Agent et E2C Admin autour de la releve, du controle qualite et des operations terrain.",
 };
 
 export default function LandingPage() {
@@ -55,7 +55,7 @@ export default function LandingPage() {
     <main className={`${styles.page} ${poppins.className}`}>
       <header className={styles.topbar}>
         <div className={styles.topbarInner}>
-          <div className={styles.brand}>meterflow</div>
+          <div className={styles.brand}>E2C</div>
           <nav className={styles.nav}>
             <a href="#workflow">Processus</a>
             <a href="#kpi">KPI</a>
@@ -78,7 +78,7 @@ export default function LandingPage() {
           <div>
             <h1>Les releves compteurs passent en vitesse superieure.</h1>
             <p>
-              MeterFlow unifie capture terrain, verification bureau et suivi des anomalies pour fiabiliser la facturation.
+              E2C Client, E2C Agent et E2C Admin unifient capture terrain, verification bureau et suivi des anomalies pour fiabiliser la facturation.
             </p>
             <ActionButton href="/signin">Demarrer un pilote</ActionButton>
           </div>
@@ -140,7 +140,7 @@ export default function LandingPage() {
         </section>
 
         <section id="kpi" className={styles.metricSection}>
-          <h2>MeterFlow, le standard operationnel pour la releve intelligente</h2>
+          <h2>E2C, le standard operationnel pour la releve intelligente</h2>
           <p className={styles.kpiIntro}>
             Des indicateurs simples pour piloter la performance terrain, la qualite des donnees et le revenu.
           </p>
@@ -178,7 +178,7 @@ export default function LandingPage() {
 
         <section id="reviews">
           <SectionHeading
-            title="Les equipes exploitation adoptent MeterFlow"
+            title="Les equipes exploitation adoptent E2C"
             text="Des retours concrets de responsables releve, support client et revenue assurance."
           />
           <div className={styles.reviewGrid}>
@@ -215,7 +215,7 @@ export default function LandingPage() {
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div>
-            <h4>meterflow</h4>
+            <h4>E2C</h4>
             <p>Plateforme metier pour operations de releve et pilotage qualite.</p>
           </div>
           <div>

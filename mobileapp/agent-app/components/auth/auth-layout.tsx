@@ -35,8 +35,7 @@ export function AuthLayout({ title, subtitle, showBack = false, children }: Auth
   const titleSize = compactWidth ? 22 : 26;
   const titleLineHeight = compactWidth ? 28 : 32;
   const subtitleSize = compactWidth ? 13 : 14;
-  const brandSize = compactWidth ? 20 : 22;
-  const logoSize = compactWidth ? 50 : 56;
+  const logoSize = compactWidth ? 74 : compactHeight ? 82 : 92;
 
   return (
     <AppShell>
@@ -64,10 +63,10 @@ export function AuthLayout({ title, subtitle, showBack = false, children }: Auth
             </Pressable>
           ) : null}
 
-          <View style={[styles.contentStack, { gap: blockGap }]}> 
-            <View style={[styles.hero, { width: contentWidth }]}> 
+          <View style={[styles.contentStack, { gap: blockGap }]}>
+            <View style={[styles.hero, { width: contentWidth }]}>
               <View style={styles.logoBlock}>
-                <View style={[styles.logo, { width: logoSize, height: logoSize }]}> 
+                <View style={[styles.logo, { width: logoSize, height: logoSize }]}>
                   <BrandMark
                     size={logoSize}
                     backgroundColor={palette.accentSoft}
@@ -77,11 +76,10 @@ export function AuthLayout({ title, subtitle, showBack = false, children }: Auth
                     accentColor={palette.accent}
                   />
                 </View>
-                <Text style={[styles.brand, { color: palette.headline, fontSize: brandSize }]}>AgentFlow</Text>
               </View>
             </View>
 
-            <View style={[styles.header, { width: contentWidth }]}> 
+            <View style={[styles.header, { width: contentWidth }]}>
               <Text
                 style={[
                   styles.title,
@@ -143,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hero: {
-    minHeight: 54,
+    minHeight: 94,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -164,10 +162,6 @@ const styles = StyleSheet.create({
   logo: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: '900',
   },
   header: {
     alignItems: 'center',

@@ -3,30 +3,38 @@ import { router } from 'expo-router';
 import { AuthInput } from '@/components/auth/auth-input';
 import { AuthLayout } from '@/components/auth/auth-layout';
 import { AuthPrimaryButton } from '@/components/auth/auth-primary-button';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function ResetPasswordScreen() {
+  const { t } = useI18n();
+
   return (
-    <AuthLayout title="Reinitialiser le mot de passe" subtitle="Entrez le code et votre nouveau mot de passe" showBack>
+    <AuthLayout
+      title={t('auth.resetPassword.title')}
+      subtitle={t('auth.resetPassword.subtitle')}>
       <AuthInput
-        label="Code OTP"
+        label={t('auth.resetPassword.otpLabel')}
         icon="shield-checkmark-outline"
-        placeholder="000000"
+        placeholder={t('auth.resetPassword.otpPlaceholder')}
         keyboardType="number-pad"
       />
       <AuthInput
-        label="Nouveau mot de passe"
+        label={t('auth.resetPassword.passwordLabel')}
         icon="lock-closed-outline"
-        placeholder="Votre nouveau mot de passe"
+        placeholder={t('auth.resetPassword.passwordPlaceholder')}
         secureTextEntry
       />
       <AuthInput
-        label="Confirmer le mot de passe"
+        label={t('auth.resetPassword.confirmPasswordLabel')}
         icon="checkmark-circle-outline"
-        placeholder="Confirmez le mot de passe"
+        placeholder={t('auth.resetPassword.confirmPasswordPlaceholder')}
         secureTextEntry
       />
 
-      <AuthPrimaryButton label="Mettre a jour" onPress={() => router.replace('/(auth)/login')} />
+      <AuthPrimaryButton
+        label={t('auth.resetPassword.submit')}
+        onPress={() => router.replace('/(auth)/login')}
+      />
     </AuthLayout>
   );
 }

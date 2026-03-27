@@ -35,7 +35,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
 
     'drawer.agentRole': 'Agent terrain',
 
-    'splash.title': 'AgentFlow',
+    'splash.title': 'E2C Agent',
 
     'onboarding.skip': 'Passer',
     'onboarding.next': 'Suivant',
@@ -269,7 +269,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
 
     'about.title': 'A propos',
     'about.subtitle': 'Outil terrain',
-    'about.appDescription': 'AgentFlow aide les agents terrain a traiter les missions, documenter leurs interventions et remonter des preuves fiables au backoffice.',
+    'about.appName': 'E2C Agent',
+    'about.appDescription': 'E2C Agent aide les agents terrain a traiter les missions, documenter leurs interventions et remonter des preuves fiables au backoffice.',
     'about.whatItDoes': 'Ce que permet l application',
     'about.trackMissions': 'Suivre les missions',
     'about.trackMissionsText': 'Consultez les missions assignees, les priorites du jour et les echeances en retard depuis un seul espace.',
@@ -284,8 +285,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.mainFunctionLabel': 'Fonction principale',
     'about.mainFunctionValue': 'Execution et suivi des missions terrain',
     'about.whyTitle': 'Pourquoi cette application',
-    'about.whyText': 'AgentFlow rassemble les outils essentiels du terrain dans une experience mobile simple: missions, preuves photo, GPS, commentaires et suivi des interventions.',
-    'about.footer': '© 2026 AgentFlow. Propulse par E2C.',
+    'about.whyText': 'E2C Agent rassemble les outils essentiels du terrain dans une experience mobile simple: missions, preuves photo, GPS, commentaires et suivi des interventions.',
+    'about.footer': '© 2026 E2C Agent.',
   },
   en: {
     'common.home': 'Home',
@@ -319,7 +320,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
 
     'drawer.agentRole': 'Field agent',
 
-    'splash.title': 'AgentFlow',
+    'splash.title': 'E2C Agent',
 
     'onboarding.skip': 'Skip',
     'onboarding.next': 'Next',
@@ -553,7 +554,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
 
     'about.title': 'About',
     'about.subtitle': 'Field tool',
-    'about.appDescription': 'AgentFlow helps field agents manage missions, document interventions, and send reliable evidence back to the back office.',
+    'about.appName': 'E2C Agent',
+    'about.appDescription': 'E2C Agent helps field agents manage missions, document interventions, and send reliable evidence back to the back office.',
     'about.whatItDoes': 'What the app enables',
     'about.trackMissions': 'Track missions',
     'about.trackMissionsText': 'View assigned missions, daily priorities, and overdue tasks from one place.',
@@ -568,8 +570,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.mainFunctionLabel': 'Main function',
     'about.mainFunctionValue': 'Field mission execution and follow-up',
     'about.whyTitle': 'Why this app exists',
-    'about.whyText': 'AgentFlow brings essential field tools into one mobile experience: missions, photo proof, GPS, comments, and intervention tracking.',
-    'about.footer': '© 2026 AgentFlow. Powered by E2C.',
+    'about.whyText': 'E2C Agent brings essential field tools into one mobile experience: missions, photo proof, GPS, comments, and intervention tracking.',
+    'about.footer': '© 2026 E2C Agent.',
   },
   ln: {
     'common.home': 'Ndako',
@@ -603,7 +605,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
 
     'drawer.agentRole': 'Agent ya terrain',
 
-    'splash.title': 'AgentFlow',
+    'splash.title': 'E2C Agent',
 
     'onboarding.skip': 'Leka',
     'onboarding.next': 'Landela',
@@ -837,7 +839,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
 
     'about.title': 'Na ntina na yango',
     'about.subtitle': 'Esaleli ya terrain',
-    'about.appDescription': 'AgentFlow esalisaka ba agents terrain mpo na kolanda misala, kokoma ba interventions mpe kozongisa bilembo ya solo na backoffice.',
+    'about.appName': 'E2C Agent',
+    'about.appDescription': 'E2C Agent esalisaka ba agents terrain mpo na kolanda misala, kokoma ba interventions mpe kozongisa bilembo ya solo na backoffice.',
     'about.whatItDoes': 'Makambo app ekoki kosala',
     'about.trackMissions': 'Kolanda misala',
     'about.trackMissionsText': 'Monaka misala oyo epesami, ya mokolo mpe oyo eleki date na esika moko.',
@@ -852,7 +855,7 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'about.mainFunctionLabel': 'Mosala monene',
     'about.mainFunctionValue': 'Kosala mpe kolanda misala ya terrain',
     'about.whyTitle': 'Mpo na nini app oyo',
-    'about.whyText': 'AgentFlow esangisi bisaleli ya tina ya terrain na mobile moko: misala, foto ya preuve, GPS, ba commentaires mpe bolandi intervention.',
-    'about.footer': '© 2026 AgentFlow. Epesami nguya na E2C.',
+    'about.whyText': 'E2C Agent esangisi bisaleli ya tina ya terrain na mobile moko: misala, foto ya preuve, GPS, ba commentaires mpe bolandi intervention.',
+    'about.footer': '© 2026 E2C Agent.',
   },
 };

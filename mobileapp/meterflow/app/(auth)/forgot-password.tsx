@@ -4,25 +4,30 @@ import { AuthFooterLink } from '@/components/auth/auth-footer-link';
 import { AuthInput } from '@/components/auth/auth-input';
 import { AuthLayout } from '@/components/auth/auth-layout';
 import { AuthPrimaryButton } from '@/components/auth/auth-primary-button';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function ForgotPasswordScreen() {
+  const { t } = useI18n();
+
   return (
-    <AuthLayout title="Mot de passe oublie" subtitle="Recevez un code de reinitialisation" showBack>
+    <AuthLayout
+      title={t('auth.forgotPassword.title')}
+      subtitle={t('auth.forgotPassword.subtitle')}>
       <AuthInput
-        label="Email, telephone ou username"
+        label={t('auth.forgotPassword.identifierLabel')}
         icon="key-outline"
-        placeholder="Saisissez votre identifiant"
+        placeholder={t('auth.forgotPassword.identifierPlaceholder')}
         autoCapitalize="none"
       />
 
       <AuthPrimaryButton
-        label="Envoyer le code"
+        label={t('auth.forgotPassword.submit')}
         onPress={() => router.push('/(auth)/reset-password')}
       />
 
       <AuthFooterLink
-        label="Vous vous souvenez de votre mot de passe ?"
-        actionLabel="Retour connexion"
+        label={t('auth.forgotPassword.footerLabel')}
+        actionLabel={t('auth.forgotPassword.footerAction')}
         onPress={() => router.replace('/(auth)/login')}
       />
     </AuthLayout>

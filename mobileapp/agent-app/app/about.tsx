@@ -30,7 +30,7 @@ export default function AboutScreen() {
                 accentColor={palette.accent}
               />
             </View>
-            <Text style={[styles.title, { color: palette.headline }]}>AgentFlow</Text>
+            <Text style={[styles.title, { color: palette.headline }]}>{t('about.appName')}</Text>
             <Text style={[styles.subtitle, { color: palette.primary }]}>{t('about.subtitle')}</Text>
             <Text style={[styles.text, { color: palette.muted }]}>{t('about.appDescription')}</Text>
             <View style={[styles.versionBadge, { backgroundColor: palette.accentSoft }]}>
@@ -66,7 +66,7 @@ export default function AboutScreen() {
           <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('about.productInfo')}</Text>
 
-            <InfoRow label={t('about.appLabel')} value="AgentFlow" palette={palette} />
+            <InfoRow label={t('about.appLabel')} value={t('about.appName')} palette={palette} />
             <InfoRow label={t('common.version')} value={appVersion} palette={palette} />
             <InfoRow label={t('about.targetLabel')} value={t('about.targetValue')} palette={palette} />
             <InfoRow

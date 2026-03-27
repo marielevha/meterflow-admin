@@ -7,6 +7,7 @@ import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import {
   getClientConsumptionDetail,
@@ -17,6 +18,7 @@ import { useMobileSession } from '@/providers/mobile-session-provider';
 export default function ConsumptionDetailScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const params = useLocalSearchParams<{ meterId?: string; periodKey?: string }>();
   const { logout } = useMobileSession();
   const [detail, setDetail] = useState<MobileConsumptionDetail | null>(null);
@@ -28,7 +30,7 @@ export default function ConsumptionDetailScreen() {
 
     async function loadDetail() {
       if (!params.meterId || !params.periodKey) {
-        setError('Période de consommation manquante.');
+        setError(t('consumptionDetail.missingPeriod'));
         setLoading(false);
         return;
       }
@@ -42,7 +44,7 @@ export default function ConsumptionDetailScreen() {
         setDetail(result.consumption);
       } catch (loadError) {
         if (!active) return;
-        const message = toMobileErrorMessage(loadError, 'Impossible de charger le détail.');
+        const message = toMobileErrorMessage(loadError, t('consumptionDetail.fallback'));
         setError(message);
 
         if (isMobileAuthError(loadError)) {
@@ -60,11 +62,15 @@ export default function ConsumptionDetailScreen() {
     return () => {
       active = false;
     };
-  }, [logout, params.meterId, params.periodKey]);
+  }, [logout, params.meterId, params.periodKey, t]);
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Détail consommation" subtitle="Période mensuelle" topBarMode="back" backHref="/(tabs)/account">
+      <AppPage
+        title={t('consumptionDetail.title')}
+        subtitle={t('consumptionDetail.subtitle')}
+        topBarMode="back"
+        backHref="/(tabs)/account">
         {loading ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
@@ -72,7 +78,7 @@ export default function ConsumptionDetailScreen() {
         ) : error ? (
           <StateCard text={error} color={palette.danger} palette={palette} />
         ) : !detail ? (
-          <StateCard text="Consommation introuvable." color={palette.muted} palette={palette} />
+          <StateCard text={t('consumptionDetail.notFound')} color={palette.muted} palette={palette} />
         ) : (
           <>
             <View style={[styles.heroCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
@@ -84,12 +90,12 @@ export default function ConsumptionDetailScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Synthèse</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('consumptionDetail.summary')}</Text>
               <View style={styles.metricsRow}>
-                <MetricItem label="P1" value={formatConsumption(detail.primaryConsumption)} palette={palette} />
+                <MetricItem label={t('common.primaryShort')} value={formatConsumption(detail.primaryConsumption)} palette={palette} />
                 {detail.meter.type === 'DUAL_INDEX' ? (
                   <MetricItem
-                    label="P2"
+                    label={t('common.secondaryShort')}
                     value={formatConsumption(detail.secondaryConsumption)}
                     palette={palette}
                   />
@@ -97,12 +103,12 @@ export default function ConsumptionDetailScreen() {
               </View>
               <View style={styles.metricsRow}>
                 <MetricItem
-                  label="Zone"
+                  label={t('consumptionDetail.zone')}
                   value={[detail.meter.city, detail.meter.zone].filter(Boolean).join(' / ') || '--'}
                   palette={palette}
                 />
                 <MetricItem
-                  label="Référence"
+                  label={t('consumptionDetail.reference')}
                   value={detail.meter.meterReference || '--'}
                   palette={palette}
                 />
@@ -110,7 +116,7 @@ export default function ConsumptionDetailScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>États utilisés</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('consumptionDetail.usedStates')}</Text>
               <View style={styles.itemsStack}>
                 {detail.items.map((item) => (
                   <View
@@ -118,16 +124,18 @@ export default function ConsumptionDetailScreen() {
                     style={[styles.itemRow, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
                     <View style={styles.itemHead}>
                       <Text style={[styles.itemDate, { color: palette.headline }]}>
-                        {formatDate(item.effectiveAt)}
+                        {formatDate(item.effectiveAt, locale)}
                       </Text>
                       <Text style={[styles.itemReadingRef, { color: palette.muted }]}>
-                        {item.sourceReadingId ? `Relevé ${item.sourceReadingId.slice(0, 8)}` : 'État système'}
+                        {item.sourceReadingId
+                          ? t('consumptionDetail.readingRef', { id: item.sourceReadingId.slice(0, 8) })
+                          : t('consumptionDetail.systemState')}
                       </Text>
                     </View>
 
                     <View style={styles.itemMetrics}>
                       <MetricLine
-                        label="P1"
+                        label={t('common.primaryShort')}
                         previous={item.previousPrimary}
                         current={item.currentPrimary}
                         delta={item.deltaPrimary}
@@ -135,7 +143,7 @@ export default function ConsumptionDetailScreen() {
                       />
                       {detail.meter.type === 'DUAL_INDEX' ? (
                         <MetricLine
-                          label="P2"
+                          label={t('common.secondaryShort')}
                           previous={item.previousSecondary}
                           current={item.currentSecondary}
                           delta={item.deltaSecondary}
@@ -188,7 +196,7 @@ function MetricLine({
     <View style={styles.metricLine}>
       <Text style={[styles.metricLineLabel, { color: palette.muted }]}>{label}</Text>
       <Text style={[styles.metricLineValue, { color: palette.headline }]}>
-        {formatNumber(previous)} → {formatNumber(current)}
+        {formatNumber(previous)} {'->'} {formatNumber(current)}
       </Text>
       <Text style={[styles.metricLineDelta, { color: palette.accent }]}>+{formatNumber(delta)} kWh</Text>
     </View>
@@ -221,10 +229,10 @@ function formatNumber(value: number | null) {
   return value.toFixed(0);
 }
 
-function formatDate(value: string) {
+function formatDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

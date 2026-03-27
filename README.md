@@ -693,6 +693,20 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
     - bouton menu ou retour selon le contexte
   - drawer stabilise sur login/logout et changements de route
 
+- Swipe-to-refresh generalise sur les ecrans clients:
+  - support `refreshControl` partage dans `mobileapp/meterflow/components/app/app-page.tsx`
+  - geste de pull-to-refresh branche sur:
+    - accueil
+    - consommation
+    - releves
+    - notifications
+    - compteurs
+    - profil
+    - parametres
+    - a propos
+  - sur les ecrans avec donnees deja chargees, le refresh manuel ne remplace plus le contenu par un spinner plein ecran
+  - les refresh de retour sur ecran restent discrets pour conserver le contexte utilisateur
+
 - Internationalisation mobile:
   - infrastructure i18n legere ajoutee:
     - `mobileapp/meterflow/lib/i18n/translations.ts`
@@ -711,6 +725,51 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
     - consommation
     - a propos
     - drawer / tabs / parametres
+
+- Parcours auth client renforce:
+  - creation de compte branchee au backend avec:
+    - `POST /api/v1/mobile/auth/signup`
+    - `POST /api/v1/mobile/auth/activate`
+    - `POST /api/v1/mobile/auth/resend-otp`
+  - flow OTP mobile reel sur:
+    - inscription
+    - verification
+    - renvoi de code
+  - ecran d'inscription simplifie pour le mobile:
+    - champs `Prenom` et `Nom` empiles
+    - suppression de la section localisation a l'inscription
+    - informations d'accompagnement affichees uniquement a la premiere utilisation
+  - navigation auth epuree:
+    - suppression des retours inutiles sur `register`, `forgot-password`, `reset-password`, `verify-otp`
+    - `login -> register` passe par `replace`
+    - sur Android, retour depuis `register` quitte l'application au lieu de revenir sur `login`
+
+- Generation et verification de username cote client:
+  - nouvelles routes:
+    - `POST /api/v1/mobile/auth/username/generate`
+    - `POST /api/v1/mobile/auth/username/check`
+  - logique partagee ajoutee dans `src/lib/auth/username.ts`
+  - le username est genere automatiquement a partir du prenom et du nom des qu'ils sont saisis
+  - si le username est modifie manuellement, une verification immediate de disponibilite est lancee
+  - les suggestions privilegient des formes courtes et lisibles, avec notamment le motif `initialePrenom.nom`
+
+- Couverture i18n client etendue:
+  - ajout d'un helper runtime pour traduire aussi hors hooks React:
+    - `mobileapp/meterflow/lib/i18n/runtime.ts`
+  - ecrans auth migres:
+    - login
+    - register
+    - forgot-password
+    - reset-password
+    - verify-otp
+  - ecrans clients supplementaires migres:
+    - onboarding
+    - historique des releves
+    - detail releve
+    - detail compteur
+    - detail consommation
+    - flow de soumission de releve
+  - messages utilisateur i18nises aussi dans les couches API/mobile auth/upload pour eviter les textes en dur hors composants
 
 - Cloisonnement des roles cote mobile:
   - l'app mobile client est maintenant reservee aux profils `CLIENT`
@@ -841,6 +900,93 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - evenements de mission
   - notifications lues / non lues
   - utile pour tester sans reconstruire tout le workflow a la main
+
+### 27) Rebranding des surfaces utilisateur
+
+- Nommage produit harmonise autour de `E2C`:
+  - app client: `E2C Client`
+  - app agent: `E2C Agent`
+  - backoffice web: `E2C Admin`
+
+- App client:
+  - nom affiche Expo mis a jour dans `mobileapp/meterflow/app.json`
+  - branding auth et page `A propos` ajustes sur `E2C Client`
+  - textes de permissions natives (camera, photos, localisation) renommes
+  - faux splash React aligne sur `E2C Client` dans `mobileapp/meterflow/app/index.tsx`
+  - layout d'auth epure:
+    - logo seul, sans mention texte redondante
+    - logo agrandi pour mieux occuper l'ecran
+
+- App agent:
+  - nom affiche Expo mis a jour dans `mobileapp/agent-app/app.json`
+  - branding auth, drawer et page `A propos` ajustes sur `E2C Agent`
+  - dictionnaires i18n alignes sur cette nouvelle marque
+  - textes de permissions natives renommes
+  - faux splash React aligne sur `E2C Agent` dans `mobileapp/agent-app/app/index.tsx`
+  - layout d'auth epure:
+    - logo seul, sans mention texte redondante
+    - logo agrandi pour mieux occuper l'ecran
+
+- Identite visuelle mobile:
+  - le monogramme precedent a ete remplace par un vrai logo `E2C` avec point haut
+  - composant logo mis a jour dans:
+    - `mobileapp/meterflow/components/app/brand-mark.tsx`
+    - `mobileapp/agent-app/components/app/brand-mark.tsx`
+
+### 28) Push natifs client et diagnostic embarque
+
+- App customer (`E2C Client`) preparee pour les push natifs hors `Expo Go`:
+  - ajout de `expo-dev-client` dans `mobileapp/meterflow/package.json`
+  - scripts de demarrage orientes dev client:
+    - `expo start --dev-client`
+    - `expo start --dev-client --android`
+    - `expo start --dev-client --ios`
+  - ajout du `bundleIdentifier` iOS dans `mobileapp/meterflow/app.json`
+
+- Cote mobile, le provider push a ete enrichi pour exposer un vrai etat de diagnostic:
+  - permission notifications
+  - plateforme
+  - version app
+  - token appareil
+  - confirmation d'enregistrement backend
+  - derniere verification
+  - derniere erreur eventuelle
+
+- L'ecran `Parametres` de l'app client affiche maintenant une carte `Diagnostic push`:
+  - lecture de l'etat push courant
+  - rafraichissement manuel du diagnostic
+  - bouton de resynchronisation forcee vers le backend
+  - utile pour verifier rapidement pourquoi une notification in-app existe alors que le push OS n'arrive pas
+
+- Les libelles de ce diagnostic ont ete ajoutes aux dictionnaires i18n de l'app client:
+  - `fr`
+  - `en`
+  - `ln`
+  - assets natifs regeneres pour les deux apps:
+    - `icon.png`
+    - `favicon.png`
+    - `splash-icon.png`
+    - `android-icon-foreground.png`
+    - `android-icon-background.png`
+    - `android-icon-monochrome.png`
+
+- Admin web:
+  - metadata globale et ecran de connexion renommes en `E2C Admin`
+  - landing publique rebrandee autour de `E2C` dans `src/app/(landing)/page.tsx`
+  - placeholder de connexion web rendu plus neutre dans `src/components/auth/SignInForm.tsx`
+
+- Cohherence produit:
+  - `companyName` par defaut passe a `E2C` dans `src/lib/settings/appSettings.ts`
+  - les fallbacks de rappels de releve utilisent maintenant `E2C`
+  - les assets SVG de demo dans `public/seed/demo-assets` ont aussi ete renommes
+
+- Choix volontaire:
+  - les identifiants techniques restent stables pour l'instant:
+    - `slug`
+    - `scheme`
+    - `package` Android
+    - cles de stockage locales
+  - le renommage vise d'abord les surfaces visibles et la communication produit
 
 - Finition UX agent:
   - page `A propos` ajoutee a l'app agent

@@ -15,12 +15,11 @@ import {
 import { AppShell } from '@/components/app/app-shell';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { setOnboardingCompleted } from '@/lib/storage/onboarding';
 
 type Slide = {
   id: string;
-  title: string;
-  description: string;
   image: string;
   tint: string;
   glow: string;
@@ -29,8 +28,6 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     id: 'welcome',
-    title: 'Bienvenue',
-    description: 'Suivez vos compteurs et vos releves depuis une interface simple et claire.',
     image:
       'https://images.pexels.com/photos/3760067/pexels-photo-3760067.jpeg?auto=compress&cs=tinysrgb&w=1200',
     tint: '#eef6ff',
@@ -38,8 +35,6 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'capture',
-    title: 'Photographiez le releve',
-    description: "Prenez la photo du compteur et saisissez l'index en quelques secondes.",
     image:
       'https://images.pexels.com/photos/3183198/pexels-photo-3183198.jpeg?auto=compress&cs=tinysrgb&w=1200',
     tint: '#fff8ef',
@@ -47,8 +42,6 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'followup',
-    title: 'Restez informe',
-    description: 'Consultez vos statuts, alertes et evolutions de facturation dans un seul espace.',
     image:
       'https://images.pexels.com/photos/4050315/pexels-photo-4050315.jpeg?auto=compress&cs=tinysrgb&w=1200',
     tint: '#f6f1ff',
@@ -56,8 +49,6 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'ready',
-    title: 'Pret a commencer',
-    description: 'Accedez a vos compteurs, a votre historique et au suivi de vos demandes.',
     image:
       'https://images.pexels.com/photos/9875441/pexels-photo-9875441.jpeg?auto=compress&cs=tinysrgb&w=1200',
     tint: '#f3fff5',
@@ -68,6 +59,7 @@ const SLIDES: Slide[] = [
 export default function OnboardingScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { t } = useI18n();
   const { width, height } = useWindowDimensions();
   const scrollRef = useRef<ScrollView | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -129,7 +121,7 @@ export default function OnboardingScreen() {
 
           {!isLast ? (
             <Pressable onPress={handleSkip} hitSlop={12}>
-              <Text style={[styles.skipText, { color: palette.headline }]}>Skip</Text>
+              <Text style={[styles.skipText, { color: palette.headline }]}>{t('onboarding.skip')}</Text>
             </Pressable>
           ) : (
             <View style={styles.skipPlaceholder} />
@@ -184,7 +176,7 @@ export default function OnboardingScreen() {
                         lineHeight: titleLineHeight,
                       },
                     ]}>
-                    {slide.title}
+                    {t(`onboarding.${slide.id}.title`)}
                   </Text>
                   <Text
                     style={[
@@ -194,7 +186,7 @@ export default function OnboardingScreen() {
                         fontSize: descriptionSize,
                       },
                     ]}>
-                    {slide.description}
+                    {t(`onboarding.${slide.id}.description`)}
                   </Text>
                 </View>
 
@@ -218,7 +210,9 @@ export default function OnboardingScreen() {
                   <Pressable
                     onPress={handleNext}
                     style={[styles.nextButton, { backgroundColor: palette.headline }]}>
-                    <Text style={styles.nextButtonText}>{isLast ? 'Finish' : 'Next'}</Text>
+                    <Text style={styles.nextButtonText}>
+                      {isLast ? t('onboarding.finish') : t('onboarding.next')}
+                    </Text>
                   </Pressable>
                 </View>
               </View>

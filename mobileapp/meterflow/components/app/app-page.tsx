@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, ReactElement } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { AppShell } from '@/components/app/app-shell';
@@ -22,6 +22,7 @@ type AppPageProps = PropsWithChildren<{
   onBackPress?: () => void;
   scrollable?: boolean;
   contentStyle?: ViewStyle;
+  refreshControl?: ReactElement | null;
 }>;
 
 export function AppPage({
@@ -32,6 +33,7 @@ export function AppPage({
   onBackPress,
   scrollable = true,
   contentStyle,
+  refreshControl,
   children,
 }: AppPageProps) {
   const scheme = useColorScheme() ?? 'light';
@@ -60,7 +62,8 @@ export function AppPage({
           <ScrollView
             style={styles.content}
             contentContainerStyle={[styles.scrollContent, contentStyle]}
-            showsVerticalScrollIndicator={false}>
+            showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl ?? undefined}>
             {children}
           </ScrollView>
         ) : (

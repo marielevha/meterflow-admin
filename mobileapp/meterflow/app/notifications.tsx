@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
@@ -30,28 +30,38 @@ export default function NotificationsScreen() {
   const { safePush } = useSafePush();
   const [notifications, setNotifications] = useState<MobileNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const hasNotificationsData = notifications.length > 0;
 
   const loadNotifications = useCallback(
     async ({
       activeRef = { current: true },
       cursor,
       append = false,
+      mode = 'initial',
     }: {
       activeRef?: { current: boolean };
       cursor?: string | null;
       append?: boolean;
+      mode?: 'initial' | 'refresh' | 'background';
     } = {}) => {
       if (append) {
         setLoadingMore(true);
         setLoadMoreError(null);
+      } else if (mode === 'refresh') {
+        setRefreshing(true);
+        setError(null);
+        setLoadMoreError(null);
       } else {
-        setLoading(true);
+        if (mode === 'initial') {
+          setLoading(true);
+        }
         setError(null);
         setLoadMoreError(null);
       }
@@ -88,8 +98,12 @@ export default function NotificationsScreen() {
         if (activeRef.current) {
           if (append) {
             setLoadingMore(false);
+          } else if (mode === 'refresh') {
+            setRefreshing(false);
           } else {
-            setLoading(false);
+            if (mode === 'initial') {
+              setLoading(false);
+            }
           }
         }
       }
@@ -100,12 +114,15 @@ export default function NotificationsScreen() {
   useFocusEffect(
     useCallback(() => {
       const activeRef = { current: true };
-      void loadNotifications({ activeRef });
+      void loadNotifications({
+        activeRef,
+        mode: hasNotificationsData ? 'background' : 'initial',
+      });
 
       return () => {
         activeRef.current = false;
       };
-    }, [loadNotifications])
+    }, [hasNotificationsData, loadNotifications])
   );
 
   async function handleLoadMore() {
@@ -145,8 +162,17 @@ export default function NotificationsScreen() {
         title={t('common.notifications')}
         subtitle={t('notifications.subtitle')}
         topBarMode="back"
-        backHref="/(tabs)">
-        {!loading && !error && notifications.length > 0 && unreadCount > 0 ? (
+        backHref="/(tabs)"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadNotifications({ mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
+        {!loading && notifications.length > 0 && unreadCount > 0 ? (
           <View style={styles.headerActions}>
             <Pressable
               onPress={() => void handleMarkAllRead()}
@@ -171,11 +197,11 @@ export default function NotificationsScreen() {
           </View>
         ) : null}
 
-        {loading ? (
+        {loading && !hasNotificationsData ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
-        ) : error ? (
+        ) : error && !hasNotificationsData ? (
           <AppStateCard
             palette={palette}
             icon="cloud-offline-outline"

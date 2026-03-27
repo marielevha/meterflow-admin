@@ -2,6 +2,11 @@ import { OtpPurpose, OtpStatus, UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/password";
 import {
+  checkUsernameAvailability,
+  generateAvailableUsernameFromNames,
+  normalizeUsernameValue,
+} from "@/lib/auth/username";
+import {
   generateOtpCode,
   hashOtpCode,
   otpCodeLength,
@@ -56,7 +61,7 @@ function normalizeEmail(email?: string) {
 
 export async function registerMobileClient(payload: RegisterMobileClientPayload) {
   const phone = normalizePhone(payload.phone);
-  const username = normalizeOptional(payload.username);
+  const requestedUsername = normalizeUsernameValue(payload.username);
   const email = normalizeEmail(payload.email);
   const password = payload.password?.trim() ?? "";
   const firstName = normalizeOptional(payload.firstName);
@@ -64,6 +69,7 @@ export async function registerMobileClient(payload: RegisterMobileClientPayload)
   const region = normalizeOptional(payload.region);
   const city = normalizeOptional(payload.city);
   const zone = normalizeOptional(payload.zone);
+  let username: string | null = requestedUsername || null;
 
   if (!phone || !password) {
     return { status: 400, body: { error: "phone_and_password_required" } };
@@ -75,6 +81,22 @@ export async function registerMobileClient(payload: RegisterMobileClientPayload)
 
   if (password.length < 8) {
     return { status: 400, body: { error: "password_too_short" } };
+  }
+
+  if (requestedUsername) {
+    const usernameCheck = await checkUsernameAvailability(requestedUsername);
+    if (!usernameCheck.ok) {
+      return {
+        status: usernameCheck.error === "username_already_exists" ? 409 : 400,
+        body: { error: usernameCheck.error },
+      };
+    }
+    username = usernameCheck.normalized;
+  } else if (firstName && lastName) {
+    const generated = await generateAvailableUsernameFromNames(firstName, lastName);
+    if (generated.ok) {
+      username = generated.username;
+    }
   }
 
   const conflict = await prisma.user.findFirst({

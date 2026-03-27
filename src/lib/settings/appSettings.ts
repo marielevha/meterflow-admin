@@ -52,7 +52,7 @@ export type AppSettings = {
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  companyName: "MeterFlow",
+  companyName: "E2C",
   defaultCountryCode: "CG",
   timezone: "Africa/Brazzaville",
   locale: "fr-FR",

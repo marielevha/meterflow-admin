@@ -8,6 +8,7 @@ import { CircularLoading } from '@/components/app/circular-loading';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { getClientMeterDetail, type MobileMeter } from '@/lib/api/mobile-meters';
 import { useMobileSession } from '@/providers/mobile-session-provider';
@@ -15,6 +16,7 @@ import { useMobileSession } from '@/providers/mobile-session-provider';
 export default function MeterDetailScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
+  const { locale, t } = useI18n();
   const params = useLocalSearchParams<{ id?: string }>();
   const { logout } = useMobileSession();
   const [meter, setMeter] = useState<MobileMeter | null>(null);
@@ -26,7 +28,7 @@ export default function MeterDetailScreen() {
 
     async function loadDetail() {
       if (!params.id) {
-        setError('Identifiant du compteur manquant.');
+        setError(t('meterDetail.missingId'));
         setLoading(false);
         return;
       }
@@ -40,7 +42,7 @@ export default function MeterDetailScreen() {
         setMeter(result.meter);
       } catch (loadError) {
         if (!active) return;
-        const message = toMobileErrorMessage(loadError, 'Impossible de charger le compteur.');
+        const message = toMobileErrorMessage(loadError, t('meterDetail.fallback'));
         setError(message);
         if (isMobileAuthError(loadError)) {
           await logout();
@@ -57,19 +59,19 @@ export default function MeterDetailScreen() {
     return () => {
       active = false;
     };
-  }, [logout, params.id]);
+  }, [logout, params.id, t]);
 
   const latestState = meter?.states[0] ?? null;
 
   return (
     <RequireMobileAuth>
-      <AppPage title="Détail compteur" subtitle="Mes compteurs" topBarMode="back" backHref="/meters">
+      <AppPage title={t('meterDetail.title')} subtitle={t('meterDetail.subtitle')} topBarMode="back" backHref="/meters">
         {loading ? (
-          <StateCard text="Chargement du compteur..." color={palette.muted} loading palette={palette} />
+          <StateCard text={t('meterDetail.loading')} color={palette.muted} loading palette={palette} />
         ) : error ? (
           <StateCard text={error} color={palette.danger} palette={palette} />
         ) : !meter ? (
-          <StateCard text="Compteur introuvable." color={palette.muted} palette={palette} />
+          <StateCard text={t('meterDetail.notFound')} color={palette.muted} palette={palette} />
         ) : (
           <>
             <View style={[styles.heroCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
@@ -80,7 +82,7 @@ export default function MeterDetailScreen() {
                 <View style={styles.heroTextBlock}>
                   <Text style={[styles.heroTitle, { color: palette.headline }]}>{meter.serialNumber}</Text>
                   <Text style={[styles.heroMeta, { color: palette.muted }]}>
-                    {meter.meterReference || 'Référence non renseignée'}
+                    {meter.meterReference || t('meterDetail.referenceMissing')}
                   </Text>
                 </View>
               </View>
@@ -96,51 +98,51 @@ export default function MeterDetailScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Informations</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('meterDetail.information')}</Text>
               <View style={styles.infoGrid}>
                 <InfoItem
-                  label="Ville / zone"
+                  label={t('meterDetail.cityZone')}
                   value={[meter.city, meter.zone].filter(Boolean).join(' / ') || '--'}
                   palette={palette}
                 />
                 <InfoItem
-                  label="Adresse"
+                  label={t('meterDetail.address')}
                   value={[meter.addressLine1, meter.addressLine2].filter(Boolean).join(', ') || '--'}
                   palette={palette}
                 />
                 <InfoItem
-                  label="Installé le"
-                  value={meter.installedAt ? formatDisplayDate(meter.installedAt) : '--'}
+                  label={t('meterDetail.installedAt')}
+                  value={meter.installedAt ? formatDisplayDate(meter.installedAt, locale) : '--'}
                   palette={palette}
                 />
                 <InfoItem
-                  label="Dernière inspection"
-                  value={meter.lastInspectionAt ? formatDisplayDate(meter.lastInspectionAt) : '--'}
+                  label={t('meterDetail.lastInspectionAt')}
+                  value={meter.lastInspectionAt ? formatDisplayDate(meter.lastInspectionAt, locale) : '--'}
                   palette={palette}
                 />
               </View>
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Dernier état connu</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('meterDetail.latestState')}</Text>
               <View style={styles.infoGrid}>
                 <InfoItem
-                  label="Index principal"
+                  label={t('meterDetail.primaryIndex')}
                   value={latestState?.currentPrimary?.toString() ?? '--'}
                   palette={palette}
                 />
                 <InfoItem
-                  label="Index secondaire"
+                  label={t('meterDetail.secondaryIndex')}
                   value={latestState?.currentSecondary?.toString() ?? '--'}
                   palette={palette}
                 />
                 <InfoItem
-                  label="Date effective"
-                  value={latestState?.effectiveAt ? formatDisplayDate(latestState.effectiveAt) : '--'}
+                  label={t('meterDetail.effectiveAt')}
+                  value={latestState?.effectiveAt ? formatDisplayDate(latestState.effectiveAt, locale) : '--'}
                   palette={palette}
                 />
                 <InfoItem
-                  label="Agent affecté"
+                  label={t('meterDetail.assignedAgent')}
                   value={formatAssignedAgent(meter)}
                   palette={palette}
                 />
@@ -148,12 +150,12 @@ export default function MeterDetailScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Text style={[styles.sectionTitle, { color: palette.headline }]}>Coordonnées techniques</Text>
+              <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('meterDetail.technicalCoordinates')}</Text>
               <View style={styles.infoGrid}>
-                <InfoItem label="Latitude" value={meter.latitude?.toString() ?? '--'} palette={palette} />
-                <InfoItem label="Longitude" value={meter.longitude?.toString() ?? '--'} palette={palette} />
-                <InfoItem label="Créé le" value={formatDisplayDate(meter.createdAt)} palette={palette} />
-                <InfoItem label="Mis à jour" value={formatDisplayDate(meter.updatedAt)} palette={palette} />
+                <InfoItem label={t('meterDetail.latitude')} value={meter.latitude?.toString() ?? '--'} palette={palette} />
+                <InfoItem label={t('meterDetail.longitude')} value={meter.longitude?.toString() ?? '--'} palette={palette} />
+                <InfoItem label={t('meterDetail.createdAt')} value={formatDisplayDate(meter.createdAt, locale)} palette={palette} />
+                <InfoItem label={t('meterDetail.updatedAt')} value={formatDisplayDate(meter.updatedAt, locale)} palette={palette} />
               </View>
             </View>
           </>
@@ -210,10 +212,10 @@ function formatAssignedAgent(meter: MobileMeter) {
   );
 }
 
-function formatDisplayDate(value: string) {
+function formatDisplayDate(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

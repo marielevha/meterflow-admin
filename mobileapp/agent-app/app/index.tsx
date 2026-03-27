@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { BrandMark } from '@/components/app/brand-mark';
@@ -52,8 +52,15 @@ export default function SplashRoute() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.logoWrap, { opacity, transform: [{ scale }] }]}> 
-        <BrandMark size={124} />
+      <Animated.View style={[styles.logoWrap, { opacity, transform: [{ scale }] }]}>
+        <BrandMark
+          size={124}
+          backgroundColor="#18263c"
+          shadowColor="#f0b76a"
+          shadowColorAlt="#ffe0a8"
+          accentColor="#ffb84d"
+        />
+        <Text style={styles.title}>E2C Agent</Text>
       </Animated.View>
     </View>
   );
@@ -62,14 +69,21 @@ export default function SplashRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#153eaf',
+    backgroundColor: '#18263c',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoWrap: {
-    width: 124,
-    height: 124,
+    width: 220,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 18,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
 });

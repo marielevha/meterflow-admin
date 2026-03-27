@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { AppPage } from '@/components/app/app-page';
@@ -24,44 +24,60 @@ export default function ConsumptionScreen() {
   const [meters, setMeters] = useState<MobileConsumptionMeter[]>([]);
   const [entries, setEntries] = useState<MobileConsumptionEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMeterId, setSelectedMeterId] = useState<string>('ALL');
   const [showMeterSelect, setShowMeterSelect] = useState(false);
+  const hasConsumptionData = meters.length > 0 || entries.length > 0;
 
-  const loadConsumption = useCallback(async (activeRef: { current: boolean } = { current: true }) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await listClientConsumption({
-        meterId: selectedMeterId === 'ALL' ? undefined : selectedMeterId,
-        limit: 12,
-      });
-      if (!activeRef.current) return;
-      setMeters(result.meters);
-      setEntries(result.consumptions);
-    } catch (loadError) {
-      if (!activeRef.current) return;
-      const message = toMobileErrorMessage(loadError, t('consumption.loadingFallback'));
-      setError(message);
-      if (isMobileAuthError(loadError)) {
-        await logout();
+  const loadConsumption = useCallback(async (
+      activeRef: { current: boolean } = { current: true },
+      options: { mode?: 'initial' | 'refresh' | 'background' } = {}
+    ) => {
+      const mode = options.mode ?? 'initial';
+
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      } else if (mode === 'initial') {
+        setLoading(true);
       }
-    } finally {
-      if (activeRef.current) {
-        setLoading(false);
+
+      try {
+        setError(null);
+        const result = await listClientConsumption({
+          meterId: selectedMeterId === 'ALL' ? undefined : selectedMeterId,
+          limit: 12,
+        });
+        if (!activeRef.current) return;
+        setMeters(result.meters);
+        setEntries(result.consumptions);
+      } catch (loadError) {
+        if (!activeRef.current) return;
+        const message = toMobileErrorMessage(loadError, t('consumption.loadingFallback'));
+        setError(message);
+        if (isMobileAuthError(loadError)) {
+          await logout();
+        }
+      } finally {
+        if (activeRef.current) {
+          if (mode === 'refresh') {
+            setRefreshing(false);
+          } else if (mode === 'initial') {
+            setLoading(false);
+          }
+        }
       }
-    }
-  }, [logout, selectedMeterId, t]);
+    }, [logout, selectedMeterId, t]);
 
   useFocusEffect(
     useCallback(() => {
       const activeRef = { current: true };
-      void loadConsumption(activeRef);
+      void loadConsumption(activeRef, { mode: hasConsumptionData ? 'background' : 'initial' });
 
       return () => {
         activeRef.current = false;
       };
-    }, [loadConsumption])
+    }, [hasConsumptionData, loadConsumption])
   );
 
   const selectedMeterLabel = useMemo(() => {
@@ -71,7 +87,18 @@ export default function ConsumptionScreen() {
 
   return (
     <RequireMobileAuth>
-      <AppPage title={t('common.consumption')} subtitle={t('consumption.subtitle')}>
+      <AppPage
+        title={t('common.consumption')}
+        subtitle={t('consumption.subtitle')}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadConsumption({ current: true }, { mode: 'refresh' })}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
+            progressBackgroundColor={palette.surface}
+          />
+        }>
         <Pressable
           onPress={() => setShowMeterSelect(true)}
           style={[styles.filterSelect, { backgroundColor: palette.surface, borderColor: palette.border }]}>
@@ -89,11 +116,11 @@ export default function ConsumptionScreen() {
           </View>
         </Pressable>
 
-        {loading ? (
+        {loading && !hasConsumptionData ? (
           <View style={styles.loadingWrap}>
             <CircularLoading palette={palette} />
           </View>
-        ) : error ? (
+        ) : error && !hasConsumptionData ? (
           <AppStateCard
             palette={palette}
             icon="cloud-offline-outline"

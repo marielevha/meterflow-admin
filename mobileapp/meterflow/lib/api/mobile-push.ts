@@ -32,7 +32,7 @@ export async function requestExpoPushToken() {
 
   if (finalStatus !== 'granted') {
     console.warn('[mobile-push] notification_permission_denied');
-    return { token: null, granted: false };
+    return { token: null, granted: false, status: finalStatus };
   }
 
   if (Platform.OS === 'android') {
@@ -52,7 +52,7 @@ export async function requestExpoPushToken() {
     tokenPreview: `${tokenResponse.data.slice(0, 18)}...`,
   });
 
-  return { token: tokenResponse.data, granted: true };
+  return { token: tokenResponse.data, granted: true, status: finalStatus };
 }
 
 export async function registerMobilePushToken(payload: RegisterPayload) {

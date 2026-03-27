@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -40,16 +41,17 @@ export function AuthLayout({
   const titleSize = compactWidth ? 22 : 26;
   const titleLineHeight = compactWidth ? 28 : 32;
   const subtitleSize = compactWidth ? 13 : 14;
-  const brandSize = compactWidth ? 20 : 22;
-  const logoSize = compactWidth ? 50 : 56;
+  const logoSize = compactWidth ? 74 : compactHeight ? 82 : 92;
 
   return (
     <AppShell>
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View
-          style={[
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
             styles.page,
             {
               paddingHorizontal: 16,
@@ -82,9 +84,6 @@ export function AuthLayout({
                     accentColor={palette.accent}
                   />
                 </View>
-                <Text style={[styles.brand, { color: palette.headline, fontSize: brandSize }]}>
-                  MeterFlow
-                </Text>
               </View>
             </View>
 
@@ -130,7 +129,7 @@ export function AuthLayout({
               {children}
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </AppShell>
   );
@@ -141,16 +140,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   page: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
   },
   contentStack: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   hero: {
-    minHeight: 54,
+    minHeight: 94,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -171,10 +170,6 @@ const styles = StyleSheet.create({
   logo: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  brand: {
-    fontSize: 22,
-    fontWeight: '900',
   },
   header: {
     alignItems: 'center',
