@@ -161,13 +161,13 @@ function mapAgentApiError(code?: string, status?: number) {
     case 'resolution_code_required':
       return 'Choisissez une issue terrain avant de continuer.';
     case 'primary_index_required':
-      return 'Saisissez un index principal valide.';
+      return 'Saisissez un index valide.';
     case 'secondary_index_required_for_dual_meter':
-      return 'Ce compteur demande aussi un index secondaire.';
+      return 'Ce compteur demande aussi un index HC.';
     case 'primary_index_not_monotonic':
-      return 'L index principal est inferieur au dernier releve connu.';
+      return 'L index saisi est inferieur au dernier releve connu.';
     case 'secondary_index_not_monotonic':
-      return 'L index secondaire est inferieur au dernier releve connu.';
+      return 'L index HC est inferieur au dernier releve connu.';
     case 'invalid_status_transition':
       return 'Cette action n est pas autorisee pour l etat actuel de la mission.';
     case 'invalid_request':

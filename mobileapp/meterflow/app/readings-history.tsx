@@ -12,6 +12,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientReadings, type MobileReading } from '@/lib/api/mobile-readings';
+import { getCustomerMeterIndexLabels } from '@/lib/meters/index-labels';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 type HistoryFilter =
@@ -173,11 +174,14 @@ export default function ReadingsHistoryScreen() {
 
                 <View style={styles.indexBlock}>
                   {reading.meter.type === 'DUAL_INDEX' ? (
+                    (() => {
+                      const labels = getCustomerMeterIndexLabels(reading.meter.type, t);
+                      return (
                     <>
                       <View style={styles.indexRow}>
                         <View style={styles.indexLabelRow}>
                           <Ionicons name="flash-outline" size={14} color={palette.accent} />
-                          <Text style={[styles.indexLabel, { color: palette.muted }]}>{t('common.primaryShort')}</Text>
+                          <Text style={[styles.indexLabel, { color: palette.muted }]}>{labels.primaryConsumption}</Text>
                         </View>
                         <Text style={[styles.indexValue, { color: palette.headline }]}>
                           {reading.primaryIndex ?? '--'}
@@ -187,13 +191,15 @@ export default function ReadingsHistoryScreen() {
                       <View style={styles.indexRow}>
                         <View style={styles.indexLabelRow}>
                           <Ionicons name="flash-outline" size={14} color={palette.accent} />
-                          <Text style={[styles.indexLabel, { color: palette.muted }]}>{t('common.secondaryShort')}</Text>
+                          <Text style={[styles.indexLabel, { color: palette.muted }]}>{labels.secondaryConsumption}</Text>
                         </View>
                         <Text style={[styles.indexValue, { color: palette.headline }]}>
                           {reading.secondaryIndex ?? '--'}
                         </Text>
                       </View>
                     </>
+                      );
+                    })()
                   ) : (
                     <View style={styles.indexRow}>
                       <View style={styles.indexLabelRow}>

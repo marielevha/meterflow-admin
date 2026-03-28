@@ -13,6 +13,7 @@ import {
   getClientConsumptionDetail,
   type MobileConsumptionDetail,
 } from '@/lib/api/mobile-consumption';
+import { getCustomerMeterIndexLabels } from '@/lib/meters/index-labels';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function ConsumptionDetailScreen() {
@@ -64,6 +65,8 @@ export default function ConsumptionDetailScreen() {
     };
   }, [logout, params.meterId, params.periodKey, t]);
 
+  const labels = detail ? getCustomerMeterIndexLabels(detail.meter.type, t) : null;
+
   return (
     <RequireMobileAuth>
       <AppPage
@@ -92,10 +95,14 @@ export default function ConsumptionDetailScreen() {
             <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('consumptionDetail.summary')}</Text>
               <View style={styles.metricsRow}>
-                <MetricItem label={t('common.primaryShort')} value={formatConsumption(detail.primaryConsumption)} palette={palette} />
+                <MetricItem
+                  label={labels?.primaryConsumption ?? t('common.total')}
+                  value={formatConsumption(detail.primaryConsumption)}
+                  palette={palette}
+                />
                 {detail.meter.type === 'DUAL_INDEX' ? (
                   <MetricItem
-                    label={t('common.secondaryShort')}
+                    label={labels?.secondaryConsumption ?? t('common.hcShort')}
                     value={formatConsumption(detail.secondaryConsumption)}
                     palette={palette}
                   />
@@ -135,7 +142,7 @@ export default function ConsumptionDetailScreen() {
 
                     <View style={styles.itemMetrics}>
                       <MetricLine
-                        label={t('common.primaryShort')}
+                        label={labels?.primaryConsumption ?? t('common.total')}
                         previous={item.previousPrimary}
                         current={item.currentPrimary}
                         delta={item.deltaPrimary}
@@ -143,7 +150,7 @@ export default function ConsumptionDetailScreen() {
                       />
                       {detail.meter.type === 'DUAL_INDEX' ? (
                         <MetricLine
-                          label={t('common.secondaryShort')}
+                          label={labels?.secondaryConsumption ?? t('common.hcShort')}
                           previous={item.previousSecondary}
                           current={item.currentSecondary}
                           delta={item.deltaSecondary}

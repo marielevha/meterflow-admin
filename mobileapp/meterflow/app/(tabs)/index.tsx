@@ -15,9 +15,14 @@ import { AppPage } from '@/components/app/app-page';
 import { CircularLoading } from '@/components/app/circular-loading';
 import { AppStateCard } from '@/components/app/app-state-card';
 import { RequireMobileAuth } from '@/components/auth/require-mobile-auth';
+import {
+  MiniConsumptionSparkline,
+  type MiniConsumptionSparklinePoint,
+} from '@/components/consumption/mini-consumption-sparkline';
 import { Colors } from '@/constants/theme';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { listClientConsumption, type MobileConsumptionEntry } from '@/lib/api/mobile-consumption';
+import { getCustomerMeterIndexLabels } from '@/lib/meters/index-labels';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
@@ -33,7 +38,7 @@ type DashboardData = {
 export default function HomeScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { width: screenWidth } = useWindowDimensions();
   const { session, logout } = useMobileSession();
   const { unreadCount } = useMobileNotifications();
@@ -130,7 +135,39 @@ export default function HomeScreen() {
 
     return meterScopedConsumptions.slice(0, 5);
   }, [activeMeter, dashboardData.consumptions]);
-  const meterCardWidth = Math.min(screenWidth - 56, 320);
+
+  const consumptionTrendByMeterId = useMemo(() => {
+    const grouped = new Map<string, MobileConsumptionEntry[]>();
+
+    for (const consumption of dashboardData.consumptions) {
+      const bucket = grouped.get(consumption.meterId);
+      if (bucket) {
+        bucket.push(consumption);
+        continue;
+      }
+
+      grouped.set(consumption.meterId, [consumption]);
+    }
+
+    const trends = new Map<string, MiniConsumptionSparklinePoint[]>();
+
+    for (const [meterId, values] of grouped.entries()) {
+      trends.set(
+        meterId,
+        [...values]
+          .sort((a, b) => new Date(a.effectiveAt).getTime() - new Date(b.effectiveAt).getTime())
+          .slice(-6)
+          .map((entry) => ({
+            periodKey: entry.periodKey,
+            label: formatPeriodLabel(entry.periodKey, locale),
+            value: entry.totalConsumption,
+          }))
+      );
+    }
+
+    return trends;
+  }, [dashboardData.consumptions, locale]);
+  const meterCardWidth = Math.min(screenWidth - 40, 336);
   const meterSnapInterval = meterCardWidth + 12;
 
   return (
@@ -203,6 +240,9 @@ export default function HomeScreen() {
                 }}>
                 {dashboardData.meters.map((meter) => {
                   const latestState = meter.states[0];
+                  const meterTrend = consumptionTrendByMeterId.get(meter.id) ?? [];
+                  const latestTrendPoint = meterTrend.at(-1) ?? null;
+                  const indexLabels = getCustomerMeterIndexLabels(meter.type, t);
                   return (
                     <Pressable
                       key={meter.id}
@@ -238,7 +278,7 @@ export default function HomeScreen() {
                       <View style={styles.financeBottomRow}>
                         <View style={styles.financeMetric}>
                           <Text style={[styles.financeMetricLabel, { color: palette.muted }]}>
-                            {t('home.primaryIndex')}
+                            {indexLabels.primaryIndex}
                           </Text>
                           <Text style={[styles.financeMetricValue, { color: palette.headline }]}>
                             {latestState?.currentPrimary?.toString() || '--'}
@@ -247,7 +287,7 @@ export default function HomeScreen() {
                         {meter.type === 'DUAL_INDEX' ? (
                           <View style={styles.financeMetric}>
                             <Text style={[styles.financeMetricLabel, { color: palette.muted }]}>
-                              {t('home.secondaryIndex')}
+                              {indexLabels.secondaryIndex}
                             </Text>
                             <Text style={[styles.financeMetricValue, { color: palette.headline }]}>
                               {latestState?.currentSecondary?.toString() || '--'}
@@ -255,6 +295,19 @@ export default function HomeScreen() {
                           </View>
                         ) : null}
                       </View>
+
+                      {meterTrend.length > 1 ? (
+                        <View style={[styles.financeTrendWrap, { borderTopColor: `${palette.border}B3` }]}>
+                          <MiniConsumptionSparkline
+                            variant="compact"
+                            points={meterTrend}
+                            latestValue={formatConsumption(latestTrendPoint?.value ?? null)}
+                            latestLabel={latestTrendPoint?.label ?? '--'}
+                            title={t('home.consumptionTrendTitle')}
+                            palette={palette}
+                          />
+                        </View>
+                      ) : null}
                     </Pressable>
                   );
                 })}
@@ -413,6 +466,19 @@ export default function HomeScreen() {
 function formatConsumption(value: number | null) {
   if (value === null || Number.isNaN(value)) return '--';
   return `${value.toFixed(0)} kWh`;
+}
+
+function formatPeriodLabel(periodKey: string, locale: string) {
+  if (!/^\d{4}-\d{2}$/.test(periodKey)) {
+    return periodKey;
+  }
+
+  const [year, month] = periodKey.split('-').map(Number);
+  const date = new Date(year, month - 1, 1);
+
+  return date.toLocaleDateString(locale, {
+    month: 'short',
+  });
 }
 
 function humanizeMeterStatus(status: string, t: (key: string) => string) {
@@ -594,6 +660,10 @@ const styles = StyleSheet.create({
   financeBottomRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  financeTrendWrap: {
+    borderTopWidth: 1,
+    paddingTop: 14,
   },
   financeMetric: {
     flex: 1,

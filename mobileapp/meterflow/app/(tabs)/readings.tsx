@@ -24,6 +24,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
+import { getCustomerMeterIndexLabels } from '@/lib/meters/index-labels';
 import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
 import { getMobileAppConfig } from '@/lib/api/mobile-app-config';
 import { createClientReading, resubmitClientReading } from '@/lib/api/mobile-readings';
@@ -303,17 +304,15 @@ export default function ReadingsScreen() {
 
     const primaryValue = Number(primaryIndex);
     const secondaryValue = Number(secondaryIndex);
+    const indexLabels = getCustomerMeterIndexLabels(selectedMeter.type, t);
 
     if (!Number.isFinite(primaryValue) || primaryValue < 0) {
-      Alert.alert(t('readingsFlow.alert.invalidIndexTitle'), t('readingsFlow.alert.invalidPrimaryIndexBody'));
+      Alert.alert(t('readingsFlow.alert.invalidIndexTitle'), indexLabels.invalidPrimaryIndexBody);
       return;
     }
 
     if (selectedMeter.type === 'DUAL_INDEX' && (!Number.isFinite(secondaryValue) || secondaryValue < 0)) {
-      Alert.alert(
-        t('readingsFlow.alert.secondaryIndexRequiredTitle'),
-        t('readingsFlow.alert.secondaryIndexRequiredBody')
-      );
+      Alert.alert(indexLabels.secondaryIndexRequiredTitle, indexLabels.invalidSecondaryIndexBody);
       return;
     }
 
@@ -745,8 +744,12 @@ export default function ReadingsScreen() {
             </View>
 
             <View style={styles.indexStack}>
+              {(() => {
+                const indexLabels = getCustomerMeterIndexLabels(selectedMeter?.type, t);
+                return (
+                  <>
               <AuthInput
-                label={t('home.primaryIndex')}
+                label={indexLabels.primaryIndex}
                 icon="flash-outline"
                 keyboardType="numeric"
                 value={primaryIndex}
@@ -756,7 +759,7 @@ export default function ReadingsScreen() {
 
               {selectedMeter?.type === 'DUAL_INDEX' ? (
                 <AuthInput
-                  label={t('home.secondaryIndex')}
+                  label={indexLabels.secondaryIndex}
                   icon="layers-outline"
                   keyboardType="numeric"
                   value={secondaryIndex}
@@ -764,6 +767,9 @@ export default function ReadingsScreen() {
                   placeholder={t('readingsFlow.index.secondaryPlaceholder')}
                 />
               ) : null}
+                  </>
+                );
+              })()}
             </View>
 
             <Pressable

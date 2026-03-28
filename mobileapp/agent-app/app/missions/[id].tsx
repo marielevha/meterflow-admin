@@ -13,6 +13,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { getAgentTaskDetail, startAgentTask, type AgentMissionDetail } from '@/lib/api/agent-tasks';
 import { isAgentAuthError, toAgentErrorMessage } from '@/lib/api/agent-client';
+import { getAgentMeterIndexLabels } from '@/lib/meters/index-labels';
 import { useAgentSession } from '@/providers/agent-session-provider';
 import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 
@@ -84,6 +85,7 @@ export default function MissionDetailScreen() {
   );
 
   const historyEntries = useMemo(() => mission?.timeline ?? [], [mission?.timeline]);
+  const indexLabels = mission ? getAgentMeterIndexLabels(mission.meter.type, t) : null;
   const canReport = Boolean(mission && !['DONE', 'CANCELED'].includes(mission.status));
   const canStart = Boolean(mission && mission.status === 'OPEN');
 
@@ -267,15 +269,17 @@ export default function MissionDetailScreen() {
                     palette={palette}
                   />
                   <InfoItem
-                    label={t('missions.fieldPrimaryIndex')}
+                    label={indexLabels?.primaryIndex ?? t('missions.fieldIndex')}
                     value={mission.fieldReport.primaryIndex?.toString() ?? '--'}
                     palette={palette}
                   />
-                  <InfoItem
-                    label={t('missions.fieldSecondaryIndex')}
-                    value={mission.fieldReport.secondaryIndex?.toString() ?? '--'}
-                    palette={palette}
-                  />
+                  {mission.meter.type === 'DUAL_INDEX' || mission.fieldReport.secondaryIndex !== null ? (
+                    <InfoItem
+                      label={indexLabels?.secondaryIndex ?? t('missions.fieldHcIndex')}
+                      value={mission.fieldReport.secondaryIndex?.toString() ?? '--'}
+                      palette={palette}
+                    />
+                  ) : null}
                 </View>
 
                 {mission.fieldReport.comment ? (
@@ -293,8 +297,18 @@ export default function MissionDetailScreen() {
                 <View style={styles.infoGrid}>
                   <InfoItem label={t('missions.fieldReadingStatus')} value={mission.reading.status} palette={palette} />
                   <InfoItem label={t('missions.fieldReadingDate')} value={formatNullableDateTime(mission.reading.readingAt, locale, t)} palette={palette} />
-                  <InfoItem label={t('missions.fieldPrimaryIndex')} value={mission.reading.primaryIndex?.toString() ?? '--'} palette={palette} />
-                  <InfoItem label={t('missions.fieldSecondaryIndex')} value={mission.reading.secondaryIndex?.toString() ?? '--'} palette={palette} />
+                  <InfoItem
+                    label={indexLabels?.primaryIndex ?? t('missions.fieldIndex')}
+                    value={mission.reading.primaryIndex?.toString() ?? '--'}
+                    palette={palette}
+                  />
+                  {mission.meter.type === 'DUAL_INDEX' || mission.reading.secondaryIndex !== null ? (
+                    <InfoItem
+                      label={indexLabels?.secondaryIndex ?? t('missions.fieldHcIndex')}
+                      value={mission.reading.secondaryIndex?.toString() ?? '--'}
+                      palette={palette}
+                    />
+                  ) : null}
                 </View>
               </View>
             ) : null}
@@ -305,8 +319,18 @@ export default function MissionDetailScreen() {
                 <View style={styles.infoGrid}>
                   <InfoItem label={t('missions.fieldReadingStatus')} value={mission.reportedReading.status} palette={palette} />
                   <InfoItem label={t('missions.fieldReadingDate')} value={formatNullableDateTime(mission.reportedReading.readingAt, locale, t)} palette={palette} />
-                  <InfoItem label={t('missions.fieldPrimaryIndex')} value={mission.reportedReading.primaryIndex?.toString() ?? '--'} palette={palette} />
-                  <InfoItem label={t('missions.fieldSecondaryIndex')} value={mission.reportedReading.secondaryIndex?.toString() ?? '--'} palette={palette} />
+                  <InfoItem
+                    label={indexLabels?.primaryIndex ?? t('missions.fieldIndex')}
+                    value={mission.reportedReading.primaryIndex?.toString() ?? '--'}
+                    palette={palette}
+                  />
+                  {mission.meter.type === 'DUAL_INDEX' || mission.reportedReading.secondaryIndex !== null ? (
+                    <InfoItem
+                      label={indexLabels?.secondaryIndex ?? t('missions.fieldHcIndex')}
+                      value={mission.reportedReading.secondaryIndex?.toString() ?? '--'}
+                      palette={palette}
+                    />
+                  ) : null}
                 </View>
               </View>
             ) : null}

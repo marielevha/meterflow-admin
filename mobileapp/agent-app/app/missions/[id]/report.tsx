@@ -30,6 +30,7 @@ import {
   type AgentMissionResolutionCode,
 } from '@/lib/api/agent-tasks';
 import { isAgentAuthError, toAgentErrorMessage } from '@/lib/api/agent-client';
+import { getAgentMeterIndexLabels } from '@/lib/meters/index-labels';
 import { uploadTaskEvidence } from '@/lib/api/agent-uploads';
 import { useAgentSession } from '@/providers/agent-session-provider';
 import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
@@ -128,6 +129,7 @@ export default function MissionReportScreen() {
   const requiresIndexes = resolutionCode === 'READING_CONFIRMED';
   const selectedResolutionLabel =
     resolutionOptions.find((item) => item.value === resolutionCode)?.label ?? t('missions.selectResolution');
+  const indexLabels = mission ? getAgentMeterIndexLabels(mission.meter.type, t) : null;
 
   async function handleCapture() {
     if (!cameraRef.current || isCapturing) {
@@ -189,7 +191,10 @@ export default function MissionReportScreen() {
     const secondaryValue = Number(secondaryIndex);
 
     if (requiresIndexes && (!Number.isFinite(primaryValue) || primaryValue < 0)) {
-      Alert.alert(t('missions.invalidIndexTitle'), t('missions.invalidPrimaryIndexBody'));
+      Alert.alert(
+        t('missions.invalidIndexTitle'),
+        indexLabels?.invalidPrimaryIndexBody ?? t('missions.invalidIndexBody')
+      );
       return;
     }
 
@@ -198,7 +203,10 @@ export default function MissionReportScreen() {
       mission.meter.type === 'DUAL_INDEX' &&
       (!Number.isFinite(secondaryValue) || secondaryValue < 0)
     ) {
-      Alert.alert(t('missions.invalidIndexTitle'), t('missions.invalidSecondaryIndexBody'));
+      Alert.alert(
+        t('missions.invalidIndexTitle'),
+        indexLabels?.invalidSecondaryIndexBody ?? t('missions.invalidHcIndexBody')
+      );
       return;
     }
 
@@ -357,7 +365,7 @@ export default function MissionReportScreen() {
               {requiresIndexes ? (
                 <>
                   <AuthInput
-                    label={t('missions.fieldPrimaryIndex')}
+                    label={indexLabels?.primaryIndex ?? t('missions.fieldIndex')}
                     icon="flash-outline"
                     keyboardType="numeric"
                     value={primaryIndex}
@@ -367,7 +375,7 @@ export default function MissionReportScreen() {
 
                   {mission.meter.type === 'DUAL_INDEX' ? (
                     <AuthInput
-                      label={t('missions.fieldSecondaryIndex')}
+                      label={indexLabels?.secondaryIndex ?? t('missions.fieldHcIndex')}
                       icon="layers-outline"
                       keyboardType="numeric"
                       value={secondaryIndex}

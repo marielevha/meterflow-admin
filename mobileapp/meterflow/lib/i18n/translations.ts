@@ -38,8 +38,13 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'common.continue': 'Continuer',
     'common.system': 'Systeme',
     'common.index': 'Index',
+    'common.total': 'Total',
     'common.primaryShort': 'P1',
     'common.secondaryShort': 'P2',
+    'common.hpShort': 'HP',
+    'common.hcShort': 'HC',
+    'common.hpIndex': 'Index HP',
+    'common.hcIndex': 'Index HC',
 
     'drawer.subtitle': 'Navigation',
     'drawer.releves': 'Releves',
@@ -215,6 +220,10 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'home.noConsumptionDescription':
       "Les dernieres consommations de ce compteur apparaitront ici des qu'elles seront calculees.",
     'home.consumptionLabel': 'consommation',
+    'home.consumptionTrendTitle': 'Tendance recente',
+    'home.consumptionTrendSubtitle': 'Evolution sur les derniers mois',
+    'home.consumptionTrendSubtitleMeter': 'Pour le compteur {serial}',
+    'home.consumptionTrendCta': 'Ouvrir la page consommation',
     'home.primaryIndex': 'Index principal',
     'home.secondaryIndex': 'Index secondaire',
     'home.meterLabel': 'Compteur',
@@ -327,6 +336,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'consumption.emptyDescription':
       'Vos consommations mensuelles apparaitront ici des qu’un historique exploitable sera disponible.',
     'consumption.filterTitle': 'Filtrer la consommation',
+    'consumption.chartTitle': 'Evolution recente',
+    'consumption.chartTotal': 'Total',
 
     'onboarding.skip': 'Passer',
     'onboarding.next': 'Suivant',
@@ -436,6 +447,10 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
       'La localisation est necessaire pour transmettre ce releve. Reprends la photo apres avoir active la position.',
     'readingsFlow.alert.invalidIndexTitle': 'Index invalide',
     'readingsFlow.alert.invalidPrimaryIndexBody': 'Saisis un index principal valide.',
+    'readingsFlow.alert.invalidIndexBody': 'Saisis un index valide.',
+    'readingsFlow.alert.invalidHpIndexBody': 'Saisis un index HP valide.',
+    'readingsFlow.alert.invalidHcIndexBody': 'Ce compteur demande aussi un index HC valide.',
+    'readingsFlow.alert.hcIndexRequiredTitle': 'Index HC requis',
     'readingsFlow.alert.secondaryIndexRequiredTitle': 'Index secondaire requis',
     'readingsFlow.alert.secondaryIndexRequiredBody':
       'Ce compteur demande aussi un index secondaire.',
@@ -508,9 +523,9 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
       'Choisissez un compteur, ajoutez une photo et renseignez l index principal.',
     'api.error.readingPhotoIndexRequired':
       'Ajoutez une photo et renseignez l index principal pour renvoyer le releve.',
-    'api.error.primaryIndexPositive': "L'index principal doit etre un nombre positif.",
-    'api.error.secondaryIndexPositive': "L'index secondaire doit etre un nombre positif.",
-    'api.error.secondaryIndexRequired': 'Ce compteur necessite aussi un index secondaire.',
+    'api.error.primaryIndexPositive': "L'index saisi doit etre un nombre positif.",
+    'api.error.secondaryIndexPositive': "L'index HC doit etre un nombre positif.",
+    'api.error.secondaryIndexRequired': 'Ce compteur necessite aussi un index HC.',
     'api.error.gpsRequired': 'La localisation est requise pour transmettre ce releve.',
     'api.error.readingSubmissionWindowClosed':
       "La periode d'auto-releve est actuellement fermee.",
@@ -624,6 +639,12 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'common.french': 'French',
     'common.english': 'English',
     'common.lingala': 'Lingala',
+    'common.index': 'Index',
+    'common.total': 'Total',
+    'common.hpShort': 'HP',
+    'common.hcShort': 'HC',
+    'common.hpIndex': 'HP index',
+    'common.hcIndex': 'HC index',
 
     'drawer.subtitle': 'Navigation',
     'drawer.releves': 'Readings',
@@ -797,6 +818,10 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'home.noConsumptionDescription':
       'Latest consumption for this meter will appear here once it has been calculated.',
     'home.consumptionLabel': 'consumption',
+    'home.consumptionTrendTitle': 'Recent trend',
+    'home.consumptionTrendSubtitle': 'Evolution over recent months',
+    'home.consumptionTrendSubtitleMeter': 'For meter {serial}',
+    'home.consumptionTrendCta': 'Open consumption screen',
     'home.primaryIndex': 'Primary index',
     'home.secondaryIndex': 'Secondary index',
     'home.meterLabel': 'Meter',
@@ -909,6 +934,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'consumption.emptyDescription':
       'Your monthly consumption will appear here as soon as usable history is available.',
     'consumption.filterTitle': 'Filter consumption',
+    'consumption.chartTitle': 'Recent trend',
+    'consumption.chartTotal': 'Total',
 
     'onboarding.skip': 'Skip',
     'onboarding.next': 'Next',
@@ -1018,6 +1045,10 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
       'Location is required to submit this reading. Take the photo again after enabling location.',
     'readingsFlow.alert.invalidIndexTitle': 'Invalid index',
     'readingsFlow.alert.invalidPrimaryIndexBody': 'Enter a valid primary index.',
+    'readingsFlow.alert.invalidIndexBody': 'Enter a valid index.',
+    'readingsFlow.alert.invalidHpIndexBody': 'Enter a valid HP index.',
+    'readingsFlow.alert.invalidHcIndexBody': 'This meter also requires a valid HC index.',
+    'readingsFlow.alert.hcIndexRequiredTitle': 'HC index required',
     'readingsFlow.alert.secondaryIndexRequiredTitle': 'Secondary index required',
     'readingsFlow.alert.secondaryIndexRequiredBody':
       'This meter also requires a secondary index.',
@@ -1089,9 +1120,9 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
       'Choose a meter, add a photo and provide the primary index.',
     'api.error.readingPhotoIndexRequired':
       'Add a photo and provide the primary index to resubmit the reading.',
-    'api.error.primaryIndexPositive': 'The primary index must be a positive number.',
-    'api.error.secondaryIndexPositive': 'The secondary index must be a positive number.',
-    'api.error.secondaryIndexRequired': 'This meter also requires a secondary index.',
+    'api.error.primaryIndexPositive': 'The entered index must be a positive number.',
+    'api.error.secondaryIndexPositive': 'The HC index must be a positive number.',
+    'api.error.secondaryIndexRequired': 'This meter also requires an HC index.',
     'api.error.gpsRequired': 'Location is required to submit this reading.',
     'api.error.readingSubmissionWindowClosed':
       'The self-reading submission window is currently closed.',
@@ -1204,8 +1235,13 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'common.continue': 'Koba',
     'common.system': 'Systeme',
     'common.index': 'Index',
+    'common.total': 'Total',
     'common.primaryShort': 'P1',
     'common.secondaryShort': 'P2',
+    'common.hpShort': 'HP',
+    'common.hcShort': 'HC',
+    'common.hpIndex': 'Index HP',
+    'common.hcIndex': 'Index HC',
 
     'drawer.subtitle': 'Navigation',
     'drawer.releves': 'Ba releve',
@@ -1382,6 +1418,10 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'home.noConsumptionDescription':
       'Bosaleli ya suka ya metre oyo ekomonana awa soki esili kotangama.',
     'home.consumptionLabel': 'bosaleli',
+    'home.consumptionTrendTitle': 'Tendance ya sika',
+    'home.consumptionTrendSubtitle': 'Evolution na sanza ya suka',
+    'home.consumptionTrendSubtitleMeter': 'Mpo na metre {serial}',
+    'home.consumptionTrendCta': 'Fungola lokasa ya bosaleli',
     'home.primaryIndex': 'Index ya liboso',
     'home.secondaryIndex': 'Index ya mibale',
     'home.meterLabel': 'Metre',
@@ -1494,6 +1534,8 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'consumption.emptyDescription':
       'Bosaleli ya sanza ekomonana awa soki historique ezali.',
     'consumption.filterTitle': 'Filtrer bosaleli',
+    'consumption.chartTitle': 'Evolution ya kala te',
+    'consumption.chartTotal': 'Total',
 
     'onboarding.skip': 'Leka',
     'onboarding.next': 'Suivant',
@@ -1603,6 +1645,10 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
       'Localisation esengeli mpo na kotinda releve oyo. Zonga kokanga photo sima ya kofungola position.',
     'readingsFlow.alert.invalidIndexTitle': 'Index ezali mabe',
     'readingsFlow.alert.invalidPrimaryIndexBody': 'Koma index principal oyo ezali malamu.',
+    'readingsFlow.alert.invalidIndexBody': 'Koma index oyo ezali malamu.',
+    'readingsFlow.alert.invalidHpIndexBody': 'Koma index HP oyo ezali malamu.',
+    'readingsFlow.alert.invalidHcIndexBody': 'Metre oyo esengaka mpe index HC ya malamu.',
+    'readingsFlow.alert.hcIndexRequiredTitle': 'Index HC esengeli',
     'readingsFlow.alert.secondaryIndexRequiredTitle': 'Index secondaire esengeli',
     'readingsFlow.alert.secondaryIndexRequiredBody':
       'Metre oyo esengaka mpe index secondaire.',
@@ -1674,9 +1720,9 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
       'Pona metre, bakisa photo mpe koma index principal.',
     'api.error.readingPhotoIndexRequired':
       'Bakisa photo mpe koma index principal mpo na kotinda releve lisusu.',
-    'api.error.primaryIndexPositive': 'Index principal esengeli kozala motango positif.',
-    'api.error.secondaryIndexPositive': 'Index secondaire esengeli kozala motango positif.',
-    'api.error.secondaryIndexRequired': 'Metre oyo esengaka mpe index secondaire.',
+    'api.error.primaryIndexPositive': 'Index oyo ekomami esengeli kozala motango positif.',
+    'api.error.secondaryIndexPositive': 'Index HC esengeli kozala motango positif.',
+    'api.error.secondaryIndexRequired': 'Metre oyo esengaka mpe index HC.',
     'api.error.gpsRequired': 'Localisation esengeli mpo na kotinda releve oyo.',
     'api.error.readingSubmissionWindowClosed':
       'Fenetre ya kotinda auto-releve ekangami mpo na sikoyo.',

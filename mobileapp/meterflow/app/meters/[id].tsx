@@ -11,6 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
 import { getClientMeterDetail, type MobileMeter } from '@/lib/api/mobile-meters';
+import { getCustomerMeterIndexLabels } from '@/lib/meters/index-labels';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function MeterDetailScreen() {
@@ -62,6 +63,7 @@ export default function MeterDetailScreen() {
   }, [logout, params.id, t]);
 
   const latestState = meter?.states[0] ?? null;
+  const indexLabels = meter ? getCustomerMeterIndexLabels(meter.type, t) : null;
 
   return (
     <RequireMobileAuth>
@@ -127,15 +129,17 @@ export default function MeterDetailScreen() {
               <Text style={[styles.sectionTitle, { color: palette.headline }]}>{t('meterDetail.latestState')}</Text>
               <View style={styles.infoGrid}>
                 <InfoItem
-                  label={t('meterDetail.primaryIndex')}
+                  label={indexLabels?.primaryIndex ?? t('common.index')}
                   value={latestState?.currentPrimary?.toString() ?? '--'}
                   palette={palette}
                 />
-                <InfoItem
-                  label={t('meterDetail.secondaryIndex')}
-                  value={latestState?.currentSecondary?.toString() ?? '--'}
-                  palette={palette}
-                />
+                {meter.type === 'DUAL_INDEX' || latestState?.currentSecondary !== null ? (
+                  <InfoItem
+                    label={indexLabels?.secondaryIndex ?? t('common.hcIndex')}
+                    value={latestState?.currentSecondary?.toString() ?? '--'}
+                    palette={palette}
+                  />
+                ) : null}
                 <InfoItem
                   label={t('meterDetail.effectiveAt')}
                   value={latestState?.effectiveAt ? formatDisplayDate(latestState.effectiveAt, locale) : '--'}
