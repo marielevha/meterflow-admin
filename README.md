@@ -1119,6 +1119,82 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
     - fenetre par defaut
     - surcharge possible par campagne
 
+### 29) Visualisation des consommations client + rebranding contextuel HP/HC
+
+- Nouvelle visualisation des consommations dans l'app customer:
+  - page `Consommation` enrichie avec un graphique d'evolution mensuelle
+  - composant dedie:
+    - `mobileapp/meterflow/components/consumption/consumption-trend-chart.tsx`
+  - affichage des 6 derniers mois avec mise en avant du mois selectionne
+  - agregat par mois en vue `Tous les compteurs`
+
+- Mini tendance ajoutee sur l'accueil mobile:
+  - composant compact:
+    - `mobileapp/meterflow/components/consumption/mini-consumption-sparkline.tsx`
+  - la tendance est fusionnee dans la carte compteur du carousel d'accueil
+  - la carte compteur a ete legerement elargie pour mieux accueillir:
+    - les index
+    - le statut
+    - la tendance recente
+
+- Rebranding contextuel des doubles index dans l'app customer:
+  - compteur simple:
+    - `Index`
+    - `Total`
+  - compteur double index:
+    - `Index HP`
+    - `Index HC`
+    - `HP`
+    - `HC`
+  - helper partage:
+    - `mobileapp/meterflow/lib/meters/index-labels.ts`
+  - ecrans couverts:
+    - `mobileapp/meterflow/app/(tabs)/index.tsx`
+    - `mobileapp/meterflow/app/(tabs)/account.tsx`
+    - `mobileapp/meterflow/app/(tabs)/readings.tsx`
+    - `mobileapp/meterflow/app/readings-history.tsx`
+    - `mobileapp/meterflow/app/consumption/[meterId].tsx`
+    - `mobileapp/meterflow/app/meters/[id].tsx`
+
+- Rebranding contextuel des doubles index dans l'app agent:
+  - helper partage:
+    - `mobileapp/agent-app/lib/meters/index-labels.ts`
+  - ecrans couverts:
+    - `mobileapp/agent-app/app/missions/[id].tsx`
+    - `mobileapp/agent-app/app/missions/[id]/report.tsx`
+  - les messages d'erreur et libelles saisie utilisent maintenant `HP/HC` quand le compteur est en double index
+
+- Dictionnaires mobiles enrichis:
+  - customer:
+    - `mobileapp/meterflow/lib/i18n/translations.ts`
+  - agent:
+    - `mobileapp/agent-app/lib/i18n/translations.ts`
+  - nouvelles cles ajoutees pour:
+    - `HP`
+    - `HC`
+    - `Index HP`
+    - `Index HC`
+    - messages de validation contextualises
+
+- Backoffice admin aligne sur la meme logique contextuelle:
+  - helper partage:
+    - `src/lib/meters/indexLabels.ts`
+  - les pages admin affichent maintenant des labels adaptes au type du compteur:
+    - simple: `Index`
+    - double index: `Index HP` / `Index HC`
+  - ecrans admin couverts:
+    - `src/app/(admin)/admin/readings/page.tsx`
+    - `src/app/(admin)/admin/readings/[id]/page.tsx`
+    - `src/app/(admin)/admin/readings/[id]/edit/page.tsx`
+    - `src/app/(admin)/admin/tasks/[id]/page.tsx`
+    - `src/app/(admin)/admin/meters/page.tsx`
+    - `src/app/(admin)/admin/meters/[id]/page.tsx`
+    - `src/app/(admin)/admin/overview/page.tsx`
+  - les resumes admin ne montrent plus une simple concatenation anonyme des deux index:
+    - ils affichent maintenant des syntheses explicites du type `HP: 941 | HC: 408`
+  - le dictionnaire admin a ete enrichi dans:
+    - `src/lib/admin-i18n/messages.ts`
+
 
 ## Overview
 
