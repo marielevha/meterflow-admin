@@ -17,6 +17,7 @@ import {
   UserRole,
   UserStatus,
 } from "@prisma/client";
+import { canonicalizeReviewReasonCode } from "@/lib/readings/reviewReasons";
 
 type Translator = (key: string, values?: Record<string, string | number>) => string;
 
@@ -264,7 +265,7 @@ export function translateDeliveryChannel(channel: DeliveryChannel | string, t: T
 }
 
 export function translateReviewReasonCode(value: string | null | undefined, t: Translator) {
-  switch (value) {
+  switch (canonicalizeReviewReasonCode(value)) {
     case "BLURRY_IMAGE":
       return t("readings.reasonBlurryImage");
     case "INDEX_NOT_READABLE":

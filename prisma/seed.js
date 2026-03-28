@@ -515,7 +515,7 @@ const demoReadings = [
     gpsLongitude: 15.281,
     gpsAccuracyMeters: 18.3,
     reviewedAt: "2026-03-20T10:05:00.000Z",
-    flagReason: "gps_distance_exceeded",
+    flagReason: "INDEX_INCONSISTENT",
     confidenceScore: 73.4,
     anomalyScore: 79.1,
     ocrText: "PEAK 918 / OFF PEAK 401",
@@ -582,8 +582,9 @@ const demoReadings = [
 const managedTaskDefinitions = [
   {
     key: "bzv-dual-gps-recheck",
-    title: "Recontrole GPS compteur CG-BZV-0002",
-    description: "Le releve client a ete signale pour ecart GPS important. Reprendre la verification sur site.",
+    title: "Controle terrain index incoherent compteur CG-BZV-0002",
+    description:
+      "Le releve client presente un ecart avec la derniere reference connue et un GPS eloigne. Reprendre la verification sur site.",
     meterSerialNumber: "MF-CG-BZV-0002",
     readingKey: "bzv-dual-flagged-mar",
     assignedToUsername: "agent001",
@@ -1375,19 +1376,73 @@ function readingEventsByKey() {
         type: ReadingEventType.ANOMALY_DETECTED,
         actorUsername: null,
         createdAt: "2026-03-20T09:22:00.000Z",
-        payload: { source: "seed", reason: "gps_distance_exceeded", anomalyScore: 79.1 },
+        payload: {
+          source: "seed",
+          suspicious: true,
+          preferredReasonCode: "INDEX_INCONSISTENT",
+          failedChecks: ["primary_index_monotonic", "secondary_index_monotonic", "gps_distance"],
+          referenceState: {
+            sourceReadingId: null,
+            previousPrimary: 903,
+            previousSecondary: 392,
+            currentPrimary: 941,
+            currentSecondary: 408,
+            effectiveAt: "2026-03-01T07:00:00.000Z",
+          },
+          checks: [
+            {
+              check: "primary_index_monotonic",
+              passed: false,
+              details: {
+                previous: 941,
+                current: 918,
+                referenceEffectiveAt: "2026-03-01T07:00:00.000Z",
+              },
+            },
+            {
+              check: "secondary_index_monotonic",
+              passed: false,
+              details: {
+                previous: 408,
+                current: 401,
+                referenceEffectiveAt: "2026-03-01T07:00:00.000Z",
+              },
+            },
+            {
+              check: "gps_distance",
+              passed: false,
+              details: {
+                distanceMeters: 4511.13,
+                thresholdMeters: 200,
+                meterLatitude: -4.2894,
+                meterLongitude: 15.2673,
+                readingLatitude: -4.2512,
+                readingLongitude: 15.281,
+              },
+            },
+          ],
+          anomalyScore: 79.1,
+        },
       },
       {
         type: ReadingEventType.FLAGGED,
         actorUsername: "supervisor001",
         createdAt: "2026-03-20T10:05:00.000Z",
-        payload: { source: "seed", previousStatus: ReadingStatus.PENDING, nextStatus: ReadingStatus.FLAGGED, reason: "gps_distance_exceeded" },
+        payload: {
+          source: "seed",
+          previousStatus: ReadingStatus.PENDING,
+          nextStatus: ReadingStatus.FLAGGED,
+          reason: "INDEX_INCONSISTENT",
+        },
       },
       {
         type: ReadingEventType.TASK_CREATED,
         actorUsername: "supervisor001",
         createdAt: "2026-03-20T10:17:00.000Z",
-        payload: { source: "seed", taskTitle: "Recontrole GPS compteur CG-BZV-0002" },
+        payload: {
+          source: "seed",
+          taskTitle: "Controle terrain index incoherent compteur CG-BZV-0002",
+        },
       },
     ],
     "pnr-client-rejected-mar": [

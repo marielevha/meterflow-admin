@@ -29,6 +29,7 @@ import {
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
+import { evaluateReadingAnomalies, type ReadingAnomalyCheck } from "@/lib/readings/anomalyChecks";
 
 export const metadata: Metadata = {
   title: "Reading details",
@@ -154,6 +155,22 @@ function flattenPayload(
   return entries;
 }
 
+function translateAnomalyCheck(
+  check: ReadingAnomalyCheck["check"],
+  t: (key: string, values?: Record<string, string | number>) => string
+) {
+  switch (check) {
+    case "primary_index_monotonic":
+      return t("readings.checkPrimaryIndexMonotonic");
+    case "secondary_index_monotonic":
+      return t("readings.checkSecondaryIndexMonotonic");
+    case "gps_distance":
+      return t("readings.checkGpsDistance");
+    default:
+      return check;
+  }
+}
+
 export default async function ReadingDetailPage({
   params,
 }: {
@@ -264,8 +281,22 @@ export default async function ReadingDetailPage({
 
   if (!reading) notFound();
   const activeCustomer = getActiveMeterCustomer(reading.meter);
-  const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
   const gpsThreshold = gpsThresholdMeters();
+  const anomalyDiagnostics = await evaluateReadingAnomalies({
+    meterId: reading.meterId,
+    meterType: reading.meter.type,
+    readingAt: reading.readingAt,
+    primaryIndex: reading.primaryIndex,
+    secondaryIndex: reading.secondaryIndex,
+    meterLatitude: reading.meter.latitude,
+    meterLongitude: reading.meter.longitude,
+    readingLatitude: reading.gpsLatitude,
+    readingLongitude: reading.gpsLongitude,
+    gpsThresholdMeters: gpsThreshold,
+    excludeReadingId: reading.id,
+  });
+  const gpsDistance =
+    anomalyDiagnostics.gpsDistanceMeters ?? decimalToNumber(reading.gpsDistanceMeters);
   const gpsWithinThreshold = gpsDistance === null ? null : gpsDistance <= gpsThreshold;
   const resubmissionEvents = reading.events.filter((event) => event.type === ReadingEventType.RESUBMITTED);
   const auditTrailEvents = canViewReadingEventsAuditTrail ? reading.events : [];
@@ -327,6 +358,52 @@ export default async function ReadingDetailPage({
                   label={t("readings.rejectionReason")}
                   value={translateReviewReasonCode(reading.rejectionReason, t)}
                 />
+              </div>
+            ) : null}
+
+            {anomalyDiagnostics.suspicious ? (
+              <div className="mt-4 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                  {t("readings.anomalyChecksTitle")}
+                </p>
+                {anomalyDiagnostics.referenceState ? (
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                    {reading.meter.type === "DUAL_INDEX"
+                      ? t("readings.referenceSummaryDual", {
+                          date: anomalyDiagnostics.referenceState.effectiveAt
+                            ? formatDate(
+                                new Date(anomalyDiagnostics.referenceState.effectiveAt),
+                                t("common.notAvailable")
+                              )
+                            : t("common.notAvailable"),
+                          primary:
+                            anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
+                            t("common.notAvailable"),
+                          secondary:
+                            anomalyDiagnostics.referenceState.currentSecondary?.toString() ??
+                            t("common.notAvailable"),
+                        })
+                      : t("readings.referenceSummarySingle", {
+                          date: anomalyDiagnostics.referenceState.effectiveAt
+                            ? formatDate(
+                                new Date(anomalyDiagnostics.referenceState.effectiveAt),
+                                t("common.notAvailable")
+                              )
+                            : t("common.notAvailable"),
+                          primary:
+                            anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
+                            t("common.notAvailable"),
+                        })}
+                  </p>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {anomalyDiagnostics.failedChecks.map((check) => (
+                    <Badge key={check} size="sm" color="warning">
+                      {translateAnomalyCheck(check, t)}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             ) : null}
 

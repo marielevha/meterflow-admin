@@ -1,17 +1,16 @@
 import { Prisma, ReadingEventType, ReadingStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { gpsThresholdMeters, resolveGpsThresholdMeters, haversineMeters } from "@/lib/geo/gps";
+import { resolveGpsThresholdMeters } from "@/lib/geo/gps";
 import { getAppSettings } from "@/lib/settings/serverSettings";
+import {
+  buildReadingAnomalyPayload,
+  evaluateReadingAnomalies,
+} from "@/lib/readings/anomalyChecks";
 
 type StaffUser = {
   id: string;
   role: UserRole;
 };
-
-function toNumberOrNull(value: Prisma.Decimal | null | undefined): number | null {
-  if (value === null || value === undefined) return null;
-  return Number(value);
-}
 
 export async function runReadingChecks(staff: StaffUser, readingId: string) {
   const appSettings = await getAppSettings();
@@ -33,109 +32,37 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
     return { status: 404, body: { error: "reading_not_found" } };
   }
 
-  const latestState = await prisma.meterState.findFirst({
-    where: {
-      meterId: reading.meterId,
-      deletedAt: null,
-    },
-    orderBy: { effectiveAt: "desc" },
-    select: {
-      currentPrimary: true,
-      currentSecondary: true,
-      effectiveAt: true,
-    },
+  const evaluation = await evaluateReadingAnomalies({
+    meterId: reading.meterId,
+    meterType: reading.meter.type,
+    readingAt: reading.readingAt,
+    primaryIndex: reading.primaryIndex,
+    secondaryIndex: reading.secondaryIndex,
+    meterLatitude: reading.meter.latitude,
+    meterLongitude: reading.meter.longitude,
+    readingLatitude: reading.gpsLatitude,
+    readingLongitude: reading.gpsLongitude,
+    gpsThresholdMeters: resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters),
+    excludeReadingId: reading.id,
   });
 
-  const checks: Array<{
-    check: string;
-    passed: boolean;
-    details: Record<string, unknown>;
-  }> = [];
-
-  const primaryCurrent = toNumberOrNull(reading.primaryIndex);
-  const secondaryCurrent = toNumberOrNull(reading.secondaryIndex);
-  const primaryPrevious = toNumberOrNull(latestState?.currentPrimary);
-  const secondaryPrevious = toNumberOrNull(latestState?.currentSecondary);
-
-  const primaryPassed =
-    primaryCurrent !== null && (primaryPrevious === null ? true : primaryCurrent >= primaryPrevious);
-  checks.push({
-    check: "primary_index_monotonic",
-    passed: primaryPassed,
-    details: {
-      previous: primaryPrevious,
-      current: primaryCurrent,
-      referenceEffectiveAt: latestState?.effectiveAt?.toISOString() ?? null,
-    },
-  });
-
-  if (reading.meter.type === "DUAL_INDEX") {
-    const secondaryPassed =
-      secondaryCurrent !== null &&
-      (secondaryPrevious === null ? true : secondaryCurrent >= secondaryPrevious);
-    checks.push({
-      check: "secondary_index_monotonic",
-      passed: secondaryPassed,
-      details: {
-        previous: secondaryPrevious,
-        current: secondaryCurrent,
-        referenceEffectiveAt: latestState?.effectiveAt?.toISOString() ?? null,
-      },
-    });
-  }
-
-  const meterLat = toNumberOrNull(reading.meter.latitude);
-  const meterLng = toNumberOrNull(reading.meter.longitude);
-  const readLat = toNumberOrNull(reading.gpsLatitude);
-  const readLng = toNumberOrNull(reading.gpsLongitude);
-
-  let distanceMeters: number | null = null;
-  const threshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
-  let gpsPassed = true;
-
-  if (
-    meterLat !== null &&
-    meterLng !== null &&
-    readLat !== null &&
-    readLng !== null
-  ) {
-    distanceMeters = haversineMeters(meterLat, meterLng, readLat, readLng);
-    gpsPassed = distanceMeters <= threshold;
-  }
-
-  checks.push({
-    check: "gps_distance",
-    passed: gpsPassed,
-    details: {
-      meterLatitude: meterLat,
-      meterLongitude: meterLng,
-      readingLatitude: readLat,
-      readingLongitude: readLng,
-      distanceMeters,
-      thresholdMeters: threshold,
-    },
-  });
-
-  const failedChecks = checks.filter((c) => !c.passed);
-  const suspicious = failedChecks.length > 0;
-
-  const flagReason = suspicious
-    ? failedChecks.map((c) => c.check).join(", ")
-    : null;
-  const anomalyPayload: Prisma.InputJsonObject = {
-    suspicious,
-    checks: checks as unknown as Prisma.InputJsonArray,
-  };
+  const anomalyPayload = buildReadingAnomalyPayload(
+    "backoffice_audit",
+    evaluation
+  ) as Prisma.InputJsonObject;
 
   const result = await prisma.$transaction(async (tx) => {
     const updatedReading = await tx.reading.update({
       where: { id: reading.id },
       data: {
-        gpsDistanceMeters: distanceMeters !== null ? new Prisma.Decimal(distanceMeters) : null,
-        ...(suspicious && reading.status === ReadingStatus.PENDING
+        gpsDistanceMeters:
+          evaluation.gpsDistanceMeters !== null
+            ? new Prisma.Decimal(evaluation.gpsDistanceMeters)
+            : null,
+        ...(evaluation.suspicious && reading.status === ReadingStatus.PENDING
           ? {
               status: ReadingStatus.FLAGGED,
-              flagReason,
+              flagReason: evaluation.preferredReasonCode,
               reviewedById: staff.id,
               reviewedAt: new Date(),
             }
@@ -168,9 +95,11 @@ export async function runReadingChecks(staff: StaffUser, readingId: string) {
     status: 200,
     body: {
       message: "checks_completed",
-      suspicious,
-      failedChecks: failedChecks.map((c) => c.check),
-      checks,
+      suspicious: evaluation.suspicious,
+      failedChecks: evaluation.failedChecks,
+      checks: evaluation.checks,
+      referenceState: evaluation.referenceState,
+      preferredReasonCode: evaluation.preferredReasonCode,
       reading: result,
     },
   };

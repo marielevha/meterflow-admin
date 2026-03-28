@@ -6,13 +6,17 @@ import {
   ReadingStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { resolveGpsThresholdMeters, haversineMeters } from "@/lib/geo/gps";
+import { resolveGpsThresholdMeters } from "@/lib/geo/gps";
 import {
   getClientReadingDecisionMessage,
   getClientReadingDecisionTitle,
   getReadingStatusLabel,
   getReviewReasonLabel,
 } from "@/lib/readings/reviewReasons";
+import {
+  buildReadingAnomalyPayload,
+  evaluateReadingAnomalies,
+} from "@/lib/readings/anomalyChecks";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 import { getMeterReadingSubmissionWindow } from "@/lib/mobile/readingSubmissionWindow";
 import { activeAssignmentFilter } from "@/lib/meters/assignments";
@@ -193,20 +197,24 @@ export async function createClientReading(userId: string, payload: CreateReading
     };
   }
 
-  const meterLat = toNumberOrNull(meter.latitude);
-  const meterLng = toNumberOrNull(meter.longitude);
   const readLat = toNumberOrNull(gpsLatitude);
   const readLng = toNumberOrNull(gpsLongitude);
   if (appSettings.requireGpsForReading && (readLat === null || readLng === null)) {
     return { status: 400, body: { error: "gps_required_for_reading" } };
   }
-  const gpsThreshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
-  const gpsDistanceMeters =
-    meterLat !== null && meterLng !== null && readLat !== null && readLng !== null
-      ? haversineMeters(meterLat, meterLng, readLat, readLng)
-      : null;
-  const gpsWithinExpectedArea =
-    gpsDistanceMeters === null ? null : gpsDistanceMeters <= gpsThreshold;
+  const anomalyEvaluation = await evaluateReadingAnomalies({
+    meterId: meter.id,
+    meterType: meter.type,
+    readingAt,
+    primaryIndex,
+    secondaryIndex: meter.type === MeterType.DUAL_INDEX ? secondaryIndex : null,
+    meterLatitude: meter.latitude,
+    meterLongitude: meter.longitude,
+    readingLatitude: gpsLatitude,
+    readingLongitude: gpsLongitude,
+    gpsThresholdMeters: resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters),
+  });
+  const gpsDistanceMeters = anomalyEvaluation.gpsDistanceMeters;
 
   const created = await prisma.$transaction(async (tx) => {
     const reading = await tx.reading.create({
@@ -255,22 +263,13 @@ export async function createClientReading(userId: string, payload: CreateReading
       },
     });
 
-    if (gpsDistanceMeters !== null) {
+    if (anomalyEvaluation.suspicious) {
       await tx.readingEvent.create({
         data: {
           readingId: reading.id,
           userId,
           type: ReadingEventType.ANOMALY_DETECTED,
-          payload: {
-            check: "gps_distance",
-            passed: gpsWithinExpectedArea,
-            distanceMeters: gpsDistanceMeters,
-            thresholdMeters: gpsThreshold,
-            meterLatitude: meterLat,
-            meterLongitude: meterLng,
-            readingLatitude: readLat,
-            readingLongitude: readLng,
-          },
+          payload: buildReadingAnomalyPayload("mobile", anomalyEvaluation) as Prisma.InputJsonObject,
         },
       });
     }
@@ -512,20 +511,25 @@ export async function resubmitClientReading(
   }
 
   const appSettings = await getAppSettings();
-  const meterLat = toNumberOrNull(existing.meter.latitude);
-  const meterLng = toNumberOrNull(existing.meter.longitude);
   const readLat = toNumberOrNull(gpsLatitude);
   const readLng = toNumberOrNull(gpsLongitude);
   if (appSettings.requireGpsForReading && (readLat === null || readLng === null)) {
     return { status: 400, body: { error: "gps_required_for_reading" } };
   }
-  const gpsThreshold = resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters);
-  const gpsDistanceMeters =
-    meterLat !== null && meterLng !== null && readLat !== null && readLng !== null
-      ? haversineMeters(meterLat, meterLng, readLat, readLng)
-      : null;
-  const gpsWithinExpectedArea =
-    gpsDistanceMeters === null ? null : gpsDistanceMeters <= gpsThreshold;
+  const anomalyEvaluation = await evaluateReadingAnomalies({
+    meterId: existing.meterId,
+    meterType: existing.meter.type,
+    readingAt,
+    primaryIndex,
+    secondaryIndex: existing.meter.type === MeterType.DUAL_INDEX ? secondaryIndex : null,
+    meterLatitude: existing.meter.latitude,
+    meterLongitude: existing.meter.longitude,
+    readingLatitude: gpsLatitude,
+    readingLongitude: gpsLongitude,
+    gpsThresholdMeters: resolveGpsThresholdMeters(appSettings.maxGpsDistanceMeters),
+    excludeReadingId: existing.id,
+  });
+  const gpsDistanceMeters = anomalyEvaluation.gpsDistanceMeters;
 
   const updated = await prisma.$transaction(async (tx) => {
     const reading = await tx.reading.update({
@@ -567,22 +571,16 @@ export async function resubmitClientReading(
       },
     });
 
-    if (gpsDistanceMeters !== null) {
+    if (anomalyEvaluation.suspicious) {
       await tx.readingEvent.create({
         data: {
           readingId: reading.id,
           userId,
           type: ReadingEventType.ANOMALY_DETECTED,
-          payload: {
-            check: "gps_distance",
-            passed: gpsWithinExpectedArea,
-            distanceMeters: gpsDistanceMeters,
-            thresholdMeters: gpsThreshold,
-            meterLatitude: meterLat,
-            meterLongitude: meterLng,
-            readingLatitude: readLat,
-            readingLongitude: readLng,
-          },
+          payload: buildReadingAnomalyPayload(
+            "mobile_resubmission",
+            anomalyEvaluation
+          ) as Prisma.InputJsonObject,
         },
       });
     }

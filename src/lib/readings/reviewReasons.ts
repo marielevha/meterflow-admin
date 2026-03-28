@@ -16,6 +16,13 @@ type ReadingReviewReasonMeta = {
   clientMessage: string;
 };
 
+const LEGACY_REASON_ALIASES: Record<string, ReadingReviewReasonCode> = {
+  gps_distance_exceeded: "GPS_MISMATCH",
+  gps_distance: "GPS_MISMATCH",
+  primary_index_monotonic: "INDEX_INCONSISTENT",
+  secondary_index_monotonic: "INDEX_INCONSISTENT",
+};
+
 export const FLAG_REASON_OPTIONS: ReadingReviewReasonMeta[] = [
   {
     code: "BLURRY_IMAGE",
@@ -86,26 +93,42 @@ const REASON_META_BY_CODE = new Map<ReadingReviewReasonCode, ReadingReviewReason
   [...FLAG_REASON_OPTIONS, ...REJECTION_REASON_OPTIONS].map((reason) => [reason.code, reason])
 );
 
-export function normalizeFlagReasonCode(value: unknown): ReadingReviewReasonCode | null {
+export function canonicalizeReviewReasonCode(value: string | null | undefined) {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim() as ReadingReviewReasonCode;
-  return FLAG_REASON_OPTIONS.some((reason) => reason.code === trimmed) ? trimmed : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (REASON_META_BY_CODE.has(trimmed as ReadingReviewReasonCode)) {
+    return trimmed as ReadingReviewReasonCode;
+  }
+  return LEGACY_REASON_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+}
+
+export function normalizeFlagReasonCode(value: unknown): ReadingReviewReasonCode | null {
+  const canonical = canonicalizeReviewReasonCode(typeof value === "string" ? value : null);
+  if (!canonical) return null;
+  return FLAG_REASON_OPTIONS.some((reason) => reason.code === canonical)
+    ? (canonical as ReadingReviewReasonCode)
+    : null;
 }
 
 export function normalizeRejectionReasonCode(value: unknown): ReadingReviewReasonCode | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim() as ReadingReviewReasonCode;
-  return REJECTION_REASON_OPTIONS.some((reason) => reason.code === trimmed) ? trimmed : null;
+  const canonical = canonicalizeReviewReasonCode(typeof value === "string" ? value : null);
+  if (!canonical) return null;
+  return REJECTION_REASON_OPTIONS.some((reason) => reason.code === canonical)
+    ? (canonical as ReadingReviewReasonCode)
+    : null;
 }
 
 export function getReviewReasonLabel(value: string | null | undefined) {
-  if (!value) return null;
-  return REASON_META_BY_CODE.get(value as ReadingReviewReasonCode)?.label || value;
+  const canonical = canonicalizeReviewReasonCode(value);
+  if (!canonical) return null;
+  return REASON_META_BY_CODE.get(canonical as ReadingReviewReasonCode)?.label || canonical;
 }
 
 export function getClientFacingReviewReasonMessage(value: string | null | undefined) {
-  if (!value) return null;
-  return REASON_META_BY_CODE.get(value as ReadingReviewReasonCode)?.clientMessage || value;
+  const canonical = canonicalizeReviewReasonCode(value);
+  if (!canonical) return null;
+  return REASON_META_BY_CODE.get(canonical as ReadingReviewReasonCode)?.clientMessage || canonical;
 }
 
 export function getReadingStatusLabel(status: string | null | undefined) {

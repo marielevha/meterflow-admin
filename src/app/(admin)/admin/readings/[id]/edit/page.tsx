@@ -20,6 +20,7 @@ import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
+import { evaluateReadingAnomalies } from "@/lib/readings/anomalyChecks";
 import {
   FLAG_REASON_OPTIONS,
   REJECTION_REASON_OPTIONS,
@@ -171,6 +172,19 @@ export default async function EditReadingPage({
   const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
   const gpsThreshold = gpsThresholdMeters();
   const gpsExceeded = gpsDistance !== null && gpsDistance > gpsThreshold;
+  const anomalyDiagnostics = await evaluateReadingAnomalies({
+    meterId: reading.meterId,
+    meterType: reading.meter.type,
+    readingAt: reading.readingAt,
+    primaryIndex: reading.primaryIndex,
+    secondaryIndex: reading.secondaryIndex,
+    meterLatitude: reading.meter.latitude,
+    meterLongitude: reading.meter.longitude,
+    readingLatitude: reading.gpsLatitude,
+    readingLongitude: reading.gpsLongitude,
+    gpsThresholdMeters: gpsThreshold,
+    excludeReadingId: reading.id,
+  });
   const allowedReviewStatuses = [
     reading.status,
     ...(canValidateReading ? [ReadingStatus.VALIDATED] : []),
@@ -205,6 +219,58 @@ export default async function EditReadingPage({
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {t("readings.reviewDecisionDesc")}
               </p>
+
+              {anomalyDiagnostics.suspicious ? (
+                <div className="mt-4 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                    {t("readings.anomalyChecksTitle")}
+                  </p>
+                  {anomalyDiagnostics.referenceState ? (
+                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                      {reading.meter.type === "DUAL_INDEX"
+                        ? t("readings.referenceSummaryDual", {
+                            date: formatDateTime(
+                              anomalyDiagnostics.referenceState.effectiveAt
+                                ? new Date(anomalyDiagnostics.referenceState.effectiveAt)
+                                : null,
+                              t("common.notAvailable")
+                            ),
+                            primary:
+                              anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
+                              t("common.notAvailable"),
+                            secondary:
+                              anomalyDiagnostics.referenceState.currentSecondary?.toString() ??
+                              t("common.notAvailable"),
+                          })
+                        : t("readings.referenceSummarySingle", {
+                            date: formatDateTime(
+                              anomalyDiagnostics.referenceState.effectiveAt
+                                ? new Date(anomalyDiagnostics.referenceState.effectiveAt)
+                                : null,
+                              t("common.notAvailable")
+                            ),
+                            primary:
+                              anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
+                              t("common.notAvailable"),
+                          })}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {anomalyDiagnostics.failedChecks.map((check) => (
+                      <span
+                        key={check}
+                        className="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-medium text-warning-700 dark:bg-white/10 dark:text-warning-300"
+                      >
+                        {check === "primary_index_monotonic"
+                          ? t("readings.checkPrimaryIndexMonotonic")
+                          : check === "secondary_index_monotonic"
+                            ? t("readings.checkSecondaryIndexMonotonic")
+                            : t("readings.checkGpsDistance")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-4">
                 <ReadingDecisionFields

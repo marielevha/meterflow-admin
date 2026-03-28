@@ -5,8 +5,16 @@ import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import { saveSession } from "@/lib/auth/clientSession";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState } from "react";
+
+function resolveNextPath(rawNext: string | null) {
+  if (!rawNext) return "/admin/overview";
+  if (!rawNext.startsWith("/")) return "/admin/overview";
+  if (rawNext.startsWith("//")) return "/admin/overview";
+  if (!rawNext.startsWith("/admin")) return "/admin/overview";
+  return rawNext;
+}
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,6 +23,8 @@ export default function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = resolveNextPath(searchParams.get("next"));
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +61,7 @@ export default function SignInForm() {
         user: data.user,
       });
 
-      router.push("/admin");
+      router.replace(nextPath);
     } catch {
       setError("Erreur reseau. Reessaie.");
     } finally {

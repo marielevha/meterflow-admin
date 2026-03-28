@@ -1,4 +1,5 @@
 import React from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminI18nProvider from "@/components/admin-i18n/AdminI18nProvider";
 import AdminShell from "@/layout/AdminShell";
@@ -15,7 +16,9 @@ export default async function AdminLayout({
 }) {
   const staff = await getCurrentStaffFromServerComponent();
   if (!staff) {
-    redirect("/signin");
+    const requestHeaders = await headers();
+    const currentPath = requestHeaders.get("x-current-path") || "/admin/overview";
+    redirect(`/signin?next=${encodeURIComponent(currentPath)}`);
   }
 
   const permissionCodes = await getCurrentStaffPermissionCodes(staff.id);
