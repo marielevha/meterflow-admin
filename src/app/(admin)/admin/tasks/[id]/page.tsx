@@ -23,6 +23,7 @@ import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
 import { getActiveMeterCustomer } from "@/lib/meters/assignments";
+import { formatAdminMeterIndexSummary, getAdminMeterIndexLabels } from "@/lib/meters/indexLabels";
 import {
   addTaskAttachmentAction,
   addTaskCommentAction,
@@ -235,6 +236,7 @@ export default async function TaskDetailPage({
   const task = detail.body.task;
   if (!task) notFound();
   const activeCustomer = task.meter ? getActiveMeterCustomer(task.meter) : null;
+  const indexLabels = task.meter ? getAdminMeterIndexLabels(task.meter.type, t) : null;
 
   const addComment = addTaskCommentAction.bind(null, task.id);
   const addAttachment = addTaskAttachmentAction.bind(null, task.id);
@@ -325,8 +327,16 @@ export default async function TaskDetailPage({
                   <Info label={t("tasks.submittedAt")} value={formatDate(task.fieldSubmittedAt, t("common.notAvailable"))} />
                   <Info label={t("tasks.outcome")} value={translateTaskResolutionCode(task.resolutionCode, t)} />
                   <Info label={t("tasks.startedAt")} value={formatDate(task.startedAt, t("common.notAvailable"))} />
-                  <Info label={t("tasks.fieldPrimaryIndex")} value={decimalToString(task.fieldPrimaryIndex) || t("common.notAvailable")} />
-                  <Info label={t("tasks.fieldSecondaryIndex")} value={decimalToString(task.fieldSecondaryIndex) || t("common.notAvailable")} />
+                  <Info
+                    label={indexLabels?.fieldPrimaryIndex || t("tasks.fieldIndex")}
+                    value={decimalToString(task.fieldPrimaryIndex) || t("common.notAvailable")}
+                  />
+                  {task.meter?.type === "DUAL_INDEX" || task.fieldSecondaryIndex !== null ? (
+                    <Info
+                      label={indexLabels?.fieldSecondaryIndex || t("tasks.fieldSecondaryIndex")}
+                      value={decimalToString(task.fieldSecondaryIndex) || t("common.notAvailable")}
+                    />
+                  ) : null}
                   <Info label={t("tasks.gpsAccuracyMeters")} value={decimalToString(task.fieldGpsAccuracyMeters) || t("common.notAvailable")} />
                   <Info label={t("tasks.fieldCoordinates")} value={formatGps(task.fieldGpsLatitude, task.fieldGpsLongitude) || t("common.notAvailable")} />
                   <Info label={t("tasks.imageMime")} value={task.fieldImageMimeType || t("common.notAvailable")} />
@@ -356,15 +366,17 @@ export default async function TaskDetailPage({
                 ) : null}
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <LinkedReadingCard
+                  <LinkedReadingCard
                     title={t("tasks.sourceReadingTitle")}
                     reading={task.reading}
+                    meterType={task.meter?.type ?? null}
                     href={task.reading ? `/admin/readings/${task.reading.id}` : null}
                     t={t}
                   />
                   <LinkedReadingCard
                     title={t("tasks.reportedReadingTitle")}
                     reading={task.reportedReading}
+                    meterType={task.meter?.type ?? null}
                     href={task.reportedReading ? `/admin/readings/${task.reportedReading.id}` : null}
                     t={t}
                   />
@@ -660,6 +672,7 @@ function Info({
 function LinkedReadingCard({
   title,
   reading,
+  meterType,
   href,
   t,
 }: {
@@ -673,6 +686,7 @@ function LinkedReadingCard({
         secondaryIndex: { toString(): string } | null;
       }
     | null;
+  meterType: Parameters<typeof formatAdminMeterIndexSummary>[0]["meterType"];
   href: string | null;
   t: (key: string, values?: Record<string, string | number>) => string;
 }) {
@@ -691,8 +705,12 @@ function LinkedReadingCard({
             {t("tasks.readingAt")}: {formatDate(reading.readingAt, t("common.notAvailable"))}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t("common.index")}: {reading.primaryIndex.toString()}
-            {reading.secondaryIndex ? ` | ${reading.secondaryIndex.toString()}` : ""}
+            {formatAdminMeterIndexSummary({
+              meterType,
+              primary: reading.primaryIndex,
+              secondary: reading.secondaryIndex,
+              t,
+            })}
           </p>
           {href ? (
             <Link href={href} className="inline-flex text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">

@@ -17,6 +17,7 @@ import {
   activeMeterAssignmentCustomerSelect,
   getActiveMeterCustomer,
 } from "@/lib/meters/assignments";
+import { formatAdminMeterIndexSummary } from "@/lib/meters/indexLabels";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
@@ -76,6 +77,7 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
         id: true,
         serialNumber: true,
         meterReference: true,
+        type: true,
         status: true,
         city: true,
         zone: true,
@@ -192,9 +194,12 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {lastState
-                            ? t("meters.lastStateFormat", {
-                                primary: lastState.currentPrimary?.toString() || "-",
-                                secondary: lastState.currentSecondary?.toString() || "-",
+                            ? formatAdminMeterIndexSummary({
+                                meterType: meter.type,
+                                primary: lastState.currentPrimary,
+                                secondary: lastState.currentSecondary,
+                                t,
+                                fallback: "-",
                               })
                             : t("common.notAvailable")}
                         </TableCell>

@@ -95,7 +95,7 @@ async function computeOverviewDashboardData(locale = "en-US") {
     prisma.reading.findMany({
       where: { deletedAt: null },
       include: {
-        meter: { select: { serialNumber: true, city: true, zone: true } },
+        meter: { select: { serialNumber: true, city: true, zone: true, type: true } },
         submittedBy: { select: { firstName: true, lastName: true, phone: true } },
       },
       orderBy: { createdAt: "desc" },

@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Prisma } from "@prisma/client";
-import { ReadingEventType, ReadingStatus, TaskPriority, TaskStatus } from "@prisma/client";
+import { Prisma, MeterType, ReadingEventType, ReadingStatus, TaskPriority, TaskStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
@@ -28,6 +27,7 @@ import {
 } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
+import { getAdminMeterIndexLabels } from "@/lib/meters/indexLabels";
 import { prisma } from "@/lib/prisma";
 import { evaluateReadingAnomalies, type ReadingAnomalyCheck } from "@/lib/readings/anomalyChecks";
 
@@ -157,13 +157,15 @@ function flattenPayload(
 
 function translateAnomalyCheck(
   check: ReadingAnomalyCheck["check"],
+  meterType: MeterType,
   t: (key: string, values?: Record<string, string | number>) => string
 ) {
+  const labels = getAdminMeterIndexLabels(meterType, t);
   switch (check) {
     case "primary_index_monotonic":
-      return t("readings.checkPrimaryIndexMonotonic");
+      return labels.checkPrimaryIndexMonotonic;
     case "secondary_index_monotonic":
-      return t("readings.checkSecondaryIndexMonotonic");
+      return labels.checkSecondaryIndexMonotonic;
     case "gps_distance":
       return t("readings.checkGpsDistance");
     default:
@@ -281,6 +283,7 @@ export default async function ReadingDetailPage({
 
   if (!reading) notFound();
   const activeCustomer = getActiveMeterCustomer(reading.meter);
+  const indexLabels = getAdminMeterIndexLabels(reading.meter.type, t);
   const gpsThreshold = gpsThresholdMeters();
   const anomalyDiagnostics = await evaluateReadingAnomalies({
     meterId: reading.meterId,
@@ -343,8 +346,16 @@ export default async function ReadingDetailPage({
               <Info label={t("readings.source")} value={translateReadingSource(reading.source, t)} />
               <Info label={t("readings.readingDate")} value={formatDate(reading.readingAt, t("common.notAvailable"))} />
               <Info label={t("readings.reviewedAt")} value={formatDate(reading.reviewedAt, t("common.notAvailable"))} />
-              <Info label={t("readings.primaryIndex")} value={decimalToString(reading.primaryIndex, t("common.notAvailable"))} />
-              <Info label={t("readings.secondaryIndex")} value={decimalToString(reading.secondaryIndex, t("common.notAvailable"))} />
+              <Info
+                label={indexLabels.primaryIndex}
+                value={decimalToString(reading.primaryIndex, t("common.notAvailable"))}
+              />
+              {reading.meter.type === "DUAL_INDEX" || reading.secondaryIndex !== null ? (
+                <Info
+                  label={indexLabels.secondaryIndex}
+                  value={decimalToString(reading.secondaryIndex, t("common.notAvailable"))}
+                />
+              ) : null}
               <Info label={t("readings.confidenceScore")} value={decimalToString(reading.confidenceScore, t("common.notAvailable"))} />
               <Info label={t("readings.anomalyScore")} value={decimalToString(reading.anomalyScore, t("common.notAvailable"))} />
               <Info label={t("readings.gpsAccuracyMeters")} value={decimalToString(reading.gpsAccuracyMeters, t("common.notAvailable"))} />
@@ -369,20 +380,20 @@ export default async function ReadingDetailPage({
                 {anomalyDiagnostics.referenceState ? (
                   <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
                     {reading.meter.type === "DUAL_INDEX"
-                      ? t("readings.referenceSummaryDual", {
-                          date: anomalyDiagnostics.referenceState.effectiveAt
+                      ? `${t("readings.previousReference")} ${
+                          anomalyDiagnostics.referenceState.effectiveAt
                             ? formatDate(
                                 new Date(anomalyDiagnostics.referenceState.effectiveAt),
                                 t("common.notAvailable")
                               )
-                            : t("common.notAvailable"),
-                          primary:
-                            anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
-                            t("common.notAvailable"),
-                          secondary:
-                            anomalyDiagnostics.referenceState.currentSecondary?.toString() ??
-                            t("common.notAvailable"),
-                        })
+                            : t("common.notAvailable")
+                        }: ${indexLabels.primaryShort}: ${
+                          anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
+                          t("common.notAvailable")
+                        } | ${indexLabels.secondaryShort}: ${
+                          anomalyDiagnostics.referenceState.currentSecondary?.toString() ??
+                          t("common.notAvailable")
+                        }`
                       : t("readings.referenceSummarySingle", {
                           date: anomalyDiagnostics.referenceState.effectiveAt
                             ? formatDate(
@@ -400,7 +411,7 @@ export default async function ReadingDetailPage({
                 <div className="mt-3 flex flex-wrap gap-2">
                   {anomalyDiagnostics.failedChecks.map((check) => (
                     <Badge key={check} size="sm" color="warning">
-                      {translateAnomalyCheck(check, t)}
+                      {translateAnomalyCheck(check, reading.meter.type, t)}
                     </Badge>
                   ))}
                 </div>

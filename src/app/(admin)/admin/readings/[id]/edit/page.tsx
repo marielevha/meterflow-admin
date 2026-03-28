@@ -19,6 +19,7 @@ import {
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
 import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
+import { getAdminMeterIndexLabels } from "@/lib/meters/indexLabels";
 import { prisma } from "@/lib/prisma";
 import { evaluateReadingAnomalies } from "@/lib/readings/anomalyChecks";
 import {
@@ -74,12 +75,18 @@ function readingStatusBadge(status: ReadingStatus) {
   return "light" as const;
 }
 
-function mapError(code: string, t: (key: string) => string) {
+function mapError(
+  code: string,
+  t: (key: string) => string,
+  labels?: ReturnType<typeof getAdminMeterIndexLabels>
+) {
   if (!code) return "";
   if (code === "invalid_status") return t("readings.errorInvalidStatus");
   if (code === "invalid_status_transition") return t("readings.errorInvalidStatusTransition");
-  if (code === "invalid_primary_index") return t("readings.errorInvalidPrimaryIndex");
-  if (code === "invalid_secondary_index") return t("readings.errorInvalidSecondaryIndex");
+  if (code === "invalid_primary_index") return labels?.invalidPrimaryIndex || t("readings.errorInvalidPrimaryIndex");
+  if (code === "invalid_secondary_index") {
+    return labels?.invalidSecondaryIndex || t("readings.errorInvalidSecondaryIndex");
+  }
   if (code === "invalid_gps_latitude") return t("readings.errorInvalidGpsLatitude");
   if (code === "invalid_gps_longitude") return t("readings.errorInvalidGpsLongitude");
   if (code === "invalid_gps_accuracy") return t("readings.errorInvalidGpsAccuracy");
@@ -105,7 +112,7 @@ export default async function EditReadingPage({
 
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-  const error = mapError(firstValue(resolvedSearchParams.error), t);
+  const errorCode = firstValue(resolvedSearchParams.error);
 
   const reading = await prisma.reading.findFirst({
     where: { id, deletedAt: null },
@@ -157,6 +164,8 @@ export default async function EditReadingPage({
 
   if (!reading) notFound();
   const activeCustomer = getActiveMeterCustomer(reading.meter);
+  const indexLabels = getAdminMeterIndexLabels(reading.meter.type, t);
+  const error = mapError(errorCode, t, indexLabels);
 
   const submit = updateReadingAction.bind(null, reading.id);
   const canEditGps = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsUpdate);
@@ -226,22 +235,20 @@ export default async function EditReadingPage({
                     {t("readings.anomalyChecksTitle")}
                   </p>
                   {anomalyDiagnostics.referenceState ? (
-                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                      {reading.meter.type === "DUAL_INDEX"
-                        ? t("readings.referenceSummaryDual", {
-                            date: formatDateTime(
-                              anomalyDiagnostics.referenceState.effectiveAt
-                                ? new Date(anomalyDiagnostics.referenceState.effectiveAt)
-                                : null,
-                              t("common.notAvailable")
-                            ),
-                            primary:
-                              anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
-                              t("common.notAvailable"),
-                            secondary:
-                              anomalyDiagnostics.referenceState.currentSecondary?.toString() ??
-                              t("common.notAvailable"),
-                          })
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                    {reading.meter.type === "DUAL_INDEX"
+                      ? `${t("readings.previousReference")} ${formatDateTime(
+                          anomalyDiagnostics.referenceState.effectiveAt
+                            ? new Date(anomalyDiagnostics.referenceState.effectiveAt)
+                            : null,
+                          t("common.notAvailable")
+                        )}: ${indexLabels.primaryShort}: ${
+                          anomalyDiagnostics.referenceState.currentPrimary?.toString() ??
+                          t("common.notAvailable")
+                        } | ${indexLabels.secondaryShort}: ${
+                          anomalyDiagnostics.referenceState.currentSecondary?.toString() ??
+                          t("common.notAvailable")
+                        }`
                         : t("readings.referenceSummarySingle", {
                             date: formatDateTime(
                               anomalyDiagnostics.referenceState.effectiveAt
@@ -262,9 +269,9 @@ export default async function EditReadingPage({
                         className="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-xs font-medium text-warning-700 dark:bg-white/10 dark:text-warning-300"
                       >
                         {check === "primary_index_monotonic"
-                          ? t("readings.checkPrimaryIndexMonotonic")
+                          ? indexLabels.checkPrimaryIndexMonotonic
                           : check === "secondary_index_monotonic"
-                            ? t("readings.checkSecondaryIndexMonotonic")
+                            ? indexLabels.checkSecondaryIndexMonotonic
                             : t("readings.checkGpsDistance")}
                       </span>
                     ))}
@@ -296,7 +303,7 @@ export default async function EditReadingPage({
                       htmlFor="primaryIndex"
                       className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >
-                      {t("readings.primaryIndex")}
+                      {indexLabels.primaryIndex}
                     </label>
                     <input
                       id="primaryIndex"
@@ -316,7 +323,7 @@ export default async function EditReadingPage({
                         htmlFor="secondaryIndex"
                         className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                       >
-                        {t("readings.secondaryIndex")}
+                        {indexLabels.secondaryIndex}
                       </label>
                       <input
                         id="secondaryIndex"

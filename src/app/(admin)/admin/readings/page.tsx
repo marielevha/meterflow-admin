@@ -14,6 +14,7 @@ import {
   requireAdminPermissions,
 } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
+import { formatAdminMeterIndexSummary } from "@/lib/meters/indexLabels";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -121,7 +122,7 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
     skip,
     take: pageSize,
     include: {
-      meter: { select: { serialNumber: true, meterReference: true } },
+      meter: { select: { serialNumber: true, meterReference: true, type: true } },
       submittedBy: { select: { firstName: true, lastName: true, phone: true } },
       reviewedBy: { select: { firstName: true, lastName: true } },
     },
@@ -217,8 +218,12 @@ export default async function ReadingsPage({ searchParams }: { searchParams: Sea
                           <p className="text-xs text-gray-500 dark:text-gray-400">{reading.meter.meterReference || t("common.notAvailable")}</p>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                          {reading.primaryIndex.toString()}
-                          {reading.secondaryIndex ? ` | ${reading.secondaryIndex.toString()}` : ""}
+                          {formatAdminMeterIndexSummary({
+                            meterType: reading.meter.type,
+                            primary: reading.primaryIndex,
+                            secondary: reading.secondaryIndex,
+                            t,
+                          })}
                         </TableCell>
                         <TableCell className="px-4 py-3 text-sm">
                           <Badge size="sm" color={statusBadge(reading.status)}>

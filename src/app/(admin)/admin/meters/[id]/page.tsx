@@ -10,6 +10,7 @@ import {
   translateMeterAssignmentSource,
   translateMeterStatus,
   translateMeterType,
+  translateReadingStatus,
 } from "@/lib/admin-i18n/labels";
 import {
   ADMIN_PERMISSION_GROUPS,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getMeterAssignmentTransferBlockers } from "@/lib/meters/assignments";
+import { formatAdminMeterIndexSummary } from "@/lib/meters/indexLabels";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -327,9 +329,12 @@ export default async function MeterDetailsPage({
                 >
                   <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(state.effectiveAt, t("common.notAvailable"))}</p>
                   <p className="mt-1 text-sm text-gray-800 dark:text-white/90">
-                    {t("meters.lastStateFormat", {
-                      primary: state.currentPrimary?.toString() || "-",
-                      secondary: state.currentSecondary?.toString() || "-",
+                    {formatAdminMeterIndexSummary({
+                      meterType: meter.type,
+                      primary: state.currentPrimary,
+                      secondary: state.currentSecondary,
+                      t,
+                      fallback: "-",
                     })}
                   </p>
                 </div>
@@ -351,10 +356,13 @@ export default async function MeterDetailsPage({
                 >
                   <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(reading.readingAt, t("common.notAvailable"))}</p>
                   <p className="mt-1 text-sm text-gray-800 dark:text-white/90">
-                    {t("meters.lastReadingFormat", {
-                      status: reading.status,
-                      primary: reading.primaryIndex.toString(),
-                      secondary: reading.secondaryIndex?.toString() || "-",
+                    {formatAdminMeterIndexSummary({
+                      meterType: meter.type,
+                      primary: reading.primaryIndex,
+                      secondary: reading.secondaryIndex,
+                      t,
+                      fallback: "-",
+                      status: translateReadingStatus(reading.status, t),
                     })}
                   </p>
                 </div>

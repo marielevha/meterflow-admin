@@ -13,6 +13,7 @@ import OperationsKpisSection from "@/components/overview/OperationsKpisSection";
 import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 import { getOverviewDashboardData } from "@/lib/backoffice/overview";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
+import { formatAdminMeterIndexSummary } from "@/lib/meters/indexLabels";
 
 export const metadata: Metadata = {
   title: "Overview",
@@ -329,11 +330,15 @@ export default async function OverviewPage() {
                           </TableCell>
                           <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                             {customer}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                            {reading.primaryIndex.toString()}
-                            {reading.secondaryIndex ? ` | ${reading.secondaryIndex.toString()}` : ""}
-                          </TableCell>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          {formatAdminMeterIndexSummary({
+                            meterType: reading.meter.type,
+                            primary: reading.primaryIndex,
+                            secondary: reading.secondaryIndex,
+                            t,
+                          })}
+                        </TableCell>
                           <TableCell className="px-4 py-3 text-sm">
                             <Badge size="sm" color={readingStatusColor(reading.status)}>
                               {readingStatusLabel(reading.status, t)}
