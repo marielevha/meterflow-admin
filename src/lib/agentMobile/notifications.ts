@@ -1,5 +1,6 @@
 import { Prisma, TaskEventType } from "@prisma/client";
 
+import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 
 type NotificationListOptions = {
@@ -116,14 +117,7 @@ export async function listAgentNotifications(
             meter: {
               select: {
                 serialNumber: true,
-                customer: {
-                  select: {
-                    firstName: true,
-                    lastName: true,
-                    username: true,
-                    phone: true,
-                  },
-                },
+                ...activeMeterAssignmentCustomerSelect,
               },
             },
           },
@@ -147,6 +141,7 @@ export async function listAgentNotifications(
 
   const notifications = pageEvents.map((event) => {
     const payload = ((event.payload ?? {}) as TaskEventPayload) || {};
+    const customer = event.task.meter ? getActiveMeterCustomer(event.task.meter) : null;
     return {
       id: event.id,
       type: event.type,
@@ -157,12 +152,12 @@ export async function listAgentNotifications(
       taskPriority: event.task.priority,
       taskDueAt: event.task.dueAt?.toISOString() ?? null,
       meterSerialNumber: event.task.meter?.serialNumber ?? "--",
-      customerName: event.task.meter?.customer
+      customerName: customer
         ? personLabel(
-            event.task.meter.customer.firstName,
-            event.task.meter.customer.lastName,
-            event.task.meter.customer.username,
-            event.task.meter.customer.phone
+            customer.firstName,
+            customer.lastName,
+            customer.username,
+            customer.phone
           )
         : "--",
       actorName: event.actorUser

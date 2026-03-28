@@ -1,17 +1,23 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { MeterStatus, MeterType } from "@prisma/client";
+import { MeterStatus, MeterType, UserRole } from "@prisma/client";
 import { notFound } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import MeterAssignmentWorkflowCard from "@/components/meters/MeterAssignmentWorkflowCard";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
-import { translateMeterStatus, translateMeterType } from "@/lib/admin-i18n/labels";
+import {
+  translateMeterAssignmentSource,
+  translateMeterStatus,
+  translateMeterType,
+} from "@/lib/admin-i18n/labels";
 import {
   ADMIN_PERMISSION_GROUPS,
   hasAnyPermissionCode,
   requireAdminPermissions,
 } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
+import { getMeterAssignmentTransferBlockers } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -46,60 +52,178 @@ export default async function MeterDetailsPage({
   const canEditMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersEdit);
   const { t } = await getAdminTranslator();
   const { id } = await params;
-  const meter = await prisma.meter.findFirst({
-    where: { id, deletedAt: null },
-    include: {
-      customer: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          email: true,
-          city: true,
-          zone: true,
+  const [meter, currentAssignment, assignmentHistory, transferCustomers, blockers] = await Promise.all([
+    prisma.meter.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        serialNumber: true,
+        meterReference: true,
+        type: true,
+        status: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        zone: true,
+        latitude: true,
+        longitude: true,
+        installedAt: true,
+        lastInspectionAt: true,
+        createdAt: true,
+        assignedAgent: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
+        states: {
+          where: { deletedAt: null },
+          orderBy: { effectiveAt: "desc" },
+          take: 5,
+        },
+        readings: {
+          where: { deletedAt: null },
+          orderBy: { readingAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            status: true,
+            primaryIndex: true,
+            secondaryIndex: true,
+            readingAt: true,
+          },
         },
       },
-      assignedAgent: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
+    }),
+    prisma.meterAssignment.findFirst({
+      where: {
+        meterId: id,
+        endedAt: null,
+        deletedAt: null,
+      },
+      orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        customerId: true,
+        assignedAt: true,
+        source: true,
+        notes: true,
+        customer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            phone: true,
+          },
         },
       },
-      states: {
-        where: { deletedAt: null },
-        orderBy: { effectiveAt: "desc" },
-        take: 5,
+    }),
+    prisma.meterAssignment.findMany({
+      where: {
+        meterId: id,
+        deletedAt: null,
       },
-      readings: {
-        where: { deletedAt: null },
-        orderBy: { readingAt: "desc" },
-        take: 5,
-        select: {
-          id: true,
-          status: true,
-          primaryIndex: true,
-          secondaryIndex: true,
-          readingAt: true,
+      orderBy: [{ assignedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        assignedAt: true,
+        endedAt: true,
+        source: true,
+        notes: true,
+        customer: {
+          select: {
+            firstName: true,
+            lastName: true,
+            username: true,
+            phone: true,
+          },
+        },
+        assignedBy: {
+          select: {
+            firstName: true,
+            lastName: true,
+            username: true,
+            phone: true,
+          },
+        },
+        endedBy: {
+          select: {
+            firstName: true,
+            lastName: true,
+            username: true,
+            phone: true,
+          },
         },
       },
-    },
-  });
+    }),
+    canEditMeters
+      ? prisma.user.findMany({
+          where: {
+            deletedAt: null,
+            role: UserRole.CLIENT,
+          },
+          orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        })
+      : Promise.resolve([]),
+    getMeterAssignmentTransferBlockers(id),
+  ]);
 
   if (!meter) {
     notFound();
   }
 
+  const customer = currentAssignment?.customer ?? null;
   const customerName =
-    [meter.customer.firstName, meter.customer.lastName].filter(Boolean).join(" ").trim() ||
-    meter.customer.phone;
+    (customer
+      ? [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() || customer.phone
+      : "") || t("meters.unassigned");
   const agentName =
     [meter.assignedAgent?.firstName, meter.assignedAgent?.lastName]
       .filter(Boolean)
       .join(" ")
       .trim() || t("meters.unassigned");
+  const customerOptions = transferCustomers
+    .filter((entry) => entry.id !== currentAssignment?.customerId)
+    .map((entry) => ({
+      value: entry.id,
+      label: [entry.firstName, entry.lastName].filter(Boolean).join(" ").trim() || t("common.customer"),
+      hint: entry.phone,
+    }));
+  const history = assignmentHistory.map((entry) => ({
+    id: entry.id,
+    customerName:
+      [entry.customer.firstName, entry.customer.lastName].filter(Boolean).join(" ").trim() ||
+      entry.customer.username ||
+      entry.customer.phone ||
+      t("meters.unassigned"),
+    customerPhone: entry.customer.phone,
+    assignedAt: entry.assignedAt.toISOString(),
+    endedAt: entry.endedAt ? entry.endedAt.toISOString() : null,
+    sourceLabel: translateMeterAssignmentSource(entry.source, t),
+    notes: entry.notes,
+    assignedByName:
+      (entry.assignedBy
+        ? [entry.assignedBy.firstName, entry.assignedBy.lastName].filter(Boolean).join(" ").trim() ||
+          entry.assignedBy.username ||
+          entry.assignedBy.phone
+        : null) || null,
+    endedByName:
+      (entry.endedBy
+        ? [entry.endedBy.firstName, entry.endedBy.lastName].filter(Boolean).join(" ").trim() ||
+          entry.endedBy.username ||
+          entry.endedBy.phone
+        : null) || null,
+    isActive: !entry.endedAt,
+  }));
 
   return (
     <div>
@@ -150,8 +274,16 @@ export default async function MeterDetailsPage({
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.assignmentLocation")}</h3>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <Field label={t("common.customer")} value={customerName} />
-            <Field label={t("meters.customerContact")} value={meter.customer.phone} />
+            <Field label={t("meters.customerContact")} value={customer?.phone || t("common.notAvailable")} />
             <Field label={t("meters.assignedAgent")} value={agentName} />
+            <Field
+              label={t("meters.assignmentSourceLabel")}
+              value={currentAssignment ? translateMeterAssignmentSource(currentAssignment.source, t) : t("common.notAvailable")}
+            />
+            <Field
+              label={t("meters.assignmentDateLabel")}
+              value={currentAssignment ? formatDate(currentAssignment.assignedAt, t("common.notAvailable")) : t("common.notAvailable")}
+            />
             <Field label={t("meters.addressLine1")} value={meter.addressLine1 || t("common.notAvailable")} />
             <Field label={t("meters.addressLine2")} value={meter.addressLine2 || t("common.notAvailable")} />
             <Field label={t("meters.cityZone")} value={`${meter.city || "-"} / ${meter.zone || "-"}`} />
@@ -160,6 +292,27 @@ export default async function MeterDetailsPage({
             <Field label={t("meters.createdAt")} value={formatDate(meter.createdAt, t("common.notAvailable"))} />
           </div>
         </div>
+
+        <MeterAssignmentWorkflowCard
+          meterId={meter.id}
+          serialNumber={meter.serialNumber}
+          canManage={canEditMeters}
+          currentAssignment={
+            currentAssignment
+              ? {
+                  customerId: currentAssignment.customerId,
+                  customerName,
+                  customerPhone: currentAssignment.customer.phone,
+                  assignedAt: currentAssignment.assignedAt.toISOString(),
+                  sourceLabel: translateMeterAssignmentSource(currentAssignment.source, t),
+                  notes: currentAssignment.notes,
+                }
+              : null
+          }
+          blockers={blockers}
+          customerOptions={customerOptions}
+          history={history}
+        />
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-3">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.latestStates")}</h3>

@@ -18,6 +18,7 @@ import {
 } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
+import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 import {
   FLAG_REASON_OPTIONS,
@@ -120,15 +121,6 @@ export default async function EditReadingPage({
           addressLine2: true,
           latitude: true,
           longitude: true,
-          customer: {
-            select: {
-              firstName: true,
-              lastName: true,
-              username: true,
-              email: true,
-              phone: true,
-            },
-          },
           assignedAgent: {
             select: {
               firstName: true,
@@ -138,6 +130,7 @@ export default async function EditReadingPage({
               phone: true,
             },
           },
+          ...activeMeterAssignmentCustomerSelect,
         },
       },
       submittedBy: {
@@ -162,6 +155,7 @@ export default async function EditReadingPage({
   });
 
   if (!reading) notFound();
+  const activeCustomer = getActiveMeterCustomer(reading.meter);
 
   const submit = updateReadingAction.bind(null, reading.id);
   const canEditGps = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.readingsUpdate);
@@ -439,7 +433,7 @@ export default async function EditReadingPage({
               <div className="mt-4 space-y-3">
                 <Info label={t("readings.submittedBy")} value={personLabel(reading.submittedBy) || t("common.notAvailable")} />
                 <Info label={t("readings.reviewedBy")} value={personLabel(reading.reviewedBy) || t("common.notAvailable")} />
-                <Info label={t("common.customer")} value={personLabel(reading.meter.customer) || t("common.notAvailable")} />
+                <Info label={t("common.customer")} value={personLabel(activeCustomer) || t("common.notAvailable")} />
                 <Info label={t("readings.assignedAgent")} value={personLabel(reading.meter.assignedAgent) || t("common.notAvailable")} />
               </div>
             </div>
@@ -497,7 +491,7 @@ function personLabel(person?: {
   lastName: string | null;
   username?: string | null;
   email?: string | null;
-  phone: string;
+  phone: string | null;
 } | null) {
   if (!person) return null;
   return (

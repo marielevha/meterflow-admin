@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { listTasks } from "@/lib/backoffice/tasks";
+import { getActiveMeterCustomer, type MeterWithActiveAssignment } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -72,13 +73,14 @@ function formatCustomer(customer?: {
   firstName: string | null;
   lastName: string | null;
   username: string | null;
-  phone: string;
+  phone: string | null;
 } | null, fallback = "N/A") {
   if (!customer) return fallback;
   return (
     [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() ||
     customer.username ||
-    customer.phone
+    customer.phone ||
+    fallback
   );
 }
 
@@ -347,6 +349,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                 todayStart={todayStart}
                 tomorrowStart={tomorrowStart}
                 locale={localeCode}
+                canEditTasks={canEditTasks}
                 t={t}
               />
             ))
@@ -418,7 +421,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Search
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                         {task.meter?.serialNumber || t("common.notAvailable")}
                         <p className="text-xs text-gray-500 dark:text-gray-400">{task.meter?.meterReference || "-"}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatCustomer(task.meter?.customer, t("common.notAvailable"))}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatCustomer(task.meter ? getActiveMeterCustomer(task.meter) : null, t("common.notAvailable"))}
+                        </p>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                         {task.fieldSubmittedAt ? (
@@ -532,6 +537,7 @@ function TaskMobileCard({
   todayStart,
   tomorrowStart,
   locale,
+  canEditTasks,
   t,
 }: {
   task: {
@@ -555,17 +561,13 @@ function TaskMobileCard({
     meter?: {
       serialNumber: string;
       meterReference: string | null;
-      customer?: {
-        firstName: string | null;
-        lastName: string | null;
-        username: string | null;
-        phone: string;
-      } | null;
+      assignments?: MeterWithActiveAssignment["assignments"];
     } | null;
   };
   todayStart: Date;
   tomorrowStart: Date;
   locale: string;
+  canEditTasks: boolean;
   t: AdminTranslatorFn;
 }) {
   const isOverdue =
@@ -624,7 +626,10 @@ function TaskMobileCard({
           value={task.startedAt ? formatDate(task.startedAt, locale, "-") : t("tasks.notStarted")}
         />
         <MobileInfo label={t("tasks.mobileMeter")} value={task.meter?.serialNumber || t("common.notAvailable")} />
-        <MobileInfo label={t("tasks.mobileClient")} value={formatCustomer(task.meter?.customer, t("common.notAvailable"))} />
+        <MobileInfo
+          label={t("tasks.mobileClient")}
+          value={formatCustomer(task.meter ? getActiveMeterCustomer(task.meter) : null, t("common.notAvailable"))}
+        />
       </div>
 
       {(task.reading || task.reportedReading || task.resolutionCode) ? (

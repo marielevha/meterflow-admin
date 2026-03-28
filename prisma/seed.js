@@ -9,6 +9,7 @@ const {
   DeliveryStatus,
   InvoiceLineType,
   InvoiceStatus,
+  MeterAssignmentSource,
   MeterStatus,
   MeterType,
   PaymentMethod,
@@ -1286,6 +1287,7 @@ async function cleanupLegacyMeters(userByUsername) {
   const legacyMeterIds = legacyMeters.map((meter) => meter.id);
   if (legacyMeterIds.length === 0) return;
 
+  await prisma.meterAssignment.deleteMany({ where: { meterId: { in: legacyMeterIds } } });
   await prisma.meterState.deleteMany({ where: { meterId: { in: legacyMeterIds } } });
   await prisma.meter.deleteMany({ where: { id: { in: legacyMeterIds } } });
 }
@@ -2114,7 +2116,6 @@ async function main() {
       where: { serialNumber: meter.serialNumber },
       update: {
         meterReference: meter.meterReference,
-        customerId: customer.id,
         assignedAgentId: agent?.id ?? null,
         zoneId: zone?.id ?? null,
         type: meter.type,
@@ -2131,7 +2132,6 @@ async function main() {
       create: {
         serialNumber: meter.serialNumber,
         meterReference: meter.meterReference,
-        customerId: customer.id,
         assignedAgentId: agent?.id ?? null,
         zoneId: zone?.id ?? null,
         type: meter.type,
@@ -2151,6 +2151,29 @@ async function main() {
     where: { serialNumber: { in: meters.map((meter) => meter.serialNumber) } },
   });
   const meterBySerial = Object.fromEntries(createdMeters.map((meter) => [meter.serialNumber, meter]));
+
+  await prisma.meterAssignment.deleteMany({
+    where: { meterId: { in: createdMeters.map((meter) => meter.id) } },
+  });
+
+  for (const meter of meters) {
+    const customer = userByUsername[meter.customerUsername];
+    const createdMeter = meterBySerial[meter.serialNumber];
+
+    if (!customer || !createdMeter) {
+      throw new Error(`Missing assignment data for meter ${meter.serialNumber}`);
+    }
+
+    await prisma.meterAssignment.create({
+      data: {
+        meterId: createdMeter.id,
+        customerId: customer.id,
+        assignedById: admin.id,
+        source: MeterAssignmentSource.SYSTEM,
+        assignedAt: new Date(meter.installedAt),
+      },
+    });
+  }
 
   await cleanupManagedTasks();
   await cleanupManagedReadings();

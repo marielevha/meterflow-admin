@@ -179,6 +179,10 @@ function mapMobileApiError(code?: string, status?: number) {
       return translateCurrentApp('api.error.idempotencyConflict');
     case 'meter_not_found':
       return translateCurrentApp('api.error.meterNotFound');
+    case 'meter_identifier_required':
+      return translateCurrentApp('api.error.meterIdentifierRequired');
+    case 'meter_already_assigned':
+      return translateCurrentApp('api.error.meterAlreadyAssigned');
     case 'reading_not_found':
       return translateCurrentApp('api.error.readingNotFound');
     case 'reading_image_not_found':

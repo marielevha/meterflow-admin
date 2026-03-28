@@ -1,4 +1,4 @@
-import { MeterStatus, MeterType, UserRole } from "@prisma/client";
+import { MeterAssignmentSource, MeterStatus, MeterType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type ImportMeterRow = {
@@ -27,7 +27,7 @@ type ParsedCsvRow = {
   values: Record<string, string>;
 };
 
-const REQUIRED_HEADERS = ["serial_number", "type", "customer_phone"];
+const REQUIRED_HEADERS = ["serial_number", "type"];
 const CSV_HEADERS = [
   "serial_number",
   "meter_reference",
@@ -226,8 +226,6 @@ export async function previewMetersImportFromCsv(csvContent: string) {
     if (!serialNumber) errors.push("serial_number_required");
     if (!type) errors.push("invalid_type");
     if (!status) errors.push("invalid_status");
-    if (!customerPhone) errors.push("customer_phone_required");
-
     if (serialNumber) {
       if (seenSerial.has(serialNumber)) errors.push("duplicate_serial_in_file");
       seenSerial.add(serialNumber);
@@ -341,7 +339,6 @@ export async function importMetersRows(rows: ImportMeterRow[]) {
             meterReference: row.meterReference || null,
             type: row.type,
             status: row.status,
-            customerId: row.customerId,
             assignedAgentId: row.assignedAgentId,
             addressLine1: row.addressLine1 || null,
             addressLine2: row.addressLine2 || null,
@@ -354,6 +351,21 @@ export async function importMetersRows(rows: ImportMeterRow[]) {
           },
           select: { id: true, serialNumber: true },
         });
+
+        if (row.customerId) {
+          await tx.meterAssignment.create({
+            data: {
+              meterId: meter.id,
+              customerId: row.customerId,
+              source: MeterAssignmentSource.IMPORT,
+              assignedAt: row.installedAt ? new Date(row.installedAt) : new Date(),
+              notes: row.customerPhone
+                ? `Imported with initial customer phone ${row.customerPhone}.`
+                : "Imported with initial customer assignment.",
+            },
+          });
+        }
+
         created.push(meter);
       }
       return created;

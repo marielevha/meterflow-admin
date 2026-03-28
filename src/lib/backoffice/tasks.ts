@@ -10,6 +10,7 @@ import {
   UserStatus,
 } from "@prisma/client";
 import { createAgentTaskEvent } from "@/lib/agentMobile/notifications";
+import { activeMeterAssignmentCustomerSelect } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 import { isTaskTransitionAllowed } from "@/lib/workflows/stateMachines";
 
@@ -342,15 +343,7 @@ export async function listTasks(staff: StaffUser, filters: TaskFilters) {
             meterReference: true,
             city: true,
             zone: true,
-            customer: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                username: true,
-                phone: true,
-              },
-            },
+            ...activeMeterAssignmentCustomerSelect,
           },
         },
         reading: {
@@ -642,9 +635,7 @@ export async function getTaskDetail(staff: StaffUser, taskId: string) {
           addressLine2: true,
           city: true,
           zone: true,
-          customer: {
-            select: { id: true, firstName: true, lastName: true, phone: true },
-          },
+          ...activeMeterAssignmentCustomerSelect,
         },
       },
       reading: {

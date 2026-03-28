@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ReadingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentMobileClient } from "@/lib/auth/mobileSession";
+import { activeAssignmentFilter } from "@/lib/meters/assignments";
 
 const mobileProfileSelect = {
   id: true,
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
   const [meterCount, readingCount, pendingReadingCount] = await Promise.all([
     prisma.meter.count({
       where: {
-        customerId: auth.user.id,
+        ...activeAssignmentFilter(auth.user.id),
         deletedAt: null,
       },
     }),

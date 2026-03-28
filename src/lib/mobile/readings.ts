@@ -15,6 +15,7 @@ import {
 } from "@/lib/readings/reviewReasons";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 import { getMeterReadingSubmissionWindow } from "@/lib/mobile/readingSubmissionWindow";
+import { activeAssignmentFilter } from "@/lib/meters/assignments";
 
 type CreateReadingPayload = {
   meterId?: string;
@@ -115,7 +116,7 @@ export async function createClientReading(userId: string, payload: CreateReading
   const meter = await prisma.meter.findFirst({
     where: {
       id: meterId,
-      customerId: userId,
+      ...activeAssignmentFilter(userId),
       deletedAt: null,
     },
     select: {
@@ -154,7 +155,6 @@ export async function createClientReading(userId: string, payload: CreateReading
   const currentWindowReading = await prisma.reading.findFirst({
     where: {
       meterId: meter.id,
-      submittedById: userId,
       deletedAt: null,
       createdAt: {
         gte: submissionWindow.windowStart,
@@ -163,6 +163,7 @@ export async function createClientReading(userId: string, payload: CreateReading
     },
     select: {
       id: true,
+      submittedById: true,
       status: true,
     },
     orderBy: { readingAt: "desc" },
@@ -170,8 +171,9 @@ export async function createClientReading(userId: string, payload: CreateReading
 
   if (currentWindowReading) {
     if (
-      currentWindowReading.status === ReadingStatus.REJECTED ||
-      currentWindowReading.status === ReadingStatus.RESUBMISSION_REQUESTED
+      currentWindowReading.submittedById === userId &&
+      (currentWindowReading.status === ReadingStatus.REJECTED ||
+        currentWindowReading.status === ReadingStatus.RESUBMISSION_REQUESTED)
     ) {
       return {
         status: 409,

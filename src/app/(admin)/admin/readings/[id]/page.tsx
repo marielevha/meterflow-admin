@@ -27,6 +27,7 @@ import {
   staffHasAnyPermissionFromServerComponent,
 } from "@/lib/auth/staffServerSession";
 import { gpsThresholdMeters } from "@/lib/geo/gps";
+import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -83,7 +84,7 @@ function personLabel(person?: {
   lastName: string | null;
   username: string | null;
   email: string | null;
-  phone: string;
+  phone: string | null;
 } | null) {
   if (!person) return null;
   return (
@@ -184,16 +185,6 @@ export default async function ReadingDetailPage({
           zone: true,
           latitude: true,
           longitude: true,
-          customer: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              username: true,
-              email: true,
-              phone: true,
-            },
-          },
           assignedAgent: {
             select: {
               id: true,
@@ -204,6 +195,7 @@ export default async function ReadingDetailPage({
               phone: true,
             },
           },
+          ...activeMeterAssignmentCustomerSelect,
         },
       },
       submittedBy: {
@@ -271,6 +263,7 @@ export default async function ReadingDetailPage({
   });
 
   if (!reading) notFound();
+  const activeCustomer = getActiveMeterCustomer(reading.meter);
   const gpsDistance = decimalToNumber(reading.gpsDistanceMeters);
   const gpsThreshold = gpsThresholdMeters();
   const gpsWithinThreshold = gpsDistance === null ? null : gpsDistance <= gpsThreshold;
@@ -473,7 +466,7 @@ export default async function ReadingDetailPage({
             <div className="mt-4 space-y-3">
               <Info label={t("readings.submittedBy")} value={personLabel(reading.submittedBy) || t("common.notAvailable")} />
               <Info label={t("readings.reviewedBy")} value={personLabel(reading.reviewedBy) || t("common.notAvailable")} />
-              <Info label={t("common.customer")} value={personLabel(reading.meter.customer) || t("common.notAvailable")} />
+              <Info label={t("common.customer")} value={personLabel(activeCustomer) || t("common.notAvailable")} />
               <Info label={t("readings.assignedAgent")} value={personLabel(reading.meter.assignedAgent) || t("common.notAvailable")} />
             </div>
           </div>

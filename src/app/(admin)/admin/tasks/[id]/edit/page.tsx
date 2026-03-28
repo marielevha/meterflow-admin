@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { TaskPriority, TaskStatus, TaskType, UserStatus } from "@prisma/client";
+import { TaskPriority, TaskStatus, TaskType, UserRole, UserStatus } from "@prisma/client";
 import { notFound, redirect } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Label from "@/components/form/Label";

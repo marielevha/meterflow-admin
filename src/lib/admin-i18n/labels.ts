@@ -2,6 +2,7 @@ import {
   BillingCampaignStatus,
   DeliveryChannel,
   InvoiceStatus,
+  MeterAssignmentSource,
   MeterStatus,
   MeterType,
   PaymentMethod,
@@ -29,6 +30,25 @@ export function translateMeterStatus(status: MeterStatus, t: Translator) {
 export function translateMeterType(type: MeterType, t: Translator) {
   if (type === MeterType.DUAL_INDEX) return t("meters.typeDualIndex");
   return t("meters.typeSingleIndex");
+}
+
+export function translateMeterAssignmentSource(source: MeterAssignmentSource | string, t: Translator) {
+  switch (source) {
+    case MeterAssignmentSource.ADMIN:
+    case "ADMIN":
+      return t("meters.assignmentSourceAdmin");
+    case MeterAssignmentSource.IMPORT:
+    case "IMPORT":
+      return t("meters.assignmentSourceImport");
+    case MeterAssignmentSource.MOBILE_CLAIM:
+    case "MOBILE_CLAIM":
+      return t("meters.assignmentSourceMobileClaim");
+    case MeterAssignmentSource.SYSTEM:
+    case "SYSTEM":
+      return t("meters.assignmentSourceSystem");
+    default:
+      return String(source);
+  }
 }
 
 export function translateUserRole(role: UserRole | string, t: Translator) {

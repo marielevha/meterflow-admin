@@ -8,6 +8,7 @@ import ConsumptionFilters from "@/components/consumption/ConsumptionFilters";
 import ConsumptionPerPage from "@/components/consumption/ConsumptionPerPage";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -56,9 +57,33 @@ export default async function ConsumptionPage({
             { meterReference: { contains: q, mode: "insensitive" } },
             { city: { contains: q, mode: "insensitive" } },
             { zone: { contains: q, mode: "insensitive" } },
-            { customer: { firstName: { contains: q, mode: "insensitive" } } },
-            { customer: { lastName: { contains: q, mode: "insensitive" } } },
-            { customer: { phone: { contains: q } } },
+            {
+              assignments: {
+                some: {
+                  endedAt: null,
+                  deletedAt: null,
+                  customer: { firstName: { contains: q, mode: "insensitive" } },
+                },
+              },
+            },
+            {
+              assignments: {
+                some: {
+                  endedAt: null,
+                  deletedAt: null,
+                  customer: { lastName: { contains: q, mode: "insensitive" } },
+                },
+              },
+            },
+            {
+              assignments: {
+                some: {
+                  endedAt: null,
+                  deletedAt: null,
+                  customer: { phone: { contains: q } },
+                },
+              },
+            },
           ],
         }
       : {}),
@@ -78,8 +103,12 @@ export default async function ConsumptionPage({
 
   const meters = await prisma.meter.findMany({
     where: meterWhere,
-    include: {
-      customer: { select: { firstName: true, lastName: true, phone: true } },
+    select: {
+      id: true,
+      serialNumber: true,
+      meterReference: true,
+      city: true,
+      zone: true,
       states: {
         where: { deletedAt: null },
         orderBy: { effectiveAt: "desc" },
@@ -90,6 +119,7 @@ export default async function ConsumptionPage({
         orderBy: { readingAt: "desc" },
         take: 6,
       },
+      ...activeMeterAssignmentCustomerSelect,
     },
     orderBy: { createdAt: "desc" },
     skip,
@@ -112,9 +142,12 @@ export default async function ConsumptionPage({
         ? meter.readings.reduce((sum, r) => sum + toNumber(r.primaryIndex), 0) / meter.readings.length
         : 0;
 
+    const customerRecord = getActiveMeterCustomer(meter);
     const customer =
-      [meter.customer.firstName, meter.customer.lastName].filter(Boolean).join(" ").trim() ||
-      meter.customer.phone;
+      (customerRecord
+        ? [customerRecord.firstName, customerRecord.lastName].filter(Boolean).join(" ").trim() ||
+          customerRecord.phone
+        : "") || t("meters.unassigned");
 
     return {
       id: meter.id,

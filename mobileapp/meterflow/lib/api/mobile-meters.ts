@@ -56,3 +56,18 @@ export async function listClientMeters(accessToken: string) {
 export async function getClientMeterDetail(meterId: string) {
   return fetchMobileJson<{ meter: MobileMeter }>({ path: `/api/v1/mobile/meters/${meterId}` });
 }
+
+export async function linkClientMeter(identifier: string) {
+  return fetchMobileJson<{
+    message: 'meter_linked' | 'meter_already_linked';
+    meter: {
+      id: string;
+      serialNumber: string;
+      meterReference: string | null;
+    };
+  }>({
+    path: '/api/v1/mobile/meters/link',
+    method: 'POST',
+    body: { identifier },
+  });
+}

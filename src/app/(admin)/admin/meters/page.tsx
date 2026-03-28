@@ -13,6 +13,10 @@ import {
   hasAnyPermissionCode,
   requireAdminPermissions,
 } from "@/lib/auth/adminPermissions";
+import {
+  activeMeterAssignmentCustomerSelect,
+  getActiveMeterCustomer,
+} from "@/lib/meters/assignments";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { prisma } from "@/lib/prisma";
 
@@ -68,14 +72,20 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
       where,
       orderBy: { createdAt: "desc" },
       take: 100,
-      include: {
-        customer: { select: { firstName: true, lastName: true, phone: true } },
+      select: {
+        id: true,
+        serialNumber: true,
+        meterReference: true,
+        status: true,
+        city: true,
+        zone: true,
         assignedAgent: { select: { firstName: true, lastName: true } },
         states: {
           where: { deletedAt: null },
           orderBy: { effectiveAt: "desc" },
           take: 1,
         },
+        ...activeMeterAssignmentCustomerSelect,
       },
     }),
   ]);
@@ -150,9 +160,12 @@ export default async function MetersPage({ searchParams }: { searchParams: Searc
                 ) : (
                   meters.map((meter) => {
                     const lastState = meter.states[0];
+                    const customer = getActiveMeterCustomer(meter);
                     const customerName =
-                      [meter.customer.firstName, meter.customer.lastName].filter(Boolean).join(" ").trim() ||
-                      meter.customer.phone;
+                      (customer
+                        ? [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() ||
+                          customer.phone
+                        : "") || t("meters.unassigned");
                     const agentName =
                       [meter.assignedAgent?.firstName, meter.assignedAgent?.lastName]
                         .filter(Boolean)

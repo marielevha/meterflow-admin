@@ -1,9 +1,10 @@
 "use server";
 
-import { Prisma, MeterStatus, MeterType } from "@prisma/client";
+import { MeterAssignmentSource, Prisma, MeterStatus, MeterType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import { setMeterCustomerAssignment } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 
 function asString(value: FormDataEntryValue | null) {
@@ -27,7 +28,7 @@ function nullableDecimal(value: string) {
 }
 
 export async function createMeterAction(formData: FormData) {
-  await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersCreate);
+  const staff = await requireAdminPermissions("/admin/meters/create", ADMIN_PERMISSION_GROUPS.metersCreate);
 
   const serialNumber = asString(formData.get("serialNumber"));
   const meterReference = asString(formData.get("meterReference"));
@@ -44,7 +45,7 @@ export async function createMeterAction(formData: FormData) {
   const installedAt = asString(formData.get("installedAt"));
   const lastInspectionAt = asString(formData.get("lastInspectionAt"));
 
-  if (!serialNumber || !customerId) {
+  if (!serialNumber) {
     redirect("/admin/meters/create?error=required_fields");
   }
 
@@ -63,7 +64,6 @@ export async function createMeterAction(formData: FormData) {
         meterReference: nullable(meterReference),
         type: type as MeterType,
         status: status as MeterStatus,
-        customerId,
         assignedAgentId: nullable(assignedAgentId),
         addressLine1: nullable(addressLine1),
         addressLine2: nullable(addressLine2),
@@ -76,6 +76,16 @@ export async function createMeterAction(formData: FormData) {
       },
       select: { id: true },
     });
+
+    if (customerId) {
+      await setMeterCustomerAssignment({
+        meterId: meter.id,
+        customerId,
+        actorUserId: staff.id,
+        source: MeterAssignmentSource.ADMIN,
+        notes: "Initial assignment from admin meter creation.",
+      });
+    }
 
     revalidatePath("/admin/meters");
     redirect(`/admin/meters/${meter.id}?created=1`);

@@ -116,6 +116,7 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     where: { id: readingId, deletedAt: null },
     select: {
       id: true,
+      submittedById: true,
       status: true,
       primaryIndex: true,
       secondaryIndex: true,
@@ -127,7 +128,6 @@ export async function updateReadingAction(readingId: string, formData: FormData)
       rejectionReason: true,
       meter: {
         select: {
-          customerId: true,
           serialNumber: true,
         },
       },
@@ -348,7 +348,7 @@ export async function updateReadingAction(readingId: string, formData: FormData)
 
         if (clientTitle && clientMessage) {
           pushPayloadRef.current = {
-            userId: existing.meter.customerId,
+            userId: existing.submittedById,
             title: clientTitle,
             body: clientMessage,
             status: decisionStatus,
@@ -361,7 +361,7 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     const finalPushPayload = pushPayloadRef.current;
     if (finalPushPayload) {
       await sendPushNotificationToUser({
-        userId: existing.meter.customerId,
+        userId: existing.submittedById,
         title: finalPushPayload.title,
         body: finalPushPayload.body,
         data: {

@@ -22,6 +22,7 @@ import {
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
 import { getTaskDetail } from "@/lib/backoffice/tasks";
+import { getActiveMeterCustomer } from "@/lib/meters/assignments";
 import {
   addTaskAttachmentAction,
   addTaskCommentAction,
@@ -233,6 +234,7 @@ export default async function TaskDetailPage({
 
   const task = detail.body.task;
   if (!task) notFound();
+  const activeCustomer = task.meter ? getActiveMeterCustomer(task.meter) : null;
 
   const addComment = addTaskCommentAction.bind(null, task.id);
   const addAttachment = addTaskAttachmentAction.bind(null, task.id);
@@ -566,7 +568,7 @@ export default async function TaskDetailPage({
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("tasks.context")}</h3>
             <div className="mt-4 grid grid-cols-1 gap-3">
-              <Info label={t("common.customer")} value={personLabel(task.meter?.customer) || t("common.notAvailable")} />
+              <Info label={t("common.customer")} value={personLabel(activeCustomer) || t("common.notAvailable")} />
               <Info label={t("tasks.meterSerial")} value={task.meter?.serialNumber || t("common.notAvailable")} />
               <Info label={t("tasks.meterReference")} value={task.meter?.meterReference || t("common.notAvailable")} />
               <Info label={t("tasks.meterTypeLabel")} value={task.meter?.type ? translateMeterType(task.meter.type, t) : t("common.notAvailable")} />

@@ -160,7 +160,7 @@ export default async function CreateMeterPage({
                 name="customerId"
                 options={customerOptions}
                 placeholder={t("meters.searchCustomerPlaceholder")}
-                required
+                emptyLabel={t("meters.unassigned")}
               />
             </div>
 

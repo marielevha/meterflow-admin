@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentMobileClient } from "@/lib/auth/mobileSession";
+import { activeAssignmentFilter } from "@/lib/meters/assignments";
 import {
   resolveClientReadingSubmissionWindows,
   serializeClientReadingSubmissionWindow,
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
 
   const meters = await prisma.meter.findMany({
     where: {
-      customerId: auth.user.id,
+      ...activeAssignmentFilter(auth.user.id),
       deletedAt: null,
     },
     select: {

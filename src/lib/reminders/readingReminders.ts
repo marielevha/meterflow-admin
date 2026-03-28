@@ -456,10 +456,14 @@ export async function executeReadingRemindersJob(
       role: UserRole.CLIENT,
       status: UserStatus.ACTIVE,
       deletedAt: null,
-      customerMeters: {
+      meterAssignments: {
         some: {
           deletedAt: null,
-          status: MeterStatus.ACTIVE,
+          endedAt: null,
+          meter: {
+            deletedAt: null,
+            status: MeterStatus.ACTIVE,
+          },
         },
       },
     },
@@ -469,28 +473,36 @@ export async function executeReadingRemindersJob(
       email: true,
       firstName: true,
       lastName: true,
-      customerMeters: {
+      meterAssignments: {
         where: {
           deletedAt: null,
-          status: MeterStatus.ACTIVE,
+          endedAt: null,
+          meter: {
+            deletedAt: null,
+            status: MeterStatus.ACTIVE,
+          },
         },
         select: {
-          id: true,
-          readings: {
-            where: {
-              deletedAt: null,
-              readingAt: {
-                gte: windowStart,
-                lte: windowEnd,
-              },
-              status: {
-                not: ReadingStatus.DRAFT,
-              },
-            },
+          meter: {
             select: {
               id: true,
+              readings: {
+                where: {
+                  deletedAt: null,
+                  readingAt: {
+                    gte: windowStart,
+                    lte: windowEnd,
+                  },
+                  status: {
+                    not: ReadingStatus.DRAFT,
+                  },
+                },
+                select: {
+                  id: true,
+                },
+                take: 1,
+              },
             },
-            take: 1,
           },
         },
       },
@@ -499,8 +511,10 @@ export async function executeReadingRemindersJob(
 
   const eligibleClients: EligibleClient[] = clients
     .map((client) => {
-      const totalMeters = client.customerMeters.length;
-      const pendingMeters = client.customerMeters.filter((meter) => meter.readings.length === 0).length;
+      const totalMeters = client.meterAssignments.length;
+      const pendingMeters = client.meterAssignments.filter(
+        (assignment) => assignment.meter.readings.length === 0
+      ).length;
       return {
         id: client.id,
         phone: client.phone,

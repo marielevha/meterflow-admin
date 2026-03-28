@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { activeAssignmentFilter } from "@/lib/meters/assignments";
 
 function decimalToNumber(value: { toString(): string } | number | string | null) {
   if (value === null || value === undefined) return null;
@@ -35,7 +36,7 @@ export async function listClientConsumption(
 ) {
   const meters = await prisma.meter.findMany({
     where: {
-      customerId: userId,
+      ...activeAssignmentFilter(userId),
       deletedAt: null,
     },
     select: {
@@ -169,7 +170,7 @@ export async function getClientConsumptionDetail(
   const meter = await prisma.meter.findFirst({
     where: {
       id: meterId,
-      customerId: userId,
+      ...activeAssignmentFilter(userId),
       deletedAt: null,
     },
     select: {

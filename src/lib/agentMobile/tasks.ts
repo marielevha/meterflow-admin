@@ -14,6 +14,11 @@ import {
 
 import { createAgentTaskEvent } from '@/lib/agentMobile/notifications';
 import { getTaskDetail } from '@/lib/backoffice/tasks';
+import {
+  activeMeterAssignmentCustomerSelect,
+  getActiveMeterCustomer,
+  type MeterWithActiveAssignment,
+} from '@/lib/meters/assignments';
 import { prisma } from '@/lib/prisma';
 import { isTaskTransitionAllowed } from '@/lib/workflows/stateMachines';
 
@@ -54,12 +59,7 @@ type ListedAgentTask = {
     addressLine2: string | null;
     city: string | null;
     zone: string | null;
-    customer: {
-      id: string;
-      firstName: string | null;
-      lastName: string | null;
-      phone: string | null;
-    };
+    assignments?: MeterWithActiveAssignment['assignments'];
   } | null;
   reading: {
     id: string;
@@ -265,8 +265,9 @@ function eventTypeForStatus(status: TaskStatus) {
 }
 
 function mapTask(task: ListedAgentTask) {
-  const customerName = task.meter?.customer
-    ? formatPerson(task.meter.customer.firstName, task.meter.customer.lastName, undefined, task.meter.customer.phone)
+  const customer = task.meter ? getActiveMeterCustomer(task.meter) : null;
+  const customerName = customer
+    ? formatPerson(customer.firstName, customer.lastName, undefined, customer.phone)
     : '--';
   const now = new Date();
   const dueAt = task.dueAt ?? null;
@@ -295,9 +296,9 @@ function mapTask(task: ListedAgentTask) {
     isOverdue,
     hasFieldReport: Boolean(task.fieldSubmittedAt),
     customer: {
-      id: task.meter?.customer?.id ?? null,
+      id: customer?.id ?? null,
       name: customerName,
-      phone: task.meter?.customer?.phone ?? null,
+      phone: customer?.phone ?? null,
     },
     meter: {
       id: task.meter?.id ?? null,
@@ -341,7 +342,6 @@ async function getAccessibleAgentTask(staff: AgentStaff, taskId: string) {
           id: true,
           type: true,
           serialNumber: true,
-          customerId: true,
         },
       },
     },
@@ -525,14 +525,7 @@ export async function listAgentMobileTasks(
             addressLine2: true,
             city: true,
             zone: true,
-            customer: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-              },
-            },
+            ...activeMeterAssignmentCustomerSelect,
           },
         },
         reading: {
@@ -579,8 +572,9 @@ export async function getAgentMobileTaskDetail(staff: AgentStaff, taskId: string
   if (!task) {
     return { status: 404, body: { error: 'task_not_found' } };
   }
-  const customerName = task.meter?.customer
-    ? formatPerson(task.meter.customer.firstName, task.meter.customer.lastName, undefined, task.meter.customer.phone)
+  const customer = task.meter ? getActiveMeterCustomer(task.meter) : null;
+  const customerName = customer
+    ? formatPerson(customer.firstName, customer.lastName, undefined, customer.phone)
     : '--';
   const assignedAgentName = task.assignedTo
     ? formatPerson(task.assignedTo.firstName, task.assignedTo.lastName, task.assignedTo.username, task.assignedTo.phone)
@@ -614,9 +608,9 @@ export async function getAgentMobileTaskDetail(staff: AgentStaff, taskId: string
         createdAt: task.createdAt,
         updatedAt: task.updatedAt,
         client: {
-          id: task.meter?.customer?.id ?? null,
+          id: customer?.id ?? null,
           name: customerName,
-          phone: task.meter?.customer?.phone ?? null,
+          phone: customer?.phone ?? null,
         },
         meter: {
           id: task.meter?.id ?? null,

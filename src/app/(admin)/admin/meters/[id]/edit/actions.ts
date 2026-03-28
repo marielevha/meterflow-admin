@@ -27,13 +27,15 @@ function nullableDecimal(value: string) {
 }
 
 export async function updateMeterAction(meterId: string, formData: FormData) {
-  await requireAdminPermissions(`/admin/meters/${meterId}/edit`, ADMIN_PERMISSION_GROUPS.metersEdit);
+  await requireAdminPermissions(
+    `/admin/meters/${meterId}/edit`,
+    ADMIN_PERMISSION_GROUPS.metersEdit
+  );
 
   const serialNumber = asString(formData.get("serialNumber"));
   const meterReference = asString(formData.get("meterReference"));
   const type = asString(formData.get("type"));
   const status = asString(formData.get("status"));
-  const customerId = asString(formData.get("customerId"));
   const assignedAgentId = asString(formData.get("assignedAgentId"));
   const addressLine1 = asString(formData.get("addressLine1"));
   const addressLine2 = asString(formData.get("addressLine2"));
@@ -44,7 +46,7 @@ export async function updateMeterAction(meterId: string, formData: FormData) {
   const installedAt = asString(formData.get("installedAt"));
   const lastInspectionAt = asString(formData.get("lastInspectionAt"));
 
-  if (!serialNumber || !customerId) {
+  if (!serialNumber) {
     redirect(`/admin/meters/${meterId}/edit?error=required_fields`);
   }
 
@@ -64,7 +66,6 @@ export async function updateMeterAction(meterId: string, formData: FormData) {
         meterReference: nullable(meterReference),
         type: type as MeterType,
         status: status as MeterStatus,
-        customerId,
         assignedAgentId: nullable(assignedAgentId),
         addressLine1: nullable(addressLine1),
         addressLine2: nullable(addressLine2),

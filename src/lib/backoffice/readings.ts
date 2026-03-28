@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 import { createAgentTaskEvent } from "@/lib/agentMobile/notifications";
 import { prisma } from "@/lib/prisma";
+import { activeMeterAssignmentCustomerSelect } from "@/lib/meters/assignments";
 import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
 import {
   getClientReadingDecisionMessage,
@@ -72,7 +73,6 @@ async function getOwnedReadingForReview(readingId: string) {
         select: {
           id: true,
           type: true,
-          customerId: true,
           serialNumber: true,
         },
       },
@@ -161,15 +161,7 @@ export async function listPendingReadings() {
           type: true,
           city: true,
           zone: true,
-          customer: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              username: true,
-            },
-          },
+          ...activeMeterAssignmentCustomerSelect,
         },
       },
       submittedBy: {
@@ -266,7 +258,7 @@ export async function validateReading(staff: StaffUser, readingId: string) {
   });
 
   await notifyReadingDecision({
-    userId: reading.meter.customerId,
+    userId: reading.submittedById,
     readingId: reading.id,
     status: ReadingStatus.VALIDATED,
     reason: null,
@@ -329,7 +321,7 @@ export async function flagReading(staff: StaffUser, readingId: string, payload: 
   });
 
   await notifyReadingDecision({
-    userId: reading.meter.customerId,
+    userId: reading.submittedById,
     readingId: reading.id,
     status: ReadingStatus.FLAGGED,
     reason,
@@ -396,7 +388,7 @@ export async function rejectReading(
   });
 
   await notifyReadingDecision({
-    userId: reading.meter.customerId,
+    userId: reading.submittedById,
     readingId: reading.id,
     status: ReadingStatus.REJECTED,
     reason,

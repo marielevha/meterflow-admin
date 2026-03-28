@@ -12,6 +12,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { activeMeterAssignmentCustomerSelect, getActiveMeterAssignment } from "@/lib/meters/assignments";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 
 type StaffUser = {
@@ -225,9 +226,26 @@ async function resolveCity(inputCityId?: string | null) {
   return city ?? null;
 }
 
-async function resolveZones(inputZoneIds?: string[]) {
+async function resolveZones(inputZoneIds?: string[]): Promise<
+  Array<{
+    id: string;
+    code: string;
+    name: string;
+    cityId: string;
+    city: {
+      id: string;
+      code: string;
+      name: string;
+      region: string | null;
+    };
+  }>
+> {
   const zoneIds = Array.from(
-    new Set((inputZoneIds || []).map((zoneId) => toTrimmed(zoneId)).filter(Boolean))
+    new Set(
+      (inputZoneIds || [])
+        .map((zoneId) => toTrimmed(zoneId))
+        .filter((zoneId): zoneId is string => Boolean(zoneId))
+    )
   );
   if (zoneIds.length === 0) return [];
 
@@ -1107,11 +1125,11 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
     },
     select: {
       id: true,
-      customerId: true,
       serialNumber: true,
       status: true,
       type: true,
       zoneId: true,
+      ...activeMeterAssignmentCustomerSelect,
     },
   });
 
@@ -1119,6 +1137,12 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
   let skippedCount = 0;
 
   for (const meter of meters) {
+    const activeAssignment = getActiveMeterAssignment(meter);
+    if (!activeAssignment) {
+      skippedCount += 1;
+      continue;
+    }
+
     const reading = await prisma.reading.findFirst({
       where: {
         meterId: meter.id,
@@ -1305,7 +1329,7 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           invoiceNumber,
           campaignId: campaign.id,
           tariffPlanId: campaign.tariffPlanId,
-          customerId: meter.customerId,
+          customerId: activeAssignment.customerId,
           meterId: meter.id,
           sourceReadingId: reading?.id ?? null,
           fromReadingId,

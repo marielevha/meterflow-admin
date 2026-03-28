@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
@@ -12,7 +12,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useSafePush } from '@/hooks/use-safe-push';
 import { isMobileAuthError, toMobileErrorMessage } from '@/lib/api/mobile-client';
-import { listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
+import { linkClientMeter, listClientMeters, type MobileMeter } from '@/lib/api/mobile-meters';
 import { useMobileSession } from '@/providers/mobile-session-provider';
 
 export default function MetersScreen() {
@@ -25,6 +25,9 @@ export default function MetersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [meterIdentifier, setMeterIdentifier] = useState('');
+  const [linkingMeter, setLinkingMeter] = useState(false);
   const hasMetersData = meters.length > 0;
 
   const loadMeters = useCallback(async (
@@ -69,6 +72,39 @@ export default function MetersScreen() {
         }
       }
     }, [logout, session?.accessToken, t]);
+
+  const handleLinkMeter = useCallback(async () => {
+    const identifier = meterIdentifier.trim();
+    if (!identifier) {
+      Alert.alert(t('meters.linkValidationTitle'), t('meters.linkValidationBody'));
+      return;
+    }
+
+    setLinkingMeter(true);
+
+    try {
+      const result = await linkClientMeter(identifier);
+      setShowLinkModal(false);
+      setMeterIdentifier('');
+      await loadMeters({ current: true }, { mode: hasMetersData ? 'refresh' : 'initial' });
+
+      Alert.alert(
+        t('meters.linkSuccessTitle'),
+        result.message === 'meter_already_linked'
+          ? t('meters.linkAlreadyLinkedBody', { serial: result.meter.serialNumber })
+          : t('meters.linkSuccessBody', { serial: result.meter.serialNumber })
+      );
+    } catch (linkError) {
+      const message = toMobileErrorMessage(linkError, t('meters.linkErrorFallback'));
+      Alert.alert(t('meters.linkErrorTitle'), message);
+
+      if (isMobileAuthError(linkError)) {
+        await logout();
+      }
+    } finally {
+      setLinkingMeter(false);
+    }
+  }, [hasMetersData, loadMeters, logout, meterIdentifier, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -117,9 +153,26 @@ export default function MetersScreen() {
             icon="flash-outline"
             title={t('meters.emptyTitle')}
             description={t('meters.emptyDescription')}
+            actionLabel={t('meters.linkAction')}
+            onActionPress={() => setShowLinkModal(true)}
           />
         ) : (
           <View style={styles.stack}>
+            <Pressable
+              onPress={() => setShowLinkModal(true)}
+              style={[styles.linkCard, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
+              <View style={[styles.linkIconWrap, { backgroundColor: palette.accentSoft }]}>
+                <Ionicons name="add" size={20} color={palette.accent} />
+              </View>
+              <View style={styles.linkTextBlock}>
+                <Text style={[styles.linkTitle, { color: palette.headline }]}>{t('meters.linkAction')}</Text>
+                <Text style={[styles.linkDescription, { color: palette.muted }]}>
+                  {t('meters.linkDescription')}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.icon} />
+            </Pressable>
+
             {meters.map((meter) => {
               const latestState = meter.states[0];
 
@@ -165,6 +218,96 @@ export default function MetersScreen() {
             })}
           </View>
         )}
+
+        <Modal
+          visible={showLinkModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!linkingMeter) {
+              setShowLinkModal(false);
+            }
+          }}>
+          <View style={styles.filterModalBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                if (!linkingMeter) {
+                  setShowLinkModal(false);
+                }
+              }}
+            />
+            <View
+              style={[
+                styles.filterModalCard,
+                { backgroundColor: palette.surface, borderColor: palette.border },
+              ]}>
+              <View style={styles.filterModalHeader}>
+                <Text style={[styles.filterModalTitle, { color: palette.headline }]}>
+                  {t('meters.linkModalTitle')}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    if (!linkingMeter) {
+                      setShowLinkModal(false);
+                    }
+                  }}
+                  style={[styles.filterModalClose, { backgroundColor: palette.surfaceMuted }]}>
+                  <Ionicons name="close" size={18} color={palette.icon} />
+                </Pressable>
+              </View>
+
+              <Text style={[styles.modalHelp, { color: palette.muted }]}>
+                {t('meters.linkModalDescription')}
+              </Text>
+
+              <TextInput
+                value={meterIdentifier}
+                onChangeText={setMeterIdentifier}
+                placeholder={t('meters.linkInputPlaceholder')}
+                placeholderTextColor={palette.muted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!linkingMeter}
+                style={[
+                  styles.linkInput,
+                  {
+                    backgroundColor: palette.background,
+                    borderColor: palette.border,
+                    color: palette.headline,
+                  },
+                ]}
+              />
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => {
+                    if (!linkingMeter) {
+                      setShowLinkModal(false);
+                    }
+                  }}
+                  style={[styles.modalSecondaryButton, { borderColor: palette.border }]}>
+                  <Text style={[styles.modalSecondaryLabel, { color: palette.headline }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void handleLinkMeter()}
+                  disabled={linkingMeter}
+                  style={[
+                    styles.modalPrimaryButton,
+                    {
+                      backgroundColor: linkingMeter ? palette.surfaceMuted : palette.primary,
+                    },
+                  ]}>
+                  <Text style={styles.modalPrimaryLabel}>
+                    {linkingMeter ? t('meters.linkSubmitting') : t('meters.linkSubmit')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </AppPage>
     </RequireMobileAuth>
   );
@@ -188,6 +331,33 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   card: { borderWidth: 1, borderRadius: 24, padding: 18 },
+  linkCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  linkIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkTextBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  linkTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  linkDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowRight: { alignItems: 'flex-end', gap: 4 },
   iconWrap: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -210,5 +380,73 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  filterModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(14, 20, 37, 0.42)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  filterModalCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 18,
+    gap: 16,
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  filterModalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHelp: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  linkInput: {
+    borderWidth: 1,
+    borderRadius: 16,
+    minHeight: 50,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 46,
+    borderWidth: 1,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

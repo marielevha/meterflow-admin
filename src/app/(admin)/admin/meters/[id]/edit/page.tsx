@@ -9,6 +9,7 @@ import SearchableSelect from "@/components/form/SearchableSelect";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import { translateMeterStatus, translateMeterType } from "@/lib/admin-i18n/labels";
 import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
+import { getActiveMeterAssignment, activeMeterAssignmentCustomerSelect } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 import { updateMeterAction } from "./actions";
 
@@ -45,21 +46,25 @@ export default async function EditMeterPage({
     ? resolvedSearchParams.error[0]
     : resolvedSearchParams.error || "";
 
-  const [meter, customers, agents] = await prisma.$transaction([
+  const [meter, agents] = await prisma.$transaction([
     prisma.meter.findFirst({
       where: { id, deletedAt: null },
-    }),
-    prisma.user.findMany({
-      where: {
-        deletedAt: null,
-        role: UserRole.CLIENT,
-      },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       select: {
         id: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
+        serialNumber: true,
+        meterReference: true,
+        assignedAgentId: true,
+        type: true,
+        status: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        zone: true,
+        latitude: true,
+        longitude: true,
+        installedAt: true,
+        lastInspectionAt: true,
+        ...activeMeterAssignmentCustomerSelect,
       },
     }),
     prisma.user.findMany({
@@ -85,14 +90,16 @@ export default async function EditMeterPage({
 
   const submit = updateMeterAction.bind(null, meter.id);
   const errorMessage = messageFromError(errorCode, t);
-  const customerOptions = customers.map((customer) => {
-    const name = [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim();
-    return {
-      value: customer.id,
-      label: name || "Client",
-      hint: customer.phone,
-    };
-  });
+  const activeAssignment = getActiveMeterAssignment(meter);
+  const activeCustomerName =
+    (activeAssignment
+      ? [activeAssignment.customer.firstName, activeAssignment.customer.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        activeAssignment.customer.username ||
+        activeAssignment.customer.phone
+      : "") || t("meters.unassigned");
   const agentOptions = agents.map((agent) => {
     const name = [agent.firstName, agent.lastName].filter(Boolean).join(" ").trim();
     return {
@@ -165,16 +172,13 @@ export default async function EditMeterPage({
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="customerId">{t("common.customer")}</Label>
-              <SearchableSelect
-                id="customerId"
-                name="customerId"
-                defaultValue={meter.customerId}
-                options={customerOptions}
-                placeholder={t("meters.searchCustomerPlaceholder")}
-                noResultsLabel={t("common.noResults")}
-                required
-              />
+              <Label>{t("common.customer")}</Label>
+              <div className="rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-800 shadow-theme-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                {activeCustomerName}
+              </div>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {t("meters.transferManageFromDetails")}
+              </p>
             </div>
 
             <div>
