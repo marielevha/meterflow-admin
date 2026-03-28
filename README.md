@@ -12,6 +12,28 @@ TailAdmin utilizes the powerful features of **Next.js 16** and common features o
 
 Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de gestion des releves de compteurs electriques).
 
+### Lot recent - recherche globale admin
+
+- Recherche globale implementee dans la topbar du backoffice.
+- Palette de resultats connectee au raccourci `Cmd/Ctrl + K`.
+- Recherche permission-aware sur les ressources admin principales:
+  - `Users`
+  - `Meters`
+  - `Readings`
+  - `Tasks`
+  - `Invoices`
+- Recherche enrichie pour couvrir:
+  - nom et prenom des users
+  - `username`, `email`, `telephone`
+  - code compteur / reference compteur
+  - numero de facture
+  - titres et elements clefs des missions
+- Resultats groupes par ressource avec navigation directe vers la fiche detail.
+- Correctif backend sur la recherche globale:
+  - suppression du `startsWith` invalide sur les UUID Prisma
+  - fallback sur match exact uniquement quand la requete ressemble a un UUID
+  - suppression du `internal_error` observe lors d'une recherche comme `freddy`
+
 ### 1) Base de donnees et Prisma
 
 - Schema Prisma complet pour les entites metier:
