@@ -9,20 +9,51 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { resetOnboardingCompleted } from '@/lib/storage/onboarding';
+import { useAgentSession } from '@/providers/agent-session-provider';
 import { useMobileNotifications } from '@/providers/mobile-notifications-provider';
 import { useMobilePreferences } from '@/providers/mobile-preferences-provider';
+import { useMobilePushDiagnostics } from '@/providers/mobile-push-provider';
 
 export default function SettingsScreen() {
   const scheme = useColorScheme() ?? 'light';
   const palette = Colors[scheme];
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const { logout } = useAgentSession();
   const { preferences, updatePreferences } = useMobilePreferences();
   const { refreshUnreadCount } = useMobileNotifications();
+  const { diagnostics, isCheckingPush, refreshPushDiagnostics } = useMobilePushDiagnostics();
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
   async function handleReplayOnboarding() {
     await resetOnboardingCompleted();
     router.replace('/onboarding');
+  }
+
+  function formatPushPermission(status: string) {
+    switch (status) {
+      case 'granted':
+        return t('settings.pushPermissionGranted');
+      case 'denied':
+        return t('settings.pushPermissionDenied');
+      case 'undetermined':
+        return t('settings.pushPermissionUndetermined');
+      default:
+        return t('settings.pushUnknown');
+    }
+  }
+
+  function formatPushCheckTime(value: string | null) {
+    if (!value) return t('settings.pushUnknown');
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return t('settings.pushUnknown');
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
   }
 
   return (
@@ -61,6 +92,73 @@ export default function SettingsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.pushDiagnosticsTitle')}</Text>
+          <Text style={[styles.cardText, { color: palette.muted }]}>{t('settings.pushDiagnosticsText')}</Text>
+          <DiagnosticRow
+            label={t('settings.pushPermission')}
+            value={formatPushPermission(diagnostics.permissionStatus)}
+            palette={palette}
+          />
+          <DiagnosticRow
+            label={t('settings.pushPlatform')}
+            value={diagnostics.platform.toUpperCase()}
+            palette={palette}
+          />
+          <DiagnosticRow
+            label={t('settings.pushAppVersion')}
+            value={diagnostics.appVersion ?? t('settings.pushUnknown')}
+            palette={palette}
+          />
+          <DiagnosticRow
+            label={t('settings.pushDeviceToken')}
+            value={diagnostics.tokenPreview ?? t('settings.pushTokenMissing')}
+            palette={palette}
+          />
+          <DiagnosticRow
+            label={t('settings.pushBackendRegistration')}
+            value={diagnostics.backendRegistered ? t('common.yes') : t('common.no')}
+            palette={palette}
+          />
+          <DiagnosticRow
+            label={t('settings.pushLastCheck')}
+            value={formatPushCheckTime(diagnostics.lastCheckedAt)}
+            palette={palette}
+            last={!diagnostics.lastError}
+          />
+          {diagnostics.lastError ? (
+            <DiagnosticRow
+              label={t('settings.pushLastError')}
+              value={diagnostics.lastError}
+              palette={palette}
+              tone="danger"
+              last
+            />
+          ) : null}
+
+          <Pressable
+            disabled={isCheckingPush}
+            onPress={() => void refreshPushDiagnostics({ forceRegister: true })}
+            style={[
+              styles.actionButton,
+              styles.cardButtonSpacing,
+              {
+                backgroundColor: isCheckingPush ? palette.surfaceMuted : `${palette.accent}14`,
+                borderColor: isCheckingPush ? palette.border : `${palette.accent}33`,
+              },
+            ]}>
+            <Text
+              style={[
+                styles.actionButtonLabel,
+                {
+                  color: isCheckingPush ? palette.muted : palette.accent,
+                },
+              ]}>
+              {isCheckingPush ? t('settings.pushTesting') : t('settings.pushTestRegistration')}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <Text style={[styles.cardTitle, { color: palette.headline }]}>{t('settings.actionsTitle')}</Text>
 
           <Pressable onPress={() => void handleReplayOnboarding()} style={[styles.actionButton, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
@@ -71,6 +169,10 @@ export default function SettingsScreen() {
             <Text style={[styles.actionButtonLabel, { color: palette.headline }]}>{t('settings.refreshNotifications')}</Text>
           </Pressable>
 
+          <Pressable onPress={() => void logout()} style={[styles.actionButton, { backgroundColor: palette.surfaceMuted, borderColor: palette.border }]}>
+            <Text style={[styles.actionButtonLabel, { color: palette.headline }]}>{t('common.logout')}</Text>
+          </Pressable>
+
           <View style={[styles.versionPill, { backgroundColor: palette.background, borderColor: palette.border }]}>
             <Text style={[styles.versionLabel, { color: palette.muted }]}>{t('common.version')}</Text>
             <Text style={[styles.versionValue, { color: palette.headline }]}>{version}</Text>
@@ -79,6 +181,35 @@ export default function SettingsScreen() {
         </View>
       </AppPage>
     </RequireAgentAuth>
+  );
+}
+
+function DiagnosticRow({
+  label,
+  value,
+  palette,
+  tone = 'default',
+  last = false,
+}: {
+  label: string;
+  value: string;
+  palette: (typeof Colors)['light'];
+  tone?: 'default' | 'danger';
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.infoRow, !last && { borderBottomColor: palette.border, borderBottomWidth: 1 }]}>
+      <Text style={[styles.infoLabel, { color: palette.muted }]}>{label}</Text>
+      <Text
+        style={[
+          styles.infoValue,
+          {
+            color: tone === 'danger' ? palette.danger : palette.headline,
+          },
+        ]}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -197,6 +328,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  cardButtonSpacing: {
+    marginTop: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  infoLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  infoValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'right',
+    lineHeight: 18,
   },
   versionPill: {
     borderWidth: 1,

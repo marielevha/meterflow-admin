@@ -168,6 +168,10 @@ function mapAgentApiError(code?: string, status?: number) {
       return 'L index saisi est inferieur au dernier releve connu.';
     case 'secondary_index_not_monotonic':
       return 'L index HC est inferieur au dernier releve connu.';
+    case 'expo_push_token_required':
+      return 'Le token push appareil est requis.';
+    case 'invalid_expo_push_token':
+      return 'Le token push genere est invalide.';
     case 'invalid_status_transition':
       return 'Cette action n est pas autorisee pour l etat actuel de la mission.';
     case 'invalid_request':

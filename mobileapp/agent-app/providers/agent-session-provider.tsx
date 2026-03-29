@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { loginWithBackend, type AgentLoginResponse } from '@/lib/auth/agent-auth-api';
+import { unregisterStoredAgentPushToken } from '@/lib/api/agent-push';
 import {
   clearCurrentAgentSession,
   hydrateAgentSessionStore,
@@ -63,6 +64,11 @@ export function AgentSessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      await unregisterStoredAgentPushToken();
+    } catch {
+      // best effort cleanup
+    }
     await clearCurrentAgentSession();
   }, []);
 

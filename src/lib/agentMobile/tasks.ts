@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { createAgentTaskEvent } from '@/lib/agentMobile/notifications';
+import { sendPushNotificationForAgentTaskEvent } from '@/lib/agentMobile/notifications';
 import { getTaskDetail } from '@/lib/backoffice/tasks';
 import {
   activeMeterAssignmentCustomerSelect,
@@ -754,7 +755,7 @@ export async function startAgentMobileTask(staff: AgentStaff, taskId: string) {
       });
     }
 
-    await createAgentTaskEvent(tx, {
+    const agentEvent = await createAgentTaskEvent(tx, {
       taskId: task.id,
       type: TaskEventType.STARTED,
       actorUserId: staff.id,
@@ -766,10 +767,17 @@ export async function startAgentMobileTask(staff: AgentStaff, taskId: string) {
       },
     });
 
-    return startedTask;
+    return {
+      task: startedTask,
+      pushEventId: agentEvent?.id ?? null,
+    };
   });
 
-  return { status: 200, body: { message: 'task_started', task: updated } };
+  if (updated.pushEventId) {
+    await sendPushNotificationForAgentTaskEvent(updated.pushEventId);
+  }
+
+  return { status: 200, body: { message: 'task_started', task: updated.task } };
 }
 
 export async function submitAgentMobileTaskResult(staff: AgentStaff, taskId: string, payload: SubmitAgentTaskResultPayload) {
@@ -919,7 +927,7 @@ export async function submitAgentMobileTaskResult(staff: AgentStaff, taskId: str
       });
     }
 
-    await createAgentTaskEvent(tx, {
+    const agentEvent = await createAgentTaskEvent(tx, {
       taskId: task.id,
       type: TaskEventType.FIELD_RESULT_SUBMITTED,
       actorUserId: staff.id,
@@ -933,11 +941,15 @@ export async function submitAgentMobileTaskResult(staff: AgentStaff, taskId: str
       },
     });
 
-    return { updatedTask };
+    return { updatedTask, pushEventId: agentEvent?.id ?? null };
   });
 
   if ('error' in result) {
     return { status: 409, body: { error: result.error } };
+  }
+
+  if (result.pushEventId) {
+    await sendPushNotificationForAgentTaskEvent(result.pushEventId);
   }
 
   return {
@@ -1063,7 +1075,7 @@ export async function quickTransitionAgentMobileTask(
       });
     }
 
-    await createAgentTaskEvent(tx, {
+    const agentEvent = await createAgentTaskEvent(tx, {
       taskId: task.id,
       type: eventTypeForStatus(nextStatus),
       actorUserId: staff.id,
@@ -1076,14 +1088,21 @@ export async function quickTransitionAgentMobileTask(
       },
     });
 
-    return nextTask;
+    return {
+      task: nextTask,
+      pushEventId: agentEvent?.id ?? null,
+    };
   });
+
+  if (updated.pushEventId) {
+    await sendPushNotificationForAgentTaskEvent(updated.pushEventId);
+  }
 
   return {
     status: 200,
     body: {
       message: 'task_transition_applied',
-      task: updated,
+      task: updated.task,
     },
   };
 }

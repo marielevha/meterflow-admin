@@ -1,6 +1,7 @@
 import { Prisma, TaskEventType } from "@prisma/client";
 
 import { activeMeterAssignmentCustomerSelect, getActiveMeterCustomer } from "@/lib/meters/assignments";
+import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
 import { prisma } from "@/lib/prisma";
 
 type NotificationListOptions = {
@@ -65,6 +66,103 @@ export async function createAgentTaskEvent(
       id: true,
     },
   });
+}
+
+function buildAgentTaskPushContent(input: {
+  type: TaskEventType;
+  taskTitle: string;
+  customerName: string;
+}) {
+  switch (input.type) {
+    case TaskEventType.ASSIGNED:
+      return {
+        title: "Nouvelle mission assignee",
+        body: `${input.taskTitle} · ${input.customerName}`,
+      };
+    case TaskEventType.STARTED:
+      return {
+        title: "Mission demarree",
+        body: `La mission ${input.taskTitle} est maintenant en cours.`,
+      };
+    case TaskEventType.BLOCKED:
+      return {
+        title: "Mission bloquee",
+        body: `La mission ${input.taskTitle} demande un suivi.`,
+      };
+    case TaskEventType.COMPLETED:
+      return {
+        title: "Mission terminee",
+        body: `La mission ${input.taskTitle} a ete marquee comme terminee.`,
+      };
+    case TaskEventType.FIELD_RESULT_SUBMITTED:
+      return {
+        title: "Rapport terrain envoye",
+        body: `Le resultat terrain de ${input.taskTitle} a bien ete enregistre.`,
+      };
+    default:
+      return {
+        title: "Notification agent",
+        body: input.taskTitle,
+      };
+  }
+}
+
+export async function sendPushNotificationForAgentTaskEvent(taskEventId: string) {
+  const event = await prisma.taskEvent.findFirst({
+    where: {
+      id: taskEventId,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      type: true,
+      actorUserId: true,
+      recipientUserId: true,
+      task: {
+        select: {
+          id: true,
+          title: true,
+          meter: {
+            select: {
+              ...activeMeterAssignmentCustomerSelect,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!event?.recipientUserId || !event.task) {
+    return { sent: false, reason: "task_event_not_found" } as const;
+  }
+
+  if (event.actorUserId && event.actorUserId === event.recipientUserId) {
+    return { sent: false, reason: "self_notification_skipped" } as const;
+  }
+
+  const customer = event.task.meter ? getActiveMeterCustomer(event.task.meter) : null;
+  const content = buildAgentTaskPushContent({
+    type: event.type,
+    taskTitle: event.task.title,
+    customerName: customer
+      ? personLabel(customer.firstName, customer.lastName, customer.username, customer.phone)
+      : "--",
+  });
+
+  const result = await sendPushNotificationToUser({
+    userId: event.recipientUserId,
+    title: content.title,
+    body: content.body,
+    data: {
+      taskId: event.task.id,
+      notificationId: event.id,
+      notificationType: event.type,
+    },
+  });
+
+  return result.sent
+    ? ({ sent: true, reason: null } as const)
+    : ({ sent: false, reason: result.reason ?? "push_not_sent" } as const);
 }
 
 export async function listAgentNotifications(

@@ -7,6 +7,7 @@ import { AgentSessionProvider } from '@/providers/agent-session-provider';
 import { MobileDrawerProvider } from '@/providers/mobile-drawer-provider';
 import { MobileNotificationsProvider } from '@/providers/mobile-notifications-provider';
 import { MobilePreferencesProvider } from '@/providers/mobile-preferences-provider';
+import { MobilePushProvider } from '@/providers/mobile-push-provider';
 import { AppThemeProvider, useAppTheme } from '@/providers/app-theme-provider';
 
 export default function RootLayout() {
@@ -15,9 +16,11 @@ export default function RootLayout() {
     <AppThemeProvider>
       <MobilePreferencesProvider>
         <AgentSessionProvider>
-          <MobileNotificationsProvider>
-            <RootNavigator />
-          </MobileNotificationsProvider>
+          <MobilePushProvider>
+            <MobileNotificationsProvider>
+              <RootNavigator />
+            </MobileNotificationsProvider>
+          </MobilePushProvider>
         </AgentSessionProvider>
       </MobilePreferencesProvider>
     </AppThemeProvider>

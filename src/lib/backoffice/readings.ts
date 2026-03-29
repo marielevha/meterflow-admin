@@ -9,7 +9,10 @@ import {
   UserRole,
   UserStatus,
 } from "@prisma/client";
-import { createAgentTaskEvent } from "@/lib/agentMobile/notifications";
+import {
+  createAgentTaskEvent,
+  sendPushNotificationForAgentTaskEvent,
+} from "@/lib/agentMobile/notifications";
 import { prisma } from "@/lib/prisma";
 import { activeMeterAssignmentCustomerSelect } from "@/lib/meters/assignments";
 import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
@@ -494,7 +497,7 @@ export async function createReadingTask(
       },
     });
 
-    await createAgentTaskEvent(tx, {
+    const agentEvent = await createAgentTaskEvent(tx, {
       taskId: task.id,
       type: TaskEventType.ASSIGNED,
       actorUserId: staff.id,
@@ -505,8 +508,15 @@ export async function createReadingTask(
       },
     });
 
-    return task;
+    return {
+      task,
+      pushEventId: agentEvent?.id ?? null,
+    };
   });
 
-  return { status: 201, body: { message: "task_created", task: created } };
+  if (created.pushEventId) {
+    await sendPushNotificationForAgentTaskEvent(created.pushEventId);
+  }
+
+  return { status: 201, body: { message: "task_created", task: created.task } };
 }

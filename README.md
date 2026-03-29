@@ -12,6 +12,42 @@ TailAdmin utilizes the powerful features of **Next.js 16** and common features o
 
 Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de gestion des releves de compteurs electriques).
 
+### Lot recent - runtime push agent
+
+- L'application `mobileapp/agent-app` dispose maintenant d'un vrai runtime push Expo/FCM:
+  - demande de permission notifications
+  - recuperation du token Expo
+  - enregistrement backend du device
+  - des-enregistrement au logout
+  - gestion du tap sur notification pour ouvrir la mission concernee
+- Nouveau provider global dans l'app agent:
+  - `mobileapp/agent-app/providers/mobile-push-provider.tsx`
+- Nouveaux utilitaires agent:
+  - `mobileapp/agent-app/lib/api/agent-push.ts`
+  - `mobileapp/agent-app/lib/storage/push-token.ts`
+- Nouveaux endpoints backend dedies a l'app agent:
+  - `POST /api/v1/agent-mobile/push/register`
+  - `POST /api/v1/agent-mobile/push/unregister`
+- L'ecran `Parametres` de l'app agent affiche maintenant une carte `Diagnostic push`:
+  - permission notifications
+  - plateforme
+  - version app
+  - token appareil
+  - etat d'enregistrement backend
+  - derniere erreur
+- Les notifications push OS agent sont maintenant declenchees a partir des `TaskEvent` existants:
+  - mission assignee
+  - mission demarree
+  - mission bloquee
+  - mission terminee
+  - rapport terrain envoye
+- Les auto-notifications inutiles sont evitees:
+  - un agent ne recoit pas un push OS pour une action qu'il vient lui-meme de declencher si `actorUserId === recipientUserId`
+- La configuration agent EAS/FCM a ete completee pour les builds distants:
+  - ajout de `mobileapp/agent-app/app.config.ts`
+  - support de la variable de fichier EAS `GOOGLE_SERVICES_JSON`
+  - compatible avec les profils `development`, `preview`, `production`
+
 ### Lot recent - configuration FCM mobile
 
 - Configuration Firebase Android branchee pour les deux applications mobiles:
@@ -32,7 +68,7 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
   - plugin `expo-notifications` ajoute dans `mobileapp/agent-app/app.json`
   - `expo-dev-client` installe pour rendre le profil `development` exploitable
 - Les fichiers `google-services.json` sont volontairement gardes hors Git et ignores via `.gitignore`.
-- La configuration/build FCM Android est maintenant en place, mais l'app agent ne contient pas encore de logique runtime d'enregistrement de token push.
+- La configuration/build FCM Android est maintenant en place pour les deux apps mobiles, avec runtime push agent branche dans le lot ci-dessus.
 
 ### Lot recent - recherche globale admin
 

@@ -10,6 +10,7 @@ import {
   UserStatus,
 } from "@prisma/client";
 import { createAgentTaskEvent } from "@/lib/agentMobile/notifications";
+import { sendPushNotificationForAgentTaskEvent } from "@/lib/agentMobile/notifications";
 import { activeMeterAssignmentCustomerSelect } from "@/lib/meters/assignments";
 import { prisma } from "@/lib/prisma";
 import { isTaskTransitionAllowed } from "@/lib/workflows/stateMachines";
@@ -483,7 +484,7 @@ export async function createTask(staff: StaffUser, payload: CreateTaskPayload) {
   );
 
   if (assignee?.id) {
-    await createAgentTaskEvent(prisma, {
+    const event = await createAgentTaskEvent(prisma, {
       taskId: created.id,
       type: TaskEventType.ASSIGNED,
       actorUserId: staff.id,
@@ -493,6 +494,9 @@ export async function createTask(staff: StaffUser, payload: CreateTaskPayload) {
         nextStatus: created.status,
       },
     });
+    if (event?.id) {
+      await sendPushNotificationForAgentTaskEvent(event.id);
+    }
   }
 
   return { status: 201, body: { message: "task_created", task: created } };
@@ -918,7 +922,7 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
   );
 
   if (updated.assignedToId && updated.assignedToId !== existing.assignedToId) {
-    await createAgentTaskEvent(prisma, {
+    const event = await createAgentTaskEvent(prisma, {
       taskId: updated.id,
       type: TaskEventType.ASSIGNED,
       actorUserId: staff.id,
@@ -929,6 +933,9 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
         nextStatus: updated.status,
       },
     });
+    if (event?.id) {
+      await sendPushNotificationForAgentTaskEvent(event.id);
+    }
   }
 
   if (payload.status && updated.assignedToId) {
@@ -942,7 +949,7 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
             : null;
 
     if (eventType) {
-      await createAgentTaskEvent(prisma, {
+      const event = await createAgentTaskEvent(prisma, {
         taskId: updated.id,
         type: eventType,
         actorUserId: staff.id,
@@ -953,6 +960,9 @@ export async function updateTask(staff: StaffUser, taskId: string, payload: Upda
           nextStatus: updated.status,
         },
       });
+      if (event?.id) {
+        await sendPushNotificationForAgentTaskEvent(event.id);
+      }
     }
   }
 
