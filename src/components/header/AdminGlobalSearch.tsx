@@ -1,11 +1,22 @@
 "use client";
 
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminI18n } from "@/hooks/use-admin-i18n";
+import { buildHighlightParts } from "@/lib/search/globalSearchUtils";
 
-type SearchResource = "users" | "meters" | "readings" | "tasks" | "invoices";
+type SearchResource =
+  | "users"
+  | "meters"
+  | "readings"
+  | "tasks"
+  | "invoices"
+  | "campaigns"
+  | "tariffs"
+  | "zones"
+  | "cities"
+  | "roles";
 
 type SearchItem = {
   id: string;
@@ -23,6 +34,7 @@ type SearchGroup = {
 
 type SearchResponse = {
   query: string;
+  topResults: SearchItem[];
   groups: SearchGroup[];
 };
 
@@ -40,9 +52,156 @@ function resourceLabel(resource: SearchResource, t: (key: string, values?: Recor
       return t("nav.tasks");
     case "invoices":
       return t("nav.invoices");
+    case "campaigns":
+      return t("billing.campaignsPageTitle");
+    case "tariffs":
+      return t("billing.tariffsPageTitle");
+    case "zones":
+      return t("billing.zonesPageTitle");
+    case "cities":
+      return t("billing.citiesPageTitle");
+    case "roles":
+      return t("rbac.rolesTitle");
     default:
       return resource;
   }
+}
+
+function resourceBadgeClasses(resource: SearchResource) {
+  switch (resource) {
+    case "users":
+      return "bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/30";
+    case "meters":
+      return "bg-success-50 text-success-700 ring-success-200 dark:bg-success-500/10 dark:text-success-200 dark:ring-success-500/30";
+    case "readings":
+      return "bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-500/10 dark:text-warning-100 dark:ring-warning-500/30";
+    case "tasks":
+      return "bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-200 dark:ring-indigo-500/30";
+    case "invoices":
+      return "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/30";
+    case "campaigns":
+      return "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30";
+    case "tariffs":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30";
+    case "zones":
+      return "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-200 dark:ring-cyan-500/30";
+    case "cities":
+      return "bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-200 dark:ring-violet-500/30";
+    case "roles":
+      return "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/30";
+    default:
+      return "bg-gray-100 text-gray-700 ring-gray-200 dark:bg-white/[0.06] dark:text-gray-200 dark:ring-white/10";
+  }
+}
+
+function HighlightedText({
+  value,
+  query,
+  className,
+}: {
+  value: string;
+  query: string;
+  className?: string;
+}) {
+  const parts = useMemo(() => buildHighlightParts(value, query), [value, query]);
+
+  return (
+    <span className={className}>
+      {parts.map((part, index) =>
+        part.match ? (
+          <mark
+            key={`${part.text}-${index}`}
+            className="rounded bg-brand-100 px-0.5 text-inherit dark:bg-brand-500/20"
+          >
+            {part.text}
+          </mark>
+        ) : (
+          <span key={`${part.text}-${index}`}>{part.text}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
+function ResultCard({
+  item,
+  query,
+  isActive,
+  badge,
+  openInNewTabLabel,
+  onHover,
+  onSelect,
+  onOpenInNewTab,
+}: {
+  item: SearchItem;
+  query: string;
+  isActive: boolean;
+  badge: ReactNode;
+  openInNewTabLabel: string;
+  onHover: () => void;
+  onSelect: () => void;
+  onOpenInNewTab: () => void;
+}) {
+  return (
+    <div
+      className={`group relative rounded-xl transition ${
+        isActive
+          ? "bg-brand-50 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:ring-brand-500/30"
+          : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"
+      }`}
+      onMouseEnter={onHover}
+    >
+      <button
+        type="button"
+        role="option"
+        aria-selected={isActive}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onSelect}
+        className="w-full rounded-xl px-3 py-3 text-left"
+      >
+        <div className="flex items-start justify-between gap-3 pr-10">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {badge}
+              <HighlightedText
+                value={item.title}
+                query={query}
+                className="truncate text-sm font-medium text-gray-800 dark:text-white/90"
+              />
+            </div>
+            <HighlightedText
+              value={item.subtitle}
+              query={query}
+              className="mt-1 block truncate text-xs text-gray-500 dark:text-gray-400"
+            />
+          </div>
+          {item.meta ? (
+            <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
+              {item.meta}
+            </span>
+          ) : null}
+        </div>
+      </button>
+
+      <button
+        type="button"
+        title={openInNewTabLabel}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onOpenInNewTab}
+        className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-gray-400 opacity-0 transition hover:border-gray-200 hover:bg-white hover:text-gray-700 group-hover:opacity-100 dark:hover:border-gray-700 dark:hover:bg-gray-900 dark:hover:text-white/90"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M9.33301 2.66699H13.333V6.66699M7.33301 8.66699L13.0663 2.93366M6.66634 3.33366H4.53301C3.78627 3.33366 3.41357 3.33366 3.12836 3.47899C2.87748 3.60682 2.6735 3.8108 2.54567 4.06168C2.40034 4.34689 2.40034 4.71959 2.40034 5.46633V11.4663C2.40034 12.2131 2.40034 12.5858 2.54567 12.871C2.6735 13.1218 2.87748 13.3258 3.12836 13.4537C3.41357 13.599 3.78627 13.599 4.53301 13.599H10.533C11.2797 13.599 11.6524 13.599 11.9377 13.4537C12.1885 13.3258 12.3925 13.1218 12.5203 12.871C12.6657 12.5858 12.6657 12.2131 12.6657 11.4663V9.33366"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  );
 }
 
 export default function AdminGlobalSearch() {
@@ -54,12 +213,27 @@ export default function AdminGlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [topResults, setTopResults] = useState<SearchItem[]>([]);
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
 
+  const dedupedGroupItems = useMemo(() => {
+    const highlightedIds = new Set(topResults.map((item) => `${item.resource}:${item.id}`));
+
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !highlightedIds.has(`${item.resource}:${item.id}`)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [groups, topResults]);
+
   const flattenedItems = useMemo(
-    () => groups.flatMap((group) => group.items.map((item) => ({ ...item, group: group.resource }))),
-    [groups],
+    () => [
+      ...topResults.map((item) => ({ ...item, group: "topResults" as const })),
+      ...dedupedGroupItems.flatMap((group) => group.items.map((item) => ({ ...item, group: group.resource }))),
+    ],
+    [dedupedGroupItems, topResults],
   );
 
   useEffect(() => {
@@ -93,6 +267,7 @@ export default function AdminGlobalSearch() {
 
     const trimmedQuery = query.trim();
     if (trimmedQuery.length < MIN_SEARCH_LENGTH) {
+      setTopResults([]);
       setGroups([]);
       setError("");
       setIsLoading(false);
@@ -120,10 +295,14 @@ export default function AdminGlobalSearch() {
         }
 
         const data = (await response.json()) as SearchResponse;
-        setGroups(data.groups || []);
-        setActiveIndex(data.groups?.some((group) => group.items.length > 0) ? 0 : -1);
+        const nextTopResults = data.topResults || [];
+        const nextGroups = data.groups || [];
+        setTopResults(nextTopResults);
+        setGroups(nextGroups);
+        setActiveIndex(nextTopResults.length || nextGroups.some((group) => group.items.length > 0) ? 0 : -1);
       } catch (fetchError) {
         if (controller.signal.aborted) return;
+        setTopResults([]);
         setGroups([]);
         setActiveIndex(-1);
         setError(fetchError instanceof Error ? fetchError.message : "search_failed");
@@ -150,6 +329,10 @@ export default function AdminGlobalSearch() {
     router.push(href);
   }
 
+  function openInNewTab(href: string) {
+    window.open(href, "_blank", "noopener,noreferrer");
+  }
+
   function handleInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -174,7 +357,12 @@ export default function AdminGlobalSearch() {
 
     if (event.key === "Enter" && activeIndex >= 0) {
       event.preventDefault();
-      navigateTo(flattenedItems[activeIndex].href);
+      const activeItem = flattenedItems[activeIndex];
+      if (event.metaKey || event.ctrlKey) {
+        openInNewTab(activeItem.href);
+        return;
+      }
+      navigateTo(activeItem.href);
     }
   }
 
@@ -236,13 +424,13 @@ export default function AdminGlobalSearch() {
       </div>
 
       {isOpen ? (
-        <div className="absolute left-0 top-full z-[100000] mt-3 w-[min(100vw-2rem,32rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+        <div className="absolute left-0 top-full z-[100000] mt-3 w-[min(100vw-2rem,38rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
           <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
             <p className="text-sm font-medium text-gray-800 dark:text-white/90">{t("layout.searchTitle")}</p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("layout.searchHelp")}</p>
           </div>
 
-          <div id="admin-global-search-results" role="listbox" className="max-h-[28rem] overflow-y-auto p-2">
+          <div id="admin-global-search-results" role="listbox" className="max-h-[32rem] overflow-y-auto p-2">
             {query.trim().length < MIN_SEARCH_LENGTH ? (
               <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
                 {t("layout.searchMinChars", { count: MIN_SEARCH_LENGTH })}
@@ -255,13 +443,48 @@ export default function AdminGlobalSearch() {
               <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-5 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
                 {t("layout.searchError")}
               </div>
-            ) : groups.length === 0 ? (
+            ) : topResults.length === 0 && groups.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
                 {t("layout.searchNoResults")}
               </div>
             ) : (
-              <div className="space-y-3">
-                {groups.map((group) => (
+              <div className="space-y-4">
+                {topResults.length > 0 ? (
+                  <section>
+                    <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {t("layout.searchTopResults")}
+                    </p>
+                    <div className="space-y-1">
+                      {topResults.map((item) => {
+                        renderIndex += 1;
+                        const itemIndex = renderIndex;
+                        const isActive = itemIndex === activeIndex;
+
+                        return (
+                          <ResultCard
+                            key={`top-${item.id}`}
+                            item={item}
+                            query={query}
+                            isActive={isActive}
+                            badge={
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${resourceBadgeClasses(item.resource)}`}
+                              >
+                                {resourceLabel(item.resource, t)}
+                              </span>
+                            }
+                            openInNewTabLabel={t("layout.searchOpenInNewTab")}
+                            onHover={() => setActiveIndex(itemIndex)}
+                            onSelect={() => navigateTo(item.href)}
+                            onOpenInNewTab={() => openInNewTab(item.href)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
+                {dedupedGroupItems.map((group) => (
                   <section key={group.resource}>
                     <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       {resourceLabel(group.resource, t)}
@@ -273,36 +496,23 @@ export default function AdminGlobalSearch() {
                         const isActive = itemIndex === activeIndex;
 
                         return (
-                          <button
+                          <ResultCard
                             key={item.id}
-                            type="button"
-                            role="option"
-                            aria-selected={isActive}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onMouseEnter={() => setActiveIndex(itemIndex)}
-                            onClick={() => navigateTo(item.href)}
-                            className={`w-full rounded-xl px-3 py-2 text-left transition ${
-                              isActive
-                                ? "bg-brand-50 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:ring-brand-500/30"
-                                : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">
-                                  {item.title}
-                                </p>
-                                <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-                                  {item.subtitle}
-                                </p>
-                              </div>
-                              {item.meta ? (
-                                <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
-                                  {item.meta}
-                                </span>
-                              ) : null}
-                            </div>
-                          </button>
+                            item={item}
+                            query={query}
+                            isActive={isActive}
+                            badge={
+                              <span
+                                className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ring-1 ${resourceBadgeClasses(item.resource)}`}
+                              >
+                                {resourceLabel(item.resource, t)}
+                              </span>
+                            }
+                            openInNewTabLabel={t("layout.searchOpenInNewTab")}
+                            onHover={() => setActiveIndex(itemIndex)}
+                            onSelect={() => navigateTo(item.href)}
+                            onOpenInNewTab={() => openInNewTab(item.href)}
+                          />
                         );
                       })}
                     </div>
@@ -310,6 +520,10 @@ export default function AdminGlobalSearch() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <span>{t("layout.searchKeyboardHelp")}</span>
           </div>
         </div>
       ) : null}

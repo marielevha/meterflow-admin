@@ -36,6 +36,7 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
+  const q = firstValue(resolved.q).trim();
 
   let cities: Array<{
     id: string;
@@ -48,7 +49,18 @@ export default async function BillingCitiesPage({ searchParams }: { searchParams
 
   try {
     cities = await prisma.city.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        ...(q
+          ? {
+              OR: [
+                { code: { contains: q, mode: "insensitive" } },
+                { name: { contains: q, mode: "insensitive" } },
+                { region: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
       select: {
         id: true,
         code: true,

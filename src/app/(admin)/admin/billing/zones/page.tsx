@@ -36,6 +36,7 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
+  const q = firstValue(resolved.q).trim();
 
   let zones: Array<{
     id: string;
@@ -50,7 +51,20 @@ export default async function BillingZonesPage({ searchParams }: { searchParams:
   try {
     [zones, cities] = await prisma.$transaction([
       prisma.zone.findMany({
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          ...(q
+            ? {
+                OR: [
+                  { code: { contains: q, mode: "insensitive" } },
+                  { name: { contains: q, mode: "insensitive" } },
+                  { city: { code: { contains: q, mode: "insensitive" } } },
+                  { city: { name: { contains: q, mode: "insensitive" } } },
+                  { city: { region: { contains: q, mode: "insensitive" } } },
+                ],
+              }
+            : {}),
+        },
         select: {
           id: true,
           code: true,

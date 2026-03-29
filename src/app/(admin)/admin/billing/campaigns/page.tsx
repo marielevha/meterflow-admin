@@ -106,6 +106,7 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
+  const q = firstValue(resolved.q).trim();
   const terminalStatuses = new Set<BillingCampaignStatus>([
     BillingCampaignStatus.ISSUED,
     BillingCampaignStatus.CLOSED,
@@ -122,7 +123,35 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
   try {
     [campaigns, tariffPlans, zones] = await prisma.$transaction([
       prisma.billingCampaign.findMany({
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          ...(q
+            ? {
+                OR: [
+                  { code: { contains: q, mode: "insensitive" } },
+                  { name: { contains: q, mode: "insensitive" } },
+                  { cityNameSnapshot: { contains: q, mode: "insensitive" } },
+                  { zoneNameSnapshot: { contains: q, mode: "insensitive" } },
+                  { tariffPlan: { code: { contains: q, mode: "insensitive" } } },
+                  { tariffPlan: { name: { contains: q, mode: "insensitive" } } },
+                  {
+                    zones: {
+                      some: {
+                        deletedAt: null,
+                        OR: [
+                          { cityNameSnapshot: { contains: q, mode: "insensitive" } },
+                          { zoneNameSnapshot: { contains: q, mode: "insensitive" } },
+                          { zone: { code: { contains: q, mode: "insensitive" } } },
+                          { zone: { name: { contains: q, mode: "insensitive" } } },
+                          { zone: { city: { name: { contains: q, mode: "insensitive" } } } },
+                        ],
+                      },
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
         select: {
           id: true,
           code: true,

@@ -16,23 +16,45 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 
 - Recherche globale implementee dans la topbar du backoffice.
 - Palette de resultats connectee au raccourci `Cmd/Ctrl + K`.
-- Recherche permission-aware sur les ressources admin principales:
+- Recherche permission-aware sur les ressources admin et billing:
   - `Users`
   - `Meters`
   - `Readings`
   - `Tasks`
   - `Invoices`
+  - `Campaigns`
+  - `Tariffs`
+  - `Zones`
+  - `Cities`
+  - `Roles`
 - Recherche enrichie pour couvrir:
   - nom et prenom des users
   - `username`, `email`, `telephone`
   - code compteur / reference compteur
   - numero de facture
   - titres et elements clefs des missions
-- Resultats groupes par ressource avec navigation directe vers la fiche detail.
+  - referentiels billing et RBAC
+- Moteur de recherche ameliore:
+  - normalisation plus robuste des requetes
+  - recherche multi-mots `prenom nom` / `nom prenom`
+  - ranking pondere pour remonter les meilleurs resultats en premier
+  - support des UUID complets, prefixes courts et codes compacts sans separateurs
+- Palette UI enrichie:
+  - bloc `Top results`
+  - badges par type de ressource
+  - surlignage des termes trouves
+  - ouverture dans un nouvel onglet depuis la palette
+- Atterrissages coherents sur les listes billing:
+  - `Cities`
+  - `Zones`
+  - `Tariffs`
+  - `Campaigns`
+  avec filtres `?q=...` depuis la recherche globale.
 - Correctif backend sur la recherche globale:
   - suppression du `startsWith` invalide sur les UUID Prisma
   - fallback sur match exact uniquement quand la requete ressemble a un UUID
   - suppression du `internal_error` observe lors d'une recherche comme `freddy`
+- Tests ajoutes sur les helpers purs de la recherche globale.
 
 ### 1) Base de donnees et Prisma
 

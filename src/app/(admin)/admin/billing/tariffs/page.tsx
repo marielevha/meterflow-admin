@@ -70,6 +70,7 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
   const resolved = await searchParams;
   const error = firstValue(resolved.error);
   const success = firstValue(resolved.success);
+  const q = firstValue(resolved.q).trim();
 
   let plans: TariffPlanRow[] = [];
   let zones: Array<{
@@ -81,7 +82,21 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
   try {
     [plans, zones] = await prisma.$transaction([
       prisma.tariffPlan.findMany({
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          ...(q
+            ? {
+                OR: [
+                  { code: { contains: q, mode: "insensitive" } },
+                  { name: { contains: q, mode: "insensitive" } },
+                  { description: { contains: q, mode: "insensitive" } },
+                  { serviceZone: { code: { contains: q, mode: "insensitive" } } },
+                  { serviceZone: { name: { contains: q, mode: "insensitive" } } },
+                  { serviceZone: { city: { name: { contains: q, mode: "insensitive" } } } },
+                ],
+              }
+            : {}),
+        },
         include: {
           serviceZone: {
             select: {
