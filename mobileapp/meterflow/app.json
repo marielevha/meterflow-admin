@@ -28,7 +28,8 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.meterflow.customer"
+      "package": "com.meterflow.customer",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

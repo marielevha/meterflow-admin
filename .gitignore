@@ -39,3 +39,4 @@ next-env.d.ts
 
 # mobile app
 /meterflowapp/
+mobileapp/*/google-services.json

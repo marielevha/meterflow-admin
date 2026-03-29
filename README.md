@@ -12,6 +12,28 @@ TailAdmin utilizes the powerful features of **Next.js 16** and common features o
 
 Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de gestion des releves de compteurs electriques).
 
+### Lot recent - configuration FCM mobile
+
+- Configuration Firebase Android branchee pour les deux applications mobiles:
+  - `mobileapp/meterflow`
+  - `mobileapp/agent-app`
+- Les fichiers `app.json` des apps mobiles pointent maintenant vers leur fichier local `google-services.json`:
+  - `mobileapp/meterflow/app.json`
+  - `mobileapp/agent-app/app.json`
+- EAS credentials Android verifies pour les trois profils:
+  - `development`
+  - `preview`
+  - `production`
+- Mapping des applications Android vers leurs projets Firebase/FCM:
+  - `com.meterflow.customer` -> projet Firebase `e2c-client`
+  - `com.meterflow.agent` -> projet Firebase `e2c-agent`
+- App agent preparee pour les notifications push Android:
+  - `expo-notifications` installe
+  - plugin `expo-notifications` ajoute dans `mobileapp/agent-app/app.json`
+  - `expo-dev-client` installe pour rendre le profil `development` exploitable
+- Les fichiers `google-services.json` sont volontairement gardes hors Git et ignores via `.gitignore`.
+- La configuration/build FCM Android est maintenant en place, mais l'app agent ne contient pas encore de logique runtime d'enregistrement de token push.
+
 ### Lot recent - recherche globale admin
 
 - Recherche globale implementee dans la topbar du backoffice.
