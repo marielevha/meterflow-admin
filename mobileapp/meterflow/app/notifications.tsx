@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -156,6 +156,39 @@ export default function NotificationsScreen() {
     }
   }
 
+  async function handleNotificationPress(notification: MobileNotification) {
+    if (!notification.isRead) {
+      await markNotificationsRead([notification.id]);
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id
+            ? {
+                ...item,
+                isRead: true,
+                readAt: item.readAt ?? new Date().toISOString(),
+              }
+            : item
+        )
+      );
+    }
+
+    if (notification.actionPath && notification.actionPath !== '/notifications') {
+      safePush(notification.actionPath as Href);
+      return;
+    }
+
+    if (notification.readingId) {
+      safePush({
+        pathname: '/readings/[id]',
+        params: {
+          id: notification.readingId,
+          notificationId: notification.id,
+        },
+      });
+      return;
+    }
+  }
+
   return (
     <RequireMobileAuth>
       <AppPage
@@ -223,15 +256,7 @@ export default function NotificationsScreen() {
             {notifications.map((notification) => (
               <Pressable
                 key={notification.id}
-                onPress={() =>
-                  safePush({
-                    pathname: '/readings/[id]',
-                    params: {
-                      id: notification.readingId,
-                      notificationId: notification.id,
-                    },
-                  })
-                }
+                onPress={() => void handleNotificationPress(notification)}
                 style={[
                   styles.notificationCard,
                   {
@@ -242,12 +267,12 @@ export default function NotificationsScreen() {
                 <View
                   style={[
                     styles.notificationIconWrap,
-                    notificationTone(notification.status, palette).iconWrap,
+                    notificationTone(notification, palette).iconWrap,
                   ]}>
                   <Ionicons
-                    name={notificationTone(notification.status, palette).icon}
+                    name={notificationTone(notification, palette).icon}
                     size={18}
-                    color={notificationTone(notification.status, palette).iconColor}
+                    color={notificationTone(notification, palette).iconColor}
                   />
                 </View>
 
@@ -267,7 +292,10 @@ export default function NotificationsScreen() {
 
                   <View style={styles.notificationFooter}>
                     <Text style={[styles.meterText, { color: palette.headline }]}>
-                      {notification.meterSerialNumber}
+                      {notification.meterSerialNumber ||
+                        notification.invoiceNumber ||
+                        notification.reasonLabel ||
+                        notification.category}
                     </Text>
 
                     <View style={styles.notificationStatusGroup}>
@@ -277,7 +305,7 @@ export default function NotificationsScreen() {
                       <Text
                         style={[
                           styles.statusText,
-                          { color: notificationTone(notification.status, palette).textColor },
+                          { color: notificationTone(notification, palette).textColor },
                         ]}>
                         {notification.statusLabel || '--'}
                       </Text>
@@ -324,8 +352,8 @@ export default function NotificationsScreen() {
   );
 }
 
-function notificationTone(status: string, palette: (typeof Colors)['light']) {
-  if (status === 'REJECTED') {
+function notificationTone(notification: MobileNotification, palette: (typeof Colors)['light']) {
+  if (notification.status === 'REJECTED' || notification.type === 'INVOICE_CANCELED') {
     return {
       icon: 'close-circle-outline' as const,
       iconWrap: { backgroundColor: '#fff0ef' },
@@ -334,12 +362,42 @@ function notificationTone(status: string, palette: (typeof Colors)['light']) {
     };
   }
 
-  if (status === 'FLAGGED' || status === 'RESUBMISSION_REQUESTED') {
+  if (
+    notification.status === 'FLAGGED' ||
+    notification.status === 'RESUBMISSION_REQUESTED' ||
+    notification.type === 'READING_REMINDER'
+  ) {
     return {
       icon: 'alert-circle-outline' as const,
       iconWrap: { backgroundColor: '#fff6e7' },
       iconColor: '#c77c11',
       textColor: '#c77c11',
+    };
+  }
+
+  if (notification.category === 'BILLING') {
+    return {
+      icon:
+        notification.type === 'INVOICE_PAYMENT_REGISTERED' || notification.type === 'INVOICE_PAID'
+          ? ('card-outline' as const)
+          : notification.type === 'INVOICE_DELIVERED'
+            ? ('mail-open-outline' as const)
+            : ('receipt-outline' as const),
+      iconWrap: { backgroundColor: '#edf6ff' },
+      iconColor: palette.primary,
+      textColor: palette.primary,
+    };
+  }
+
+  if (notification.category === 'METER') {
+    return {
+      icon:
+        notification.type === 'METER_UNASSIGNED'
+          ? ('remove-circle-outline' as const)
+          : ('speedometer-outline' as const),
+      iconWrap: { backgroundColor: '#eef8f1' },
+      iconColor: '#13795b',
+      textColor: '#13795b',
     };
   }
 

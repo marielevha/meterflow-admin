@@ -14,6 +14,11 @@ import {
   getReminderWindowBounds,
   shouldTriggerReadingReminder,
 } from "@/lib/settings/readingReminderWindow";
+import {
+  buildReadingReminderNotification,
+  createCustomerNotification,
+  pushCustomerNotification,
+} from "@/lib/mobile/customerNotifications";
 
 type TriggerChannelResult = {
   channel: ReminderChannel;
@@ -304,44 +309,33 @@ async function sendEmail(
   return sendEmailViaResend(to, subject, text, html);
 }
 
-async function sendPush(userId: string, title: string, body: string) {
-  const webhookUrl = process.env.REMINDER_PUSH_WEBHOOK_URL?.trim();
-  if (!webhookUrl) {
-    return {
-      status: ReminderStatus.SKIPPED,
-      reason: "push_webhook_not_configured",
-      providerMessageId: null,
-    };
-  }
-
+async function sendPush(params: {
+  userId: string;
+  title: string;
+  body: string;
+  pendingMeters: number;
+  windowStart: Date;
+  windowEnd: Date;
+}) {
   try {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        title,
-        body,
-        source: "reading_reminder",
-      }),
-    });
-
-    const payload = (await response.json().catch(() => null)) as
-      | { id?: string; messageId?: string; message?: string }
-      | null;
-
-    if (!response.ok) {
-      return {
-        status: ReminderStatus.FAILED,
-        reason: payload?.message || `push_http_${response.status}`,
-        providerMessageId: null,
-      };
-    }
+    const notification = await createCustomerNotification(
+      prisma,
+      buildReadingReminderNotification({
+        userId: params.userId,
+        title: params.title,
+        body: params.body,
+        pendingMeters: params.pendingMeters,
+        windowStart: params.windowStart,
+        windowEnd: params.windowEnd,
+        channel: ReminderChannel.PUSH,
+      })
+    );
+    const result = await pushCustomerNotification(notification);
 
     return {
-      status: ReminderStatus.SENT,
-      reason: null,
-      providerMessageId: payload?.id || payload?.messageId || null,
+      status: result.sent ? ReminderStatus.SENT : ReminderStatus.FAILED,
+      reason: result.sent ? null : result.reason || "push_send_failed",
+      providerMessageId: notification.id,
     };
   } catch {
     return {
@@ -554,6 +548,8 @@ export async function executeReadingRemindersJob(
       settings.readingReminderTimezone || "UTC",
       settings.companyName || "E2C",
     );
+    const hasPushChannel = channels.includes(ReminderChannel.PUSH);
+    let reminderNotificationCreated = false;
 
     for (const channel of channels) {
       const countInWindow = await countLogsForWindow(client.id, channel, reminderWindowKey);
@@ -620,9 +616,16 @@ export async function executeReadingRemindersJob(
             message.emailHtml,
             settings.companyName || "E2C",
           );
-        }
-      } else {
-        sendResult = await sendPush(client.id, message.pushTitle, message.pushBody);
+      }
+    } else {
+        sendResult = await sendPush({
+          userId: client.id,
+          title: message.pushTitle,
+          body: message.pushBody,
+          pendingMeters: client.pendingMeters,
+          windowStart,
+          windowEnd,
+        });
       }
 
       const result: TriggerChannelResult = {
@@ -639,6 +642,25 @@ export async function executeReadingRemindersJob(
       });
 
       if (sendResult.status === ReminderStatus.SENT) {
+        if (channel === ReminderChannel.PUSH) {
+          reminderNotificationCreated = true;
+        } else if (!hasPushChannel && !reminderNotificationCreated) {
+          await createCustomerNotification(
+            prisma,
+            buildReadingReminderNotification({
+              userId: client.id,
+              title: message.pushTitle,
+              body: message.pushBody,
+              pendingMeters: client.pendingMeters,
+              windowStart,
+              windowEnd,
+              channel,
+              createdAt: runAt,
+            })
+          );
+          reminderNotificationCreated = true;
+        }
+
         sent += 1;
         byChannel[channel].sent += 1;
       } else if (sendResult.status === ReminderStatus.FAILED) {

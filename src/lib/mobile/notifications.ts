@@ -1,69 +1,107 @@
-import { Prisma, ReadingEventType, ReadingStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import {
-  getClientReadingDecisionMessage,
-  getClientReadingDecisionTitle,
-  getReadingStatusLabel,
-  getReviewReasonLabel,
-} from "@/lib/readings/reviewReasons";
-
-type NotificationPayload = {
-  clientTitle?: unknown;
-  clientMessage?: unknown;
-  reason?: unknown;
-};
+import { getReadingStatusLabel, getReviewReasonLabel } from "@/lib/readings/reviewReasons";
 
 type NotificationListOptions = {
   limit?: number;
   cursor?: string;
 };
 
+type NotificationMetadata = {
+  category?: unknown;
+  readingId?: unknown;
+  invoiceId?: unknown;
+  invoiceNumber?: unknown;
+  meterId?: unknown;
+  meterSerialNumber?: unknown;
+  status?: unknown;
+  statusLabel?: unknown;
+  reasonCode?: unknown;
+  reasonLabel?: unknown;
+  channel?: unknown;
+  paymentMethod?: unknown;
+  assignmentSource?: unknown;
+};
+
 function toOptionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function mapEventTypeToStatus(type: ReadingEventType): ReadingStatus | null {
+function inferCategory(type: string, metadata: NotificationMetadata) {
+  const explicit = toOptionalString(metadata.category);
+  if (explicit) return explicit;
+  if (type.startsWith("READING_")) return "READING";
+  if (type.startsWith("INVOICE_")) return "BILLING";
+  if (type.startsWith("METER_")) return "METER";
+  if (type.endsWith("_REMINDER") || type === "READING_REMINDER") return "REMINDER";
+  return "GENERAL";
+}
+
+function deriveStatusLabel(type: string, metadata: NotificationMetadata) {
+  const explicit = toOptionalString(metadata.statusLabel);
+  if (explicit) return explicit;
+
+  const status = toOptionalString(metadata.status);
+  if (status) {
+    const readingLabel = getReadingStatusLabel(status);
+    if (readingLabel) return readingLabel;
+
+    switch (status) {
+      case "ISSUED":
+        return "Émise";
+      case "DELIVERED":
+        return "Diffusée";
+      case "PARTIALLY_PAID":
+        return "Partiellement payée";
+      case "PAID":
+        return "Payée";
+      case "CANCELED":
+        return "Annulée";
+      default:
+        return status;
+    }
+  }
+
   switch (type) {
-    case ReadingEventType.VALIDATED:
-      return ReadingStatus.VALIDATED;
-    case ReadingEventType.FLAGGED:
-      return ReadingStatus.FLAGGED;
-    case ReadingEventType.REJECTED:
-      return ReadingStatus.REJECTED;
+    case "INVOICE_ISSUED":
+      return "Émise";
+    case "INVOICE_DELIVERED":
+      return "Diffusée";
+    case "INVOICE_PAYMENT_REGISTERED":
+      return "Paiement enregistré";
+    case "INVOICE_PAID":
+      return "Payée";
+    case "INVOICE_CANCELED":
+      return "Annulée";
+    case "METER_ASSIGNED":
+      return "Compteur lié";
+    case "METER_UNASSIGNED":
+      return "Compteur retiré";
+    case "READING_REMINDER":
+      return "Rappel";
     default:
       return null;
   }
 }
 
-function buildNotificationWhere(userId: string): Prisma.ReadingEventWhereInput {
-  return {
-    deletedAt: null,
-    type: {
-      in: [
-        ReadingEventType.VALIDATED,
-        ReadingEventType.FLAGGED,
-        ReadingEventType.REJECTED,
-      ],
-    },
-    reading: {
-      submittedById: userId,
-      deletedAt: null,
-    },
-  };
+function deriveReasonLabel(metadata: NotificationMetadata) {
+  return toOptionalString(metadata.reasonLabel) || getReviewReasonLabel(toOptionalString(metadata.reasonCode));
 }
 
 export async function listClientNotifications(
   userId: string,
   options?: NotificationListOptions
 ) {
-  const where = buildNotificationWhere(userId);
   const limit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
   const queryCursor = toOptionalString(options?.cursor);
 
-  const [events, unreadCount] = await Promise.all([
-    prisma.readingEvent.findMany({
-      where,
+  const [rows, unreadCount] = await Promise.all([
+    prisma.customerNotification.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+      },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       ...(queryCursor
@@ -75,85 +113,53 @@ export async function listClientNotifications(
       select: {
         id: true,
         type: true,
+        title: true,
+        body: true,
+        actionPath: true,
+        metadata: true,
+        readAt: true,
         createdAt: true,
-        payload: true,
-        notificationReads: {
-          where: { userId },
-          select: {
-            readAt: true,
-          },
-          take: 1,
-        },
-        reading: {
-          select: {
-            id: true,
-            status: true,
-            flagReason: true,
-            rejectionReason: true,
-            meter: {
-              select: {
-                id: true,
-                serialNumber: true,
-              },
-            },
-          },
-        },
       },
     }),
-    prisma.readingEvent.count({
+    prisma.customerNotification.count({
       where: {
-        ...where,
-        notificationReads: {
-          none: {
-            userId,
-          },
-        },
+        userId,
+        deletedAt: null,
+        readAt: null,
       },
     }),
   ]);
 
-  const hasMore = events.length > limit;
-  const pageEvents = hasMore ? events.slice(0, limit) : events;
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-  const notifications = pageEvents.map((event) => {
-    const payload = ((event.payload ?? {}) as NotificationPayload) || {};
-    const fallbackStatus = mapEventTypeToStatus(event.type);
-    const status = fallbackStatus ?? event.reading.status;
-    const reasonCode =
-      toOptionalString(payload.reason) ||
-      event.reading.flagReason ||
-      event.reading.rejectionReason;
-    const title =
-      toOptionalString(payload.clientTitle) ||
-      getClientReadingDecisionTitle(status, reasonCode) ||
-      "Notification";
-    const body =
-      toOptionalString(payload.clientMessage) ||
-      getClientReadingDecisionMessage(
-        status,
-        reasonCode,
-        event.reading.meter.serialNumber
-      ) ||
-      "Une mise à jour est disponible pour votre relevé.";
+  const notifications = pageRows.map((row) => {
+    const metadata = ((row.metadata ?? {}) as NotificationMetadata) || {};
+    const category = inferCategory(row.type, metadata);
+    const reasonCode = toOptionalString(metadata.reasonCode);
 
     return {
-      id: event.id,
-      type: event.type,
-      createdAt: event.createdAt,
-      title,
-      body,
-      readingId: event.reading.id,
-      meterId: event.reading.meter.id,
-      meterSerialNumber: event.reading.meter.serialNumber,
-      status,
-      statusLabel: getReadingStatusLabel(status),
+      id: row.id,
+      type: row.type,
+      category,
+      createdAt: row.createdAt,
+      title: row.title,
+      body: row.body,
+      actionPath: row.actionPath,
+      readingId: toOptionalString(metadata.readingId),
+      invoiceId: toOptionalString(metadata.invoiceId),
+      invoiceNumber: toOptionalString(metadata.invoiceNumber),
+      meterId: toOptionalString(metadata.meterId),
+      meterSerialNumber: toOptionalString(metadata.meterSerialNumber),
+      status: toOptionalString(metadata.status),
+      statusLabel: deriveStatusLabel(row.type, metadata),
       reasonCode,
-      reasonLabel: getReviewReasonLabel(reasonCode),
-      canResubmit:
-        status === ReadingStatus.REJECTED ||
-        status === ReadingStatus.RESUBMISSION_REQUESTED,
-      isRead: event.notificationReads.length > 0,
-      readAt: event.notificationReads[0]?.readAt ?? null,
+      reasonLabel: deriveReasonLabel(metadata),
+      channel: toOptionalString(metadata.channel),
+      paymentMethod: toOptionalString(metadata.paymentMethod),
+      assignmentSource: toOptionalString(metadata.assignmentSource),
+      isRead: !!row.readAt,
+      readAt: row.readAt,
     };
   });
 
@@ -163,7 +169,7 @@ export async function listClientNotifications(
       notifications,
       unreadCount,
       hasMore,
-      nextCursor: hasMore ? pageEvents[pageEvents.length - 1]?.id ?? null : null,
+      nextCursor: hasMore ? pageRows[pageRows.length - 1]?.id ?? null : null,
     },
   };
 }
@@ -172,8 +178,10 @@ export async function markClientNotificationsRead(
   userId: string,
   notificationIds?: string[]
 ) {
-  const where: Prisma.ReadingEventWhereInput = {
-    ...buildNotificationWhere(userId),
+  const where: Prisma.CustomerNotificationWhereInput = {
+    userId,
+    deletedAt: null,
+    readAt: null,
     ...(notificationIds?.length
       ? {
           id: {
@@ -183,29 +191,18 @@ export async function markClientNotificationsRead(
       : {}),
   };
 
-  const events = await prisma.readingEvent.findMany({
+  const updated = await prisma.customerNotification.updateMany({
     where,
-    select: { id: true },
+    data: {
+      readAt: new Date(),
+    },
   });
 
-  if (events.length > 0) {
-    await prisma.mobileNotificationRead.createMany({
-      data: events.map((event) => ({
-        userId,
-        readingEventId: event.id,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  const unreadCount = await prisma.readingEvent.count({
+  const unreadCount = await prisma.customerNotification.count({
     where: {
-      ...buildNotificationWhere(userId),
-      notificationReads: {
-        none: {
-          userId,
-        },
-      },
+      userId,
+      deletedAt: null,
+      readAt: null,
     },
   });
 
@@ -213,7 +210,7 @@ export async function markClientNotificationsRead(
     status: 200,
     body: {
       message: "notifications_marked_read",
-      markedCount: events.length,
+      markedCount: updated.count,
       unreadCount,
     },
   };

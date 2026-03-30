@@ -9,9 +9,11 @@ import {
   useState,
 } from 'react';
 import * as Notifications from 'expo-notifications';
+import type { Href } from 'expo-router';
 import { Platform } from 'react-native';
 
 import { useSafePush } from '@/hooks/use-safe-push';
+import { markClientNotificationsRead } from '@/lib/api/mobile-notifications';
 import {
   getMobileAppVersion,
   registerMobilePushToken,
@@ -91,13 +93,31 @@ export function MobilePushProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const readingId = response.notification.request.content.data?.readingId;
-      if (typeof readingId === 'string' && readingId) {
-        safePush(`/readings/${readingId}`);
-        return;
-      }
+      void (async () => {
+        const notificationId = response.notification.request.content.data?.notificationId;
+        const actionPath = response.notification.request.content.data?.actionPath;
+        const readingId = response.notification.request.content.data?.readingId;
 
-      safePush('/notifications');
+        if (typeof notificationId === 'string' && notificationId) {
+          try {
+            await markClientNotificationsRead([notificationId]);
+          } catch {
+            // best effort only
+          }
+        }
+
+        if (typeof actionPath === 'string' && actionPath) {
+          safePush(actionPath as Href);
+          return;
+        }
+
+        if (typeof readingId === 'string' && readingId) {
+          safePush(`/readings/${readingId}`);
+          return;
+        }
+
+        safePush('/notifications');
+      })();
     });
 
     return () => {

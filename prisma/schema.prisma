@@ -254,6 +254,7 @@ model User {
   deliveryLogs            InvoiceDelivery[]        @relation("InvoiceDeliveryTriggeredBy")
   readingReminderLogs     ReadingReminderLog[]
   mobilePushDevices       MobilePushDevice[]
+  customerNotifications   CustomerNotification[]
   mobileNotificationReads MobileNotificationRead[]
   agentNotificationReads  AgentNotificationRead[]
 
@@ -1065,6 +1066,26 @@ model MobilePushDevice {
   @@index([userId, deletedAt])
   @@index([deletedAt, lastSeenAt])
   @@map("mobile_push_devices")
+}
+
+model CustomerNotification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String
+  title      String
+  body       String
+  actionPath String?   @map("action_path")
+  metadata   Json?     @default("{}")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt, createdAt])
+  @@index([type, createdAt])
+  @@index([deletedAt])
+  @@map("customer_notifications")
 }
 
 model MobileNotificationRead {

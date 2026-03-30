@@ -6,6 +6,12 @@ import {
   TaskStatus,
   UserRole,
 } from "@prisma/client";
+import {
+  buildMeterAssignedNotification,
+  buildMeterUnassignedNotification,
+  createCustomerNotification,
+  pushCustomerNotification,
+} from "@/lib/mobile/customerNotifications";
 import { prisma } from "@/lib/prisma";
 
 const ACTIVE_ASSIGNMENT_WHERE = {
@@ -165,15 +171,19 @@ export async function setMeterCustomerAssignment(
     allowTransfer = true,
   } = input;
 
-  return prisma.$transaction(async (tx) => {
+  const result: SetMeterAssignmentResult & {
+    notifications: Awaited<ReturnType<typeof createCustomerNotification>>[];
+  } = await prisma.$transaction(async (tx) => {
     const meter = await tx.meter.findFirst({
       where: { id: meterId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, serialNumber: true },
     });
 
     if (!meter) {
       throw new Error("meter_not_found");
     }
+
+    const notifications: Awaited<ReturnType<typeof createCustomerNotification>>[] = [];
 
     const existing = await tx.meterAssignment.findFirst({
       where: {
@@ -200,7 +210,21 @@ export async function setMeterCustomerAssignment(
         },
       });
 
-      return { outcome: "cleared", assignmentId: null };
+      if (!(source === MeterAssignmentSource.MOBILE_CLAIM && actorUserId === existing.customerId)) {
+        notifications.push(
+          await createCustomerNotification(
+            tx,
+            buildMeterUnassignedNotification({
+              userId: existing.customerId,
+              meterId,
+              meterSerialNumber: meter.serialNumber,
+              source,
+            })
+          )
+        );
+      }
+
+      return { outcome: "cleared", assignmentId: null, notifications };
     }
 
     const customer = await tx.user.findFirst({
@@ -217,7 +241,7 @@ export async function setMeterCustomerAssignment(
     }
 
     if (existing?.customerId === customerId) {
-      return { outcome: "unchanged", assignmentId: existing.id };
+      return { outcome: "unchanged", assignmentId: existing.id, notifications };
     }
 
     if (existing && !allowTransfer) {
@@ -232,6 +256,20 @@ export async function setMeterCustomerAssignment(
           endedById: actorUserId,
         },
       });
+
+      if (!(source === MeterAssignmentSource.MOBILE_CLAIM && actorUserId === existing.customerId)) {
+        notifications.push(
+          await createCustomerNotification(
+            tx,
+            buildMeterUnassignedNotification({
+              userId: existing.customerId,
+              meterId,
+              meterSerialNumber: meter.serialNumber,
+              source,
+            })
+          )
+        );
+      }
     }
 
     const created = await tx.meterAssignment.create({
@@ -245,8 +283,29 @@ export async function setMeterCustomerAssignment(
       select: { id: true },
     });
 
-    return { outcome: "assigned", assignmentId: created.id };
+    if (!(source === MeterAssignmentSource.MOBILE_CLAIM && actorUserId === customerId)) {
+      notifications.push(
+        await createCustomerNotification(
+          tx,
+          buildMeterAssignedNotification({
+            userId: customerId,
+            meterId,
+            meterSerialNumber: meter.serialNumber,
+            source,
+          })
+        )
+      );
+    }
+
+    return { outcome: "assigned", assignmentId: created.id, notifications };
   });
+
+  await Promise.all((result.notifications ?? []).map((notification) => pushCustomerNotification(notification)));
+
+  return {
+    outcome: result.outcome,
+    assignmentId: result.assignmentId,
+  } satisfies SetMeterAssignmentResult;
 }
 
 export async function transferMeterCustomerAssignment(input: TransferMeterAssignmentInput) {

@@ -9,7 +9,10 @@ import {
   requireAdminPermissions,
 } from "@/lib/auth/adminPermissions";
 import { getCurrentStaffPermissionCodes } from "@/lib/auth/staffServerSession";
-import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
+import {
+  buildReadingDecisionNotification,
+  createAndPushCustomerNotification,
+} from "@/lib/mobile/customerNotifications";
 import { prisma } from "@/lib/prisma";
 import {
   getClientReadingDecisionMessage,
@@ -46,9 +49,10 @@ type DecisionStatus = "VALIDATED" | "FLAGGED" | "REJECTED";
 
 type PushPayload = {
   userId: string;
-  title: string;
-  body: string;
+  readingId: string;
+  meterId: string;
   status: DecisionStatus;
+  reasonCode: string | null;
   meterSerialNumber: string;
 };
 
@@ -116,6 +120,7 @@ export async function updateReadingAction(readingId: string, formData: FormData)
     where: { id: readingId, deletedAt: null },
     select: {
       id: true,
+      meterId: true,
       submittedById: true,
       status: true,
       primaryIndex: true,
@@ -349,9 +354,10 @@ export async function updateReadingAction(readingId: string, formData: FormData)
         if (clientTitle && clientMessage) {
           pushPayloadRef.current = {
             userId: existing.submittedById,
-            title: clientTitle,
-            body: clientMessage,
+            readingId,
+            meterId: existing.meterId,
             status: decisionStatus,
+            reasonCode: effectiveReason,
             meterSerialNumber: existing.meter.serialNumber,
           };
         }
@@ -360,16 +366,16 @@ export async function updateReadingAction(readingId: string, formData: FormData)
 
     const finalPushPayload = pushPayloadRef.current;
     if (finalPushPayload) {
-      await sendPushNotificationToUser({
-        userId: existing.submittedById,
-        title: finalPushPayload.title,
-        body: finalPushPayload.body,
-        data: {
-          readingId,
-          status: finalPushPayload.status,
+      await createAndPushCustomerNotification(
+        buildReadingDecisionNotification({
+          userId: finalPushPayload.userId,
+          readingId: finalPushPayload.readingId,
+          meterId: finalPushPayload.meterId,
           meterSerialNumber: finalPushPayload.meterSerialNumber,
-        },
-      });
+          status: finalPushPayload.status,
+          reasonCode: finalPushPayload.reasonCode,
+        })
+      );
     }
   } catch {
     redirect(`/admin/readings/${readingId}/edit?error=update_failed`);

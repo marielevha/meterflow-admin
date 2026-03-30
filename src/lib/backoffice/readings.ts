@@ -15,7 +15,10 @@ import {
 } from "@/lib/agentMobile/notifications";
 import { prisma } from "@/lib/prisma";
 import { activeMeterAssignmentCustomerSelect } from "@/lib/meters/assignments";
-import { sendPushNotificationToUser } from "@/lib/notifications/expoPush";
+import {
+  buildReadingDecisionNotification,
+  createAndPushCustomerNotification,
+} from "@/lib/mobile/customerNotifications";
 import {
   getClientReadingDecisionMessage,
   getClientReadingDecisionTitle,
@@ -108,30 +111,22 @@ function buildReadingSummary(reading: {
 async function notifyReadingDecision(params: {
   userId: string;
   readingId: string;
+  meterId: string;
   status: ReadingStatus;
   reason?: string | null;
   meterSerialNumber: string;
 }) {
-  const title = getClientReadingDecisionTitle(params.status, params.reason);
-  const body = getClientReadingDecisionMessage(
-    params.status,
-    params.reason,
-    params.meterSerialNumber
-  );
-
-  if (!title || !body) return;
-
   try {
-    await sendPushNotificationToUser({
-      userId: params.userId,
-      title,
-      body,
-      data: {
+    await createAndPushCustomerNotification(
+      buildReadingDecisionNotification({
+        userId: params.userId,
         readingId: params.readingId,
-        status: params.status,
+        meterId: params.meterId,
         meterSerialNumber: params.meterSerialNumber,
-      },
-    });
+        status: params.status,
+        reasonCode: params.reason,
+      })
+    );
   } catch {
     // best effort only, the review action must not fail on push delivery errors
   }
@@ -263,6 +258,7 @@ export async function validateReading(staff: StaffUser, readingId: string) {
   await notifyReadingDecision({
     userId: reading.submittedById,
     readingId: reading.id,
+    meterId: reading.meterId,
     status: ReadingStatus.VALIDATED,
     reason: null,
     meterSerialNumber: reading.meter.serialNumber,
@@ -326,6 +322,7 @@ export async function flagReading(staff: StaffUser, readingId: string, payload: 
   await notifyReadingDecision({
     userId: reading.submittedById,
     readingId: reading.id,
+    meterId: reading.meterId,
     status: ReadingStatus.FLAGGED,
     reason,
     meterSerialNumber: reading.meter.serialNumber,
@@ -393,6 +390,7 @@ export async function rejectReading(
   await notifyReadingDecision({
     userId: reading.submittedById,
     readingId: reading.id,
+    meterId: reading.meterId,
     status: ReadingStatus.REJECTED,
     reason,
     meterSerialNumber: reading.meter.serialNumber,

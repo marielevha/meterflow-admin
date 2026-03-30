@@ -228,12 +228,12 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'home.secondaryIndex': 'Index secondaire',
     'home.meterLabel': 'Compteur',
 
-    'notifications.subtitle': 'Mises a jour de vos releves',
+    'notifications.subtitle': 'Alertes, releves et mises a jour de facturation',
     'notifications.markAllRead': 'Tout marquer comme lu',
     'notifications.unavailableTitle': 'Notifications indisponibles',
     'notifications.emptyTitle': 'Aucune notification',
     'notifications.emptyDescription':
-      "Les decisions liees a vos releves apparaitront ici des qu'une mise a jour sera disponible.",
+      "Les informations sur vos releves, vos compteurs et votre facturation apparaitront ici des qu'une mise a jour sera disponible.",
     'notifications.loadMore': 'Voir plus',
 
     'profile.subtitle': 'Compte client',
@@ -826,12 +826,12 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'home.secondaryIndex': 'Secondary index',
     'home.meterLabel': 'Meter',
 
-    'notifications.subtitle': 'Updates about your readings',
+    'notifications.subtitle': 'Alerts, readings and billing updates',
     'notifications.markAllRead': 'Mark all as read',
     'notifications.unavailableTitle': 'Notifications unavailable',
     'notifications.emptyTitle': 'No notifications',
     'notifications.emptyDescription':
-      'Decisions related to your readings will appear here as soon as an update is available.',
+      'Updates about your readings, meters and billing will appear here as soon as something changes.',
     'notifications.loadMore': 'Load more',
 
     'profile.subtitle': 'Client account',
@@ -1426,12 +1426,12 @@ export const appTranslations: Record<AppLanguage, Record<string, string>> = {
     'home.secondaryIndex': 'Index ya mibale',
     'home.meterLabel': 'Metre',
 
-    'notifications.subtitle': 'Ba mise a jour ya ba releve na yo',
+    'notifications.subtitle': 'Biyebisi, ba releve mpe mise a jour ya facturation',
     'notifications.markAllRead': 'Tanga nyonso',
     'notifications.unavailableTitle': 'Biyebisi ezali te',
     'notifications.emptyTitle': 'Liyebisi moko te',
     'notifications.emptyDescription':
-      'Ba decision na ba releve na yo ekomonana awa soki mise a jour ezali.',
+      'Ba mise a jour na ba releve, ba metre mpe facturation na yo ekomonana awa soki mbongwana ezali.',
     'notifications.loadMore': 'Mona lisusu',
 
     'profile.subtitle': 'Konte ya klienti',

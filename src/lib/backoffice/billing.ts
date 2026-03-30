@@ -13,6 +13,14 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { activeMeterAssignmentCustomerSelect, getActiveMeterAssignment } from "@/lib/meters/assignments";
+import {
+  buildInvoiceCanceledNotification,
+  buildInvoiceDeliveryNotification,
+  buildInvoiceIssuedNotification,
+  buildInvoicePaymentNotification,
+  createCustomerNotification,
+  pushCustomerNotification,
+} from "@/lib/mobile/customerNotifications";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 
 type StaffUser = {
@@ -1497,7 +1505,19 @@ export async function issueCampaignInvoices(staff: StaffUser, campaignId: string
       status: { in: [InvoiceStatus.DRAFT, InvoiceStatus.PENDING_REVIEW] },
       deletedAt: null,
     },
-    select: { id: true },
+    select: {
+      id: true,
+      customerId: true,
+      invoiceNumber: true,
+      meterId: true,
+      dueDate: true,
+      totalAmount: true,
+      meter: {
+        select: {
+          serialNumber: true,
+        },
+      },
+    },
   });
 
   if (issuable.length === 0) {
@@ -1505,7 +1525,7 @@ export async function issueCampaignInvoices(staff: StaffUser, campaignId: string
   }
 
   const now = new Date();
-  await prisma.$transaction(async (tx) => {
+  const createdNotifications = await prisma.$transaction(async (tx) => {
     await tx.invoice.updateMany({
       where: {
         id: { in: issuable.map((item) => item.id) },
@@ -1528,6 +1548,25 @@ export async function issueCampaignInvoices(staff: StaffUser, campaignId: string
       })),
     });
 
+    const notifications: Awaited<ReturnType<typeof createCustomerNotification>>[] = [];
+    for (const invoice of issuable) {
+      notifications.push(
+        await createCustomerNotification(
+          tx,
+          buildInvoiceIssuedNotification({
+            userId: invoice.customerId,
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            meterId: invoice.meterId,
+            meterSerialNumber: invoice.meter.serialNumber,
+            totalAmount: decimalToNumber(invoice.totalAmount),
+            dueDate: invoice.dueDate,
+            createdAt: now,
+          })
+        )
+      );
+    }
+
     await tx.billingCampaign.update({
       where: { id: campaignId },
       data: {
@@ -1536,7 +1575,11 @@ export async function issueCampaignInvoices(staff: StaffUser, campaignId: string
         finalizedAt: now,
       },
     });
+
+    return notifications;
   });
+
+  await Promise.all(createdNotifications.map((notification) => pushCustomerNotification(notification)));
 
   return {
     status: 200,
@@ -1632,7 +1675,16 @@ export async function getInvoiceDetail(invoiceId: string) {
 export async function issueInvoice(staff: StaffUser, invoiceId: string) {
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, deletedAt: null },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      customerId: true,
+      invoiceNumber: true,
+      meterId: true,
+      dueDate: true,
+      totalAmount: true,
+      meter: { select: { serialNumber: true } },
+    },
   });
   if (!invoice) return { status: 404, body: { error: "invoice_not_found" } };
   if (!ISSUABLE_INVOICE_STATUSES.has(invoice.status)) {
@@ -1640,7 +1692,7 @@ export async function issueInvoice(staff: StaffUser, invoiceId: string) {
   }
 
   const now = new Date();
-  const updated = await prisma.$transaction(async (tx) => {
+  const { invoice: updated, notification } = await prisma.$transaction(async (tx) => {
     const inv = await tx.invoice.update({
       where: { id: invoiceId },
       data: {
@@ -1658,8 +1710,25 @@ export async function issueInvoice(staff: StaffUser, invoiceId: string) {
         payload: { previousStatus: invoice.status },
       },
     });
-    return inv;
+
+    const createdNotification = await createCustomerNotification(
+      tx,
+      buildInvoiceIssuedNotification({
+        userId: invoice.customerId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        meterId: invoice.meterId,
+        meterSerialNumber: invoice.meter.serialNumber,
+        totalAmount: decimalToNumber(invoice.totalAmount),
+        dueDate: invoice.dueDate,
+        createdAt: now,
+      })
+    );
+
+    return { invoice: inv, notification: createdNotification };
   });
+
+  await pushCustomerNotification(notification);
 
   return { status: 200, body: { message: "invoice_issued", invoice: updated } };
 }
@@ -1667,7 +1736,14 @@ export async function issueInvoice(staff: StaffUser, invoiceId: string) {
 export async function cancelInvoice(staff: StaffUser, invoiceId: string, reason?: string) {
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, deletedAt: null },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      customerId: true,
+      invoiceNumber: true,
+      meterId: true,
+      meter: { select: { serialNumber: true } },
+    },
   });
   if (!invoice) return { status: 404, body: { error: "invoice_not_found" } };
   if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.CANCELED) {
@@ -1678,7 +1754,7 @@ export async function cancelInvoice(staff: StaffUser, invoiceId: string, reason?
   if (!cancelReason) return { status: 400, body: { error: "cancel_reason_required" } };
 
   const now = new Date();
-  const updated = await prisma.$transaction(async (tx) => {
+  const { invoice: updated, notification } = await prisma.$transaction(async (tx) => {
     const inv = await tx.invoice.update({
       where: { id: invoiceId },
       data: {
@@ -1696,8 +1772,24 @@ export async function cancelInvoice(staff: StaffUser, invoiceId: string, reason?
         payload: { reason: cancelReason, previousStatus: invoice.status },
       },
     });
-    return inv;
+
+    const createdNotification = await createCustomerNotification(
+      tx,
+      buildInvoiceCanceledNotification({
+        userId: invoice.customerId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        meterId: invoice.meterId,
+        meterSerialNumber: invoice.meter.serialNumber,
+        cancelReason,
+        createdAt: now,
+      })
+    );
+
+    return { invoice: inv, notification: createdNotification };
   });
+
+  await pushCustomerNotification(notification);
 
   return { status: 200, body: { message: "invoice_canceled", invoice: updated } };
 }
@@ -1718,7 +1810,16 @@ export async function registerInvoicePayment(
 
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, deletedAt: null },
-    select: { id: true, totalAmount: true, paidAmount: true, status: true },
+    select: {
+      id: true,
+      totalAmount: true,
+      paidAmount: true,
+      status: true,
+      customerId: true,
+      invoiceNumber: true,
+      meterId: true,
+      meter: { select: { serialNumber: true } },
+    },
   });
   if (!invoice) return { status: 404, body: { error: "invoice_not_found" } };
   if (invoice.status === InvoiceStatus.CANCELED) {
@@ -1767,10 +1868,30 @@ export async function registerInvoicePayment(
       },
     });
 
-    return { payment, invoice: updated };
+    const notification = await createCustomerNotification(
+      tx,
+      buildInvoicePaymentNotification({
+        userId: invoice.customerId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        meterId: invoice.meterId,
+        meterSerialNumber: invoice.meter.serialNumber,
+        amount,
+        totalAmount: total,
+        paidAmount: nextPaid,
+        paymentMethod: method,
+        nextStatus,
+        createdAt: paidAt,
+      })
+    );
+
+    return { payment, invoice: updated, notification };
   });
 
-  return { status: 201, body: { message: "payment_registered", ...result } };
+  await pushCustomerNotification(result.notification);
+  const { notification: _notification, ...response } = result;
+
+  return { status: 201, body: { message: "payment_registered", ...response } };
 }
 
 export async function triggerInvoiceDelivery(
@@ -1782,6 +1903,7 @@ export async function triggerInvoiceDelivery(
     where: { id: invoiceId, deletedAt: null },
     include: {
       customer: { select: { phone: true, email: true, username: true } },
+      meter: { select: { id: true, serialNumber: true } },
     },
   });
   if (!invoice) return { status: 404, body: { error: "invoice_not_found" } };
@@ -1833,8 +1955,26 @@ export async function triggerInvoiceDelivery(
       },
     });
 
-    return { delivery, invoice: updated };
+    const notification = await createCustomerNotification(
+      tx,
+      buildInvoiceDeliveryNotification({
+        userId: invoice.customerId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        meterId: invoice.meter.id,
+        meterSerialNumber: invoice.meter.serialNumber,
+        channel,
+        nextStatus:
+          invoice.status === InvoiceStatus.ISSUED ? InvoiceStatus.DELIVERED : invoice.status,
+        createdAt: sentAt,
+      })
+    );
+
+    return { delivery, invoice: updated, notification };
   });
 
-  return { status: 201, body: { message: "invoice_delivery_recorded", ...result } };
+  await pushCustomerNotification(result.notification);
+  const { notification: _notification, ...response } = result;
+
+  return { status: 201, body: { message: "invoice_delivery_recorded", ...response } };
 }
