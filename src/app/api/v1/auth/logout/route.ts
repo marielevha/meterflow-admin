@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { buildSessionCookieOptions } from "@/lib/auth/sessionCookies";
 import { generateTokenHash } from "@/lib/auth/token";
 
 export async function POST(request: Request) {
@@ -27,14 +28,10 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({ success: true }, { status: 200 });
     response.cookies.set("access_token", "", {
-      httpOnly: true,
-      path: "/",
-      maxAge: 0,
+      ...buildSessionCookieOptions(request, { maxAge: 0 }),
     });
     response.cookies.set("refresh_token", "", {
-      httpOnly: true,
-      path: "/",
-      maxAge: 0,
+      ...buildSessionCookieOptions(request, { maxAge: 0 }),
     });
 
     return response;

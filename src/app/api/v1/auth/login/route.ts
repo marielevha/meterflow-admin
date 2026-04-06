@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loginUser } from "@/lib/auth/login";
+import { buildSessionCookieOptions } from "@/lib/auth/sessionCookies";
 import { withRouteInstrumentation } from "@/lib/observability/routeInstrumentation";
 
 async function postLogin(request: Request) {
@@ -31,20 +32,11 @@ async function postLogin(request: Request) {
         : undefined;
 
     if (result.status === 200 && accessToken && refreshToken) {
-      const isSecure = process.env.NODE_ENV === "production";
       response.cookies.set("access_token", accessToken, {
-        httpOnly: true,
-        secure: isSecure,
-        sameSite: "lax",
-        path: "/",
-        maxAge: accessTokenExpiresIn,
+        ...buildSessionCookieOptions(request, { maxAge: accessTokenExpiresIn }),
       });
       response.cookies.set("refresh_token", refreshToken, {
-        httpOnly: true,
-        secure: isSecure,
-        sameSite: "lax",
-        path: "/",
-        maxAge: refreshTokenExpiresIn,
+        ...buildSessionCookieOptions(request, { maxAge: refreshTokenExpiresIn }),
       });
     }
 
