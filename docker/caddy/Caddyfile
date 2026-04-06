@@ -7,6 +7,5 @@
 		Referrer-Policy strict-origin-when-cross-origin
 	}
 
-	tls internal
 	reverse_proxy app:3000
 }
