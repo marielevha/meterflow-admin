@@ -29,6 +29,7 @@ logs/
 
 # local env files
 .env*.local
+.env.docker.prod
 
 # vercel
 .vercel

@@ -10,7 +10,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_PATH:-postgres_data}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meterflow} -d ${POSTGRES_DB:-meterflow}"]
       interval: 10s
@@ -30,7 +30,7 @@ services:
       - "${MINIO_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
-      - minio_data:/data
+      - ${MINIO_DATA_PATH:-minio_data}:/data
 
   minio-init:
     image: minio/mc:latest
@@ -142,6 +142,8 @@ services:
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
     ports:
       - "${APP_PORT:-3000}:3000"
+    volumes:
+      - ${APP_LOGS_PATH:-meterflow_logs}:/app/logs
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -157,11 +159,14 @@ services:
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     ports:
       - "${PGADMIN_PORT:-8080}:80"
+    profiles:
+      - tools
     volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - ${PGADMIN_DATA_PATH:-pgadmin_data}:/var/lib/pgadmin
       - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
 
 volumes:
   postgres_data:
   minio_data:
   pgadmin_data:
+  meterflow_logs:
