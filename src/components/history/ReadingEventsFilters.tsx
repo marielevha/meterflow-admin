@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { ReadingEventType } from "@prisma/client";
 import { CloseLineIcon } from "@/icons";
 import { translateReadingEventType } from "@/lib/admin-i18n/labels";
 import { useAdminI18n } from "@/hooks/use-admin-i18n";
@@ -14,7 +15,7 @@ type ReadingEventsFiltersProps = {
   msHasSource: string;
   msPageSize: number;
   msPage: number;
-  eventTypeOptions: string[];
+  eventTypeOptions: ReadingEventType[];
   pageSizeOptions: number[];
 };
 

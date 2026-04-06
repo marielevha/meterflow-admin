@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { DeliveryChannel, PaymentMethod } from "@prisma/client";
+import {
+  DeliveryChannel,
+  PaymentMethod,
+  TariffBillingMode,
+  TaxApplicationScope,
+  TaxRuleType,
+} from "@prisma/client";
 import {
   cancelInvoice,
   createBillingCampaign,
@@ -28,6 +34,25 @@ function asNumber(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function asTariffBillingMode(value: FormDataEntryValue | null) {
+  const candidate = asString(value);
+  return Object.values(TariffBillingMode).includes(candidate as TariffBillingMode)
+    ? (candidate as TariffBillingMode)
+    : undefined;
+}
+
+function asTaxRuleType(value: string) {
+  return Object.values(TaxRuleType).includes(value as TaxRuleType)
+    ? (value as TaxRuleType)
+    : undefined;
+}
+
+function asTaxApplicationScope(value: string) {
+  return Object.values(TaxApplicationScope).includes(value as TaxApplicationScope)
+    ? (value as TaxApplicationScope)
+    : undefined;
+}
+
 function parseTaxes(value: string) {
   return value
     .split("\n")
@@ -41,8 +66,8 @@ function parseTaxes(value: string) {
       return {
         code,
         name,
-        type: type || undefined,
-        applicationScope: applicationScope || undefined,
+        type: asTaxRuleType(type),
+        applicationScope: asTaxApplicationScope(applicationScope),
         value: Number(rawValue),
         description: description || undefined,
       };
@@ -63,7 +88,7 @@ export async function createTariffPlanAction(formData: FormData) {
       name: asString(formData.get("name")),
       description: asString(formData.get("description")),
       zoneId: asString(formData.get("zoneId")) || null,
-      billingMode: asString(formData.get("billingMode")) || undefined,
+      billingMode: asTariffBillingMode(formData.get("billingMode")),
       currency: asString(formData.get("currency")),
       singleUnitPrice: asNumber(formData.get("singleUnitPrice")),
       hpUnitPrice: asNumber(formData.get("hpUnitPrice")),

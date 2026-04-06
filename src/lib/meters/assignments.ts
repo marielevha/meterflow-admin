@@ -151,6 +151,10 @@ type SetMeterAssignmentResult =
       assignmentId: string;
     };
 
+type SetMeterAssignmentTransactionResult = SetMeterAssignmentResult & {
+  notifications: Awaited<ReturnType<typeof createCustomerNotification>>[];
+};
+
 type TransferMeterAssignmentInput = {
   meterId: string;
   customerId: string;
@@ -171,9 +175,7 @@ export async function setMeterCustomerAssignment(
     allowTransfer = true,
   } = input;
 
-  const result: SetMeterAssignmentResult & {
-    notifications: Awaited<ReturnType<typeof createCustomerNotification>>[];
-  } = await prisma.$transaction(async (tx) => {
+  const result: SetMeterAssignmentTransactionResult = await prisma.$transaction(async (tx) => {
     const meter = await tx.meter.findFirst({
       where: { id: meterId, deletedAt: null },
       select: { id: true, serialNumber: true },
@@ -199,7 +201,7 @@ export async function setMeterCustomerAssignment(
 
     if (!customerId) {
       if (!existing) {
-        return { outcome: "unchanged", assignmentId: null };
+        return { outcome: "unchanged", assignmentId: null, notifications };
       }
 
       await tx.meterAssignment.update({
@@ -300,12 +302,26 @@ export async function setMeterCustomerAssignment(
     return { outcome: "assigned", assignmentId: created.id, notifications };
   });
 
-  await Promise.all((result.notifications ?? []).map((notification) => pushCustomerNotification(notification)));
+  await Promise.all(result.notifications.map((notification) => pushCustomerNotification(notification)));
+
+  if (result.outcome === "assigned") {
+    return {
+      outcome: "assigned",
+      assignmentId: result.assignmentId,
+    };
+  }
+
+  if (result.outcome === "cleared") {
+    return {
+      outcome: "cleared",
+      assignmentId: null,
+    };
+  }
 
   return {
-    outcome: result.outcome,
+    outcome: "unchanged",
     assignmentId: result.assignmentId,
-  } satisfies SetMeterAssignmentResult;
+  };
 }
 
 export async function transferMeterCustomerAssignment(input: TransferMeterAssignmentInput) {

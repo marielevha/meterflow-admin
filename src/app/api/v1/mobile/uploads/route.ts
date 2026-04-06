@@ -17,7 +17,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const formData = await request.formData();
+    const formData = (await request.formData()) as unknown as {
+      get(name: string): FormDataEntryValue | null;
+    };
     const purposeValue = formData.get("purpose");
     const fileValue = formData.get("file");
     const purpose =

@@ -12,7 +12,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const formData = await request.formData();
+    const formData = (await request.formData()) as unknown as {
+      get(name: string): FormDataEntryValue | null;
+    };
     const file = formData.get("file");
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file_required" }, { status: 400 });
