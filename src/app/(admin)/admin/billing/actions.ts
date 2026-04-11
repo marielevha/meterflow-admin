@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import {
   DeliveryChannel,
   PaymentMethod,
+  ServicePhaseType,
+  ServicePowerUnit,
+  ServiceUsageCategory,
   TariffBillingMode,
   TaxApplicationScope,
   TaxRuleType,
@@ -22,6 +25,10 @@ import {
   triggerInvoiceDelivery,
   updateTariffPlan,
 } from "@/lib/backoffice/billing";
+import {
+  closeServiceContract,
+  createServiceContract,
+} from "@/lib/backoffice/serviceContracts";
 import { ADMIN_PERMISSION_GROUPS, requireAdminPermissions } from "@/lib/auth/adminPermissions";
 
 function asString(value: FormDataEntryValue | null) {
@@ -38,6 +45,27 @@ function asTariffBillingMode(value: FormDataEntryValue | null) {
   const candidate = asString(value);
   return Object.values(TariffBillingMode).includes(candidate as TariffBillingMode)
     ? (candidate as TariffBillingMode)
+    : undefined;
+}
+
+function asServiceUsageCategory(value: FormDataEntryValue | null) {
+  const candidate = asString(value);
+  return Object.values(ServiceUsageCategory).includes(candidate as ServiceUsageCategory)
+    ? (candidate as ServiceUsageCategory)
+    : undefined;
+}
+
+function asServicePowerUnit(value: FormDataEntryValue | null) {
+  const candidate = asString(value);
+  return Object.values(ServicePowerUnit).includes(candidate as ServicePowerUnit)
+    ? (candidate as ServicePowerUnit)
+    : undefined;
+}
+
+function asServicePhaseType(value: FormDataEntryValue | null) {
+  const candidate = asString(value);
+  return Object.values(ServicePhaseType).includes(candidate as ServicePhaseType)
+    ? (candidate as ServicePhaseType)
     : undefined;
 }
 
@@ -89,6 +117,11 @@ export async function createTariffPlanAction(formData: FormData) {
       description: asString(formData.get("description")),
       zoneId: asString(formData.get("zoneId")) || null,
       billingMode: asTariffBillingMode(formData.get("billingMode")),
+      usageCategory: asServiceUsageCategory(formData.get("usageCategory")),
+      subscribedPowerUnit: asServicePowerUnit(formData.get("subscribedPowerUnit")),
+      subscribedPowerMin: asString(formData.get("subscribedPowerMin")) ? asNumber(formData.get("subscribedPowerMin")) : null,
+      subscribedPowerMax: asString(formData.get("subscribedPowerMax")) ? asNumber(formData.get("subscribedPowerMax")) : null,
+      phaseType: asServicePhaseType(formData.get("phaseType")) || null,
       currency: asString(formData.get("currency")),
       singleUnitPrice: asNumber(formData.get("singleUnitPrice")),
       hpUnitPrice: asNumber(formData.get("hpUnitPrice")),
@@ -188,6 +221,74 @@ export async function createBillingCampaignAction(formData: FormData) {
     redirect(`/admin/billing/campaigns?error=${encodeURIComponent((result.body as { error?: string }).error || "create_failed")}`);
   }
   redirect("/admin/billing/campaigns?success=campaign_created");
+}
+
+export async function createServiceContractAction(formData: FormData) {
+  const user = await requireAdminPermissions(
+    "/admin/billing/contracts",
+    ADMIN_PERMISSION_GROUPS.billingContractsManage
+  );
+
+  const result = await createServiceContract(
+    { id: user.id, role: user.role },
+    {
+      meterId: asString(formData.get("meterId")) || null,
+      contractNumber: asString(formData.get("contractNumber")) || null,
+      policeNumber: asString(formData.get("policeNumber")) || null,
+      usageCategory: asServiceUsageCategory(formData.get("usageCategory")) || null,
+      billingMode: asTariffBillingMode(formData.get("billingMode")) || null,
+      subscribedPowerValue: asString(formData.get("subscribedPowerValue")) ? asNumber(formData.get("subscribedPowerValue")) : null,
+      subscribedPowerUnit: asServicePowerUnit(formData.get("subscribedPowerUnit")) || null,
+      phaseType: asServicePhaseType(formData.get("phaseType")) || null,
+      effectiveFrom: asString(formData.get("effectiveFrom")) || null,
+      effectiveTo: asString(formData.get("effectiveTo")) || null,
+      notes: asString(formData.get("notes")) || null,
+    }
+  );
+
+  revalidatePath("/admin/billing/contracts");
+  revalidatePath("/admin/billing/invoices");
+  revalidatePath("/admin/billing");
+  if (result.status >= 400) {
+    redirect(
+      `/admin/billing/contracts?error=${encodeURIComponent(
+        (result.body as { error?: string }).error || "create_failed"
+      )}`
+    );
+  }
+
+  redirect("/admin/billing/contracts?success=contract_created");
+}
+
+export async function closeServiceContractAction(formData: FormData) {
+  const user = await requireAdminPermissions(
+    "/admin/billing/contracts",
+    ADMIN_PERMISSION_GROUPS.billingContractsManage
+  );
+
+  const contractId = asString(formData.get("contractId"));
+  if (!contractId) {
+    redirect("/admin/billing/contracts?error=missing_contract_id");
+  }
+
+  const result = await closeServiceContract(
+    { id: user.id, role: user.role },
+    contractId,
+    asString(formData.get("effectiveTo")) || null,
+  );
+
+  revalidatePath("/admin/billing/contracts");
+  revalidatePath("/admin/billing/invoices");
+  revalidatePath("/admin/billing");
+  if (result.status >= 400) {
+    redirect(
+      `/admin/billing/contracts?error=${encodeURIComponent(
+        (result.body as { error?: string }).error || "close_failed"
+      )}`
+    );
+  }
+
+  redirect("/admin/billing/contracts?success=contract_closed");
 }
 
 export async function createCityAction(formData: FormData) {

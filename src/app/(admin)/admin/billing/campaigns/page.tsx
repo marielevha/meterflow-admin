@@ -276,13 +276,12 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
                       {t("billing.multiZoneHint")}
                     </p>
                   </Field>
-                  <Field label={t("billing.tariffPlan")}>
+                  <Field label={t("billing.preferredTariffPlanLabel")}>
                     <select
                       name="tariffPlanId"
                       className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                      required
                     >
-                      <option value="">{t("billing.chooseTariffPlan")}</option>
+                      <option value="">{t("billing.noPreferredTariffPlan")}</option>
                       {tariffPlans.map((plan) => (
                         <option key={plan.id} value={plan.id}>
                           {plan.code} - {plan.name}
@@ -394,11 +393,11 @@ export default async function BillingCampaignsPage({ searchParams }: { searchPar
                             <>
                               <p className="break-words font-medium">{campaign.tariffPlan.code}</p>
                               <p className="break-words text-xs text-gray-500 dark:text-gray-400">
-                                {translateTariffBillingMode(campaign.tariffPlan.billingMode, t)}
+                                {t("billing.preferredTariffPlanBadge")} · {translateTariffBillingMode(campaign.tariffPlan.billingMode, t)}
                               </p>
                             </>
                           ) : (
-                            t("billing.noTariffAssigned")
+                            t("billing.contractResolvedTariffs")
                           )}
                         </TableCell>
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{campaign._count.invoices}</TableCell>

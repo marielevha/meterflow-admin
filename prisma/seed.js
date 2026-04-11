@@ -16,6 +16,9 @@ const {
   ReadingEventType,
   ReadingSource,
   ReadingStatus,
+  ServicePhaseType,
+  ServicePowerUnit,
+  ServiceUsageCategory,
   TariffBillingMode,
   TaskEventType,
   TaskItemStatus,
@@ -107,6 +110,8 @@ const permissions = [
   { code: "billing:zone:manage", name: "Manage billing zones", resource: "billing_zone", action: "manage" },
   { code: "billing:tariff:view", name: "View billing tariffs", resource: "billing_tariff", action: "view" },
   { code: "billing:tariff:manage", name: "Manage billing tariffs", resource: "billing_tariff", action: "manage" },
+  { code: "billing:contract:view", name: "View billing contracts", resource: "billing_contract", action: "view" },
+  { code: "billing:contract:manage", name: "Manage billing contracts", resource: "billing_contract", action: "manage" },
   { code: "billing:campaign:view", name: "View billing campaigns", resource: "billing_campaign", action: "view" },
   { code: "billing:campaign:manage", name: "Manage billing campaigns", resource: "billing_campaign", action: "manage" },
   { code: "billing:campaign:generate", name: "Generate campaign invoices", resource: "billing_campaign", action: "generate" },
@@ -165,6 +170,7 @@ const rolePermissionCodes = {
     "billing:city:view",
     "billing:zone:view",
     "billing:tariff:view",
+    "billing:contract:view",
     "billing:campaign:view",
     "billing:campaign:generate",
     "billing:campaign:issue",
@@ -366,6 +372,14 @@ const meters = [
     zoneCode: "CG-BZV-MKL",
     latitude: -4.283,
     longitude: 15.2756,
+    contractNumber: "CTR-CG-MKL-0001",
+    policeNumber: "PLC-CG-MKL-0001",
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    contractBillingMode: TariffBillingMode.SINGLE_RATE,
+    subscribedPowerValue: 10,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    contractEffectiveFrom: "2024-07-18T09:00:00.000Z",
     installedAt: "2024-07-18T09:00:00.000Z",
     lastInspectionAt: "2026-02-10T10:30:00.000Z",
   },
@@ -382,6 +396,14 @@ const meters = [
     zoneCode: "CG-BZV-BCG",
     latitude: -4.2894,
     longitude: 15.2673,
+    contractNumber: "CTR-CG-BCG-0002",
+    policeNumber: "PLC-CG-BCG-0002",
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    contractBillingMode: TariffBillingMode.TIME_OF_USE,
+    subscribedPowerValue: 20,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    contractEffectiveFrom: "2024-09-02T09:00:00.000Z",
     installedAt: "2024-09-02T09:00:00.000Z",
     lastInspectionAt: "2026-01-22T11:15:00.000Z",
   },
@@ -398,6 +420,14 @@ const meters = [
     zoneCode: "CG-PNR-TIE",
     latitude: -4.7872,
     longitude: 11.8521,
+    contractNumber: "CTR-CG-TIE-0003",
+    policeNumber: "PLC-CG-TIE-0003",
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    contractBillingMode: TariffBillingMode.SINGLE_RATE,
+    subscribedPowerValue: 15,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    contractEffectiveFrom: "2023-12-14T09:00:00.000Z",
     installedAt: "2023-12-14T09:00:00.000Z",
     lastInspectionAt: "2026-02-05T14:00:00.000Z",
   },
@@ -414,6 +444,14 @@ const meters = [
     zoneCode: "CG-PNR-LMB",
     latitude: -4.7885,
     longitude: 11.8502,
+    contractNumber: "CTR-CG-LMB-0004",
+    policeNumber: "PLC-CG-LMB-0004",
+    usageCategory: ServiceUsageCategory.PROFESSIONAL,
+    contractBillingMode: TariffBillingMode.TIME_OF_USE,
+    subscribedPowerValue: 30,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    phaseType: ServicePhaseType.THREE_PHASE,
+    contractEffectiveFrom: "2024-03-09T09:00:00.000Z",
     installedAt: "2024-03-09T09:00:00.000Z",
     lastInspectionAt: "2026-02-12T09:45:00.000Z",
   },
@@ -430,6 +468,14 @@ const meters = [
     zoneCode: "CG-DLS-CNT",
     latitude: -4.1989,
     longitude: 12.6664,
+    contractNumber: "CTR-CG-CNT-0005",
+    policeNumber: "PLC-CG-CNT-0005",
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    contractBillingMode: TariffBillingMode.SINGLE_RATE,
+    subscribedPowerValue: 10,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    contractEffectiveFrom: "2024-11-04T09:00:00.000Z",
     installedAt: "2024-11-04T09:00:00.000Z",
     lastInspectionAt: "2026-01-30T13:30:00.000Z",
   },
@@ -446,6 +492,14 @@ const meters = [
     zoneCode: "CG-BZV-TLG",
     latitude: -4.2338,
     longitude: 15.2708,
+    contractNumber: "CTR-CG-TLG-0006",
+    policeNumber: "PLC-CG-TLG-0006",
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    contractBillingMode: TariffBillingMode.SINGLE_RATE,
+    subscribedPowerValue: 15,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    contractEffectiveFrom: "2024-05-12T09:00:00.000Z",
     installedAt: "2024-05-12T09:00:00.000Z",
     lastInspectionAt: "2026-02-15T08:50:00.000Z",
   },
@@ -679,10 +733,15 @@ const managedTaskDefinitions = [
 const managedTariffPlans = [
   {
     code: "CG-MKL-RES-STD-2026",
-    name: "Tarif residentiel Makelele 2026",
-    description: "Tarif simple pour les abonnes residentiels de Makelele.",
+    name: "Tarif residentiel Makelele 0-15A 2026",
+    description: "Tarif simple pour les abonnes residentiels monophasés de Makelele jusqu a 15A.",
     zoneCode: "CG-BZV-MKL",
     billingMode: TariffBillingMode.SINGLE_RATE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 15,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
     currency: "XAF",
     singleUnitPrice: 96,
     hpUnitPrice: null,
@@ -703,11 +762,38 @@ const managedTariffPlans = [
     ],
   },
   {
+    code: "CG-MKL-RES-PLUS-2026",
+    name: "Tarif residentiel Makelele 16-30A 2026",
+    description: "Tarif simple pour les abonnes residentiels monophasés de Makelele de 16A a 30A.",
+    zoneCode: "CG-BZV-MKL",
+    billingMode: TariffBillingMode.SINGLE_RATE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 16,
+    subscribedPowerMax: 30,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    currency: "XAF",
+    singleUnitPrice: 103,
+    hpUnitPrice: null,
+    hcUnitPrice: null,
+    fixedCharge: 2200,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [],
+  },
+  {
     code: "CG-BCG-RES-TOU-2026",
-    name: "Tarif HP/HC Bacongo 2026",
-    description: "Tarif heures pleines / heures creuses pour les doubles index de Bacongo.",
+    name: "Tarif HP/HC Bacongo 0-20A 2026",
+    description: "Tarif heures pleines / heures creuses pour les doubles index residentiels de Bacongo jusqu a 20A.",
     zoneCode: "CG-BZV-BCG",
     billingMode: TariffBillingMode.TIME_OF_USE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 20,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
     currency: "XAF",
     singleUnitPrice: null,
     hpUnitPrice: 118,
@@ -728,11 +814,38 @@ const managedTariffPlans = [
     ],
   },
   {
+    code: "CG-BCG-RES-TOU-PLUS-2026",
+    name: "Tarif HP/HC Bacongo 21-40A 2026",
+    description: "Tarif heures pleines / heures creuses pour les doubles index residentiels de Bacongo au dela de 20A.",
+    zoneCode: "CG-BZV-BCG",
+    billingMode: TariffBillingMode.TIME_OF_USE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 21,
+    subscribedPowerMax: 40,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
+    currency: "XAF",
+    singleUnitPrice: null,
+    hpUnitPrice: 126,
+    hcUnitPrice: 79,
+    fixedCharge: 2600,
+    taxPercent: 18,
+    lateFeePercent: 5,
+    isDefault: false,
+    isActive: true,
+    taxes: [],
+  },
+  {
     code: "CG-TIE-RES-STD-2026",
-    name: "Tarif residentiel Tie-Tie 2026",
-    description: "Tarif simple pour les menages de Tie-Tie.",
+    name: "Tarif residentiel Tie-Tie 0-20A 2026",
+    description: "Tarif simple pour les menages de Tie-Tie jusqu a 20A.",
     zoneCode: "CG-PNR-TIE",
     billingMode: TariffBillingMode.SINGLE_RATE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 20,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
     currency: "XAF",
     singleUnitPrice: 102,
     hpUnitPrice: null,
@@ -746,10 +859,15 @@ const managedTariffPlans = [
   },
   {
     code: "CG-LMB-PRO-TOU-2026",
-    name: "Tarif professionnel Lumumba 2026",
-    description: "Tarif HP/HC applique aux petits professionnels de Lumumba.",
+    name: "Tarif professionnel Lumumba 0-30A 2026",
+    description: "Tarif HP/HC applique aux professionnels triphasés de Lumumba jusqu a 30A.",
     zoneCode: "CG-PNR-LMB",
     billingMode: TariffBillingMode.TIME_OF_USE,
+    usageCategory: ServiceUsageCategory.PROFESSIONAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 30,
+    phaseType: ServicePhaseType.THREE_PHASE,
     currency: "XAF",
     singleUnitPrice: null,
     hpUnitPrice: 126,
@@ -770,11 +888,38 @@ const managedTariffPlans = [
     ],
   },
   {
+    code: "CG-LMB-PRO-TOU-PLUS-2026",
+    name: "Tarif professionnel Lumumba 31-60A 2026",
+    description: "Tarif HP/HC applique aux professionnels triphasés de Lumumba entre 31A et 60A.",
+    zoneCode: "CG-PNR-LMB",
+    billingMode: TariffBillingMode.TIME_OF_USE,
+    usageCategory: ServiceUsageCategory.PROFESSIONAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 31,
+    subscribedPowerMax: 60,
+    phaseType: ServicePhaseType.THREE_PHASE,
+    currency: "XAF",
+    singleUnitPrice: null,
+    hpUnitPrice: 134,
+    hcUnitPrice: 88,
+    fixedCharge: 4200,
+    taxPercent: 18,
+    lateFeePercent: 7,
+    isDefault: false,
+    isActive: true,
+    taxes: [],
+  },
+  {
     code: "CG-CNT-RES-STD-2026",
-    name: "Tarif residentiel Dolisie Centre 2026",
-    description: "Tarif simple pour le centre de Dolisie.",
+    name: "Tarif residentiel Dolisie Centre 0-20A 2026",
+    description: "Tarif simple pour le centre de Dolisie jusqu a 20A.",
     zoneCode: "CG-DLS-CNT",
     billingMode: TariffBillingMode.SINGLE_RATE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 20,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
     currency: "XAF",
     singleUnitPrice: 93,
     hpUnitPrice: null,
@@ -796,10 +941,15 @@ const managedTariffPlans = [
   },
   {
     code: "CG-TLG-RES-STD-2026",
-    name: "Tarif residentiel Talangai 2026",
-    description: "Tarif simple applique au secteur de Talangai.",
+    name: "Tarif residentiel Talangai 0-20A 2026",
+    description: "Tarif simple applique au secteur de Talangai jusqu a 20A.",
     zoneCode: "CG-BZV-TLG",
     billingMode: TariffBillingMode.SINGLE_RATE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 20,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
     currency: "XAF",
     singleUnitPrice: 98,
     hpUnitPrice: null,
@@ -813,10 +963,15 @@ const managedTariffPlans = [
   },
   {
     code: "CG-GLOBAL-STD-2026",
-    name: "Tarif general de secours 2026",
-    description: "Tarif global conserve comme fallback pour les simulations hors zone.",
+    name: "Tarif general de secours 0-20A 2026",
+    description: "Tarif global conserve comme fallback pour les contrats residentiels simples jusqu a 20A.",
     zoneCode: null,
     billingMode: TariffBillingMode.SINGLE_RATE,
+    usageCategory: ServiceUsageCategory.RESIDENTIAL,
+    subscribedPowerUnit: ServicePowerUnit.AMPERE,
+    subscribedPowerMin: 0,
+    subscribedPowerMax: 20,
+    phaseType: ServicePhaseType.SINGLE_PHASE,
     currency: "XAF",
     singleUnitPrice: 100,
     hpUnitPrice: null,
@@ -1979,6 +2134,9 @@ async function cleanupManagedBilling() {
   const tariffCodes = managedTariffPlans.map((plan) => plan.code);
   const taxCodes = managedTariffPlans.flatMap((plan) => (plan.taxes || []).map((tax) => tax.code));
   const invoiceNumbers = invoiceScenarios(planByCodeMap(managedTariffPlans)).map((invoice) => invoice.invoiceNumber);
+  const meterSerialNumbers = meters.map((meter) => meter.serialNumber);
+  const contractNumbers = meters.map((meter) => meter.contractNumber).filter(Boolean);
+  const policeNumbers = meters.map((meter) => meter.policeNumber).filter(Boolean);
 
   const invoices = await prisma.invoice.findMany({
     where: {
@@ -1999,6 +2157,16 @@ async function cleanupManagedBilling() {
     await prisma.invoiceLine.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
     await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
   }
+
+  await prisma.serviceContract.deleteMany({
+    where: {
+      OR: [
+        contractNumbers.length > 0 ? { contractNumber: { in: contractNumbers } } : undefined,
+        policeNumbers.length > 0 ? { policeNumber: { in: policeNumbers } } : undefined,
+        meterSerialNumbers.length > 0 ? { meter: { serialNumber: { in: meterSerialNumbers } } } : undefined,
+      ].filter(Boolean),
+    },
+  });
 
   const campaignIds = (
     await prisma.billingCampaign.findMany({
@@ -2206,6 +2374,7 @@ async function main() {
     where: { serialNumber: { in: meters.map((meter) => meter.serialNumber) } },
   });
   const meterBySerial = Object.fromEntries(createdMeters.map((meter) => [meter.serialNumber, meter]));
+  const serviceContractByMeterSerial = {};
 
   await prisma.meterAssignment.deleteMany({
     where: { meterId: { in: createdMeters.map((meter) => meter.id) } },
@@ -2234,6 +2403,33 @@ async function main() {
   await cleanupManagedReadings();
   await cleanupManagedBilling();
   await cleanupLegacyMeters(userByUsername);
+
+  for (const meter of meters) {
+    const customer = userByUsername[meter.customerUsername];
+    const createdMeter = meterBySerial[meter.serialNumber];
+
+    if (!customer || !createdMeter) {
+      throw new Error(`Missing service contract data for meter ${meter.serialNumber}`);
+    }
+
+    const savedContract = await prisma.serviceContract.create({
+      data: {
+        meterId: createdMeter.id,
+        customerId: customer.id,
+        createdById: admin.id,
+        contractNumber: meter.contractNumber,
+        policeNumber: meter.policeNumber,
+        usageCategory: meter.usageCategory,
+        billingMode: meter.contractBillingMode,
+        subscribedPowerValue: meter.subscribedPowerValue,
+        subscribedPowerUnit: meter.subscribedPowerUnit,
+        phaseType: meter.phaseType,
+        effectiveFrom: new Date(meter.contractEffectiveFrom || meter.installedAt),
+      },
+    });
+
+    serviceContractByMeterSerial[meter.serialNumber] = savedContract;
+  }
 
   await prisma.meterState.deleteMany({
     where: { meterId: { in: createdMeters.map((meter) => meter.id) } },
@@ -2464,6 +2660,11 @@ async function main() {
         description: plan.description,
         zoneId: zone?.id ?? null,
         billingMode: plan.billingMode,
+        usageCategory: plan.usageCategory,
+        subscribedPowerUnit: plan.subscribedPowerUnit,
+        subscribedPowerMin: plan.subscribedPowerMin,
+        subscribedPowerMax: plan.subscribedPowerMax,
+        phaseType: plan.phaseType,
         currency: plan.currency,
         singleUnitPrice: plan.singleUnitPrice,
         hpUnitPrice: plan.hpUnitPrice,
@@ -2481,6 +2682,11 @@ async function main() {
         description: plan.description,
         zoneId: zone?.id ?? null,
         billingMode: plan.billingMode,
+        usageCategory: plan.usageCategory,
+        subscribedPowerUnit: plan.subscribedPowerUnit,
+        subscribedPowerMin: plan.subscribedPowerMin,
+        subscribedPowerMax: plan.subscribedPowerMax,
+        phaseType: plan.phaseType,
         currency: plan.currency,
         singleUnitPrice: plan.singleUnitPrice,
         hpUnitPrice: plan.hpUnitPrice,
@@ -2586,11 +2792,13 @@ async function main() {
     const customer = userByUsername[invoice.customerUsername];
     const meter = meterBySerial[invoice.meterSerialNumber];
     const campaign = campaignByCode[invoice.campaignCode];
+    const serviceContract = serviceContractByMeterSerial[invoice.meterSerialNumber];
     const invoiceRecord = await prisma.invoice.create({
       data: {
         invoiceNumber: invoice.invoiceNumber,
         campaignId: campaign?.id ?? null,
         tariffPlanId: managedTariffPlanIds[invoice.tariffPlanCode] ?? null,
+        serviceContractId: serviceContract?.id ?? null,
         customerId: customer.id,
         meterId: meter.id,
         generatedById: admin.id,
@@ -2612,6 +2820,13 @@ async function main() {
         consumptionSecondary: invoice.consumptionSecondary ?? 0,
         isEstimated: false,
         hasException: false,
+        contractNumberSnapshot: serviceContract?.contractNumber ?? null,
+        policeNumberSnapshot: serviceContract?.policeNumber ?? null,
+        usageCategorySnapshot: serviceContract?.usageCategory ?? null,
+        billingModeSnapshot: serviceContract?.billingMode ?? null,
+        subscribedPowerValueSnapshot: serviceContract?.subscribedPowerValue ?? null,
+        subscribedPowerUnitSnapshot: serviceContract?.subscribedPowerUnit ?? null,
+        phaseTypeSnapshot: serviceContract?.phaseType ?? null,
         subtotal: invoice.subtotal,
         taxAmount: invoice.taxAmount,
         fixedAmount: invoice.fixedAmount,
@@ -2624,6 +2839,8 @@ async function main() {
           source: "seed-demo",
           city: meter.city,
           zone: meter.zone,
+          contractNumber: serviceContract?.contractNumber ?? null,
+          policeNumber: serviceContract?.policeNumber ?? null,
         },
       },
     });

@@ -7,10 +7,15 @@ import MeterAssignmentWorkflowCard from "@/components/meters/MeterAssignmentWork
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import {
+  translateContractPhaseType,
+  translateContractPowerUnit,
+  translateContractStatus,
+  translateContractUsageCategory,
   translateMeterAssignmentSource,
   translateMeterStatus,
   translateMeterType,
   translateReadingStatus,
+  translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import {
   ADMIN_PERMISSION_GROUPS,
@@ -54,7 +59,7 @@ export default async function MeterDetailsPage({
   const canEditMeters = hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.metersEdit);
   const { t } = await getAdminTranslator();
   const { id } = await params;
-  const [meter, currentAssignment, assignmentHistory, transferCustomers, blockers] = await Promise.all([
+  const [meter, currentAssignment, assignmentHistory, contractHistory, transferCustomers, blockers] = await Promise.all([
     prisma.meter.findFirst({
       where: { id, deletedAt: null },
       select: {
@@ -161,6 +166,26 @@ export default async function MeterDetailsPage({
         },
       },
     }),
+    prisma.serviceContract.findMany({
+      where: {
+        meterId: id,
+        deletedAt: null,
+      },
+      orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        contractNumber: true,
+        policeNumber: true,
+        usageCategory: true,
+        billingMode: true,
+        subscribedPowerValue: true,
+        subscribedPowerUnit: true,
+        phaseType: true,
+        effectiveFrom: true,
+        effectiveTo: true,
+        notes: true,
+      },
+    }),
     canEditMeters
       ? prisma.user.findMany({
           where: {
@@ -226,6 +251,11 @@ export default async function MeterDetailsPage({
         : null) || null,
     isActive: !entry.endedAt,
   }));
+  const currentContract =
+    contractHistory.find((entry) => {
+      const now = new Date();
+      return entry.effectiveFrom <= now && (!entry.effectiveTo || entry.effectiveTo >= now);
+    }) ?? null;
 
   return (
     <div>
@@ -315,6 +345,99 @@ export default async function MeterDetailsPage({
           customerOptions={customerOptions}
           history={history}
         />
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-3">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("billing.contractsCardTitle")}</h3>
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 dark:border-gray-800 dark:bg-white/[0.02]">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t("billing.currentContractTitle")}
+              </p>
+              {currentContract ? (
+                <div className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                  <p className="font-medium text-gray-800 dark:text-white/90">
+                    {currentContract.contractNumber || t("billing.noContractNumber")}
+                  </p>
+                  <p>{currentContract.policeNumber || t("billing.noPoliceNumber")}</p>
+                  <p>{translateContractUsageCategory(currentContract.usageCategory, t)}</p>
+                  <p>{translateTariffBillingMode(currentContract.billingMode, t)}</p>
+                  <p>
+                    {currentContract.subscribedPowerValue.toString()}{" "}
+                    {translateContractPowerUnit(currentContract.subscribedPowerUnit, t)}
+                  </p>
+                  <p>{translateContractPhaseType(currentContract.phaseType, t)}</p>
+                  <p>
+                    {t("billing.periodColumnShort")}:{" "}
+                    {formatDate(currentContract.effectiveFrom, t("common.notAvailable"))}
+                    {currentContract.effectiveTo
+                      ? ` → ${formatDate(currentContract.effectiveTo, t("common.notAvailable"))}`
+                      : ""}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  {t("billing.noActiveContract")}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 dark:border-gray-800 dark:bg-white/[0.02]">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t("billing.contractHistoryTitle")}
+              </p>
+              {contractHistory.length === 0 ? (
+                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  {t("billing.noContractsYet")}
+                </p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {contractHistory.map((contract) => {
+                    const now = new Date();
+                    const contractStatus =
+                      contract.effectiveTo && contract.effectiveTo < now
+                        ? "ENDED"
+                        : contract.effectiveFrom > now
+                          ? "PENDING"
+                          : "ACTIVE";
+
+                    return (
+                      <div
+                        key={contract.id}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-3 dark:border-gray-800 dark:bg-gray-900/40"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                            {contract.contractNumber || t("billing.noContractNumber")}
+                          </p>
+                          <span className="inline-flex rounded-full bg-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            {translateContractStatus(contractStatus, t)}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                          <p>{contract.policeNumber || t("billing.noPoliceNumber")}</p>
+                          <p>{translateContractUsageCategory(contract.usageCategory, t)}</p>
+                          <p>{translateTariffBillingMode(contract.billingMode, t)}</p>
+                          <p>
+                            {contract.subscribedPowerValue.toString()}{" "}
+                            {translateContractPowerUnit(contract.subscribedPowerUnit, t)}
+                          </p>
+                          <p>{translateContractPhaseType(contract.phaseType, t)}</p>
+                          <p>
+                            {formatDate(contract.effectiveFrom, t("common.notAvailable"))}
+                            {contract.effectiveTo
+                              ? ` → ${formatDate(contract.effectiveTo, t("common.notAvailable"))}`
+                              : ""}
+                          </p>
+                          <p>{contract.notes || t("common.notAvailable")}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-3">
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{t("meters.latestStates")}</h3>

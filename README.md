@@ -12,6 +12,62 @@ TailAdmin utilizes the powerful features of **Next.js 16** and common features o
 
 Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de gestion des releves de compteurs electriques).
 
+### Lot recent - facturation selon puissance souscrite
+
+- Le billing ne repose plus uniquement sur un tarif unique de campagne.
+- Nouveau modele metier `ServiceContract`:
+  - lie un `client` a un `compteur`
+  - porte le profil de fourniture actif:
+    - `usageCategory`
+    - `billingMode`
+    - `subscribedPowerValue`
+    - `subscribedPowerUnit`
+    - `phaseType`
+    - periode d'effet
+- `TariffPlan` est maintenant qualifie par:
+  - zone
+  - categorie d'usage
+  - mode de facturation
+  - bande de puissance
+  - unite de puissance
+  - phase
+- `Invoice` snapshotte desormais le contrat reellement applique:
+  - `serviceContractId`
+  - `contractNumberSnapshot`
+  - `usageCategorySnapshot`
+  - `billingModeSnapshot`
+  - `subscribedPowerValueSnapshot`
+  - `subscribedPowerUnitSnapshot`
+  - `phaseTypeSnapshot`
+- Le moteur de facturation resout maintenant chaque facture par:
+  1. affectation client couvrant tout le cycle
+  2. contrat couvrant tout le cycle
+  3. tarif compatible avec le profil du contrat et la zone
+- Les changements d'affectation compteur ferment automatiquement les contrats actifs devenus incoherents.
+- Nouveau backoffice contrats:
+  - `/admin/billing/contracts`
+  - creation / cloture de contrats
+  - visualisation du contrat courant et de l'historique sur la fiche compteur
+- Les campagnes supportent maintenant un `tarif prefere` optionnel seulement:
+  - le tarif final reste resolu par contrat si necessaire
+- Le seed billing a ete realigne:
+  - 6 contrats de service
+  - 10 tarifs qualifies par puissance/usage/phase
+  - factures seedees avec snapshots de contrat
+- L'enum `ServicePowerUnit` supporte maintenant:
+  - `AMPERE`
+  - `KVA`
+  - `KW`
+  - `KWH`
+  en attendant validation finale des unites officielles avec E2C
+- Validations executees sur ce lot:
+  - `prisma validate`
+  - `prisma generate`
+  - migration locale
+  - relance du seed
+  - tests de generation de campagne
+  - verification des garde-fous de conflit contrat/tarif
+
 ### Lot recent - runtime push agent
 
 - L'application `mobileapp/agent-app` dispose maintenant d'un vrai runtime push Expo/FCM:
@@ -455,9 +511,139 @@ Ce repository a ete adapte pour le projet **MeterFlow** (plateforme digitale de 
 - Modele billing Prisma refondu:
   - `cities`, `zones`, `billing_campaign_zones`
   - `tariff_plans`, `tax_rules`, `tariff_plan_taxes`
+  - `service_contracts`
   - `billing_campaigns`, `invoices`, `invoice_lines`, `invoice_events`, `invoice_deliveries`, `payments`
   - garde-fou: unicite facture par compteur et campagne (`@@unique([campaignId, meterId])`)
   - robustesse cycle: references `fromReadingId` / `toReadingId` + indexes source/cible et finalisation de cycle
+- Tarification contractuelle selon la puissance souscrite:
+  - un `ServiceContract` porte le profil de service actif:
+    - client
+    - compteur
+    - categorie d'usage
+    - mode de facturation
+    - puissance souscrite
+    - unite
+    - phase
+    - periode d'effet
+  - un `TariffPlan` est maintenant qualifie par:
+    - zone
+    - categorie d'usage
+    - mode de facturation
+    - bande de puissance
+    - unite
+    - phase
+  - une `Invoice` snapshotte le contrat reellement applique au moment de la generation
+
+```mermaid
+erDiagram
+  USER ||--o{ METER_ASSIGNMENT : "is assigned to"
+  METER ||--o{ METER_ASSIGNMENT : "has customer history"
+
+  USER ||--o{ SERVICE_CONTRACT : "subscribes"
+  METER ||--o{ SERVICE_CONTRACT : "is covered by"
+
+  ZONE ||--o{ TARIFF_PLAN : "scopes"
+  SERVICE_CONTRACT }o--|| TARIFF_PLAN : "matches by profile"
+
+  BILLING_CAMPAIGN ||--o{ BILLING_CAMPAIGN_ZONE : "targets"
+  ZONE ||--o{ BILLING_CAMPAIGN_ZONE : "included in"
+
+  BILLING_CAMPAIGN ||--o{ INVOICE : "generates"
+  USER ||--o{ INVOICE : "is billed"
+  METER ||--o{ INVOICE : "is billed through"
+  SERVICE_CONTRACT ||--o{ INVOICE : "snapshotted into"
+  TARIFF_PLAN ||--o{ INVOICE : "applied to"
+
+  USER {
+    uuid id PK
+    string role
+    string username
+    string phone
+  }
+
+  METER {
+    uuid id PK
+    string serialNumber
+    string meterReference
+    string type
+    uuid zoneId FK
+  }
+
+  METER_ASSIGNMENT {
+    uuid id PK
+    uuid meterId FK
+    uuid customerId FK
+    datetime assignedAt
+    datetime endedAt
+    string source
+  }
+
+  SERVICE_CONTRACT {
+    uuid id PK
+    uuid meterId FK
+    uuid customerId FK
+    string contractNumber
+    string policeNumber
+    string usageCategory
+    string billingMode
+    decimal subscribedPowerValue
+    string subscribedPowerUnit
+    string phaseType
+    datetime effectiveFrom
+    datetime effectiveTo
+  }
+
+  TARIFF_PLAN {
+    uuid id PK
+    string code
+    uuid zoneId FK
+    string usageCategory
+    string billingMode
+    decimal subscribedPowerMin
+    decimal subscribedPowerMax
+    string subscribedPowerUnit
+    string phaseType
+    decimal singleUnitPrice
+    decimal hpUnitPrice
+    decimal hcUnitPrice
+  }
+
+  ZONE {
+    uuid id PK
+    string code
+    string name
+  }
+
+  BILLING_CAMPAIGN {
+    uuid id PK
+    string code
+    datetime periodStart
+    datetime periodEnd
+    uuid tariffPlanId FK
+  }
+
+  BILLING_CAMPAIGN_ZONE {
+    uuid id PK
+    uuid campaignId FK
+    uuid zoneId FK
+  }
+
+  INVOICE {
+    uuid id PK
+    string invoiceNumber
+    uuid campaignId FK
+    uuid customerId FK
+    uuid meterId FK
+    uuid tariffPlanId FK
+    uuid serviceContractId FK
+    string contractNumberSnapshot
+    string usageCategorySnapshot
+    string billingModeSnapshot
+    decimal subscribedPowerValueSnapshot
+    string subscribedPowerUnitSnapshot
+    string phaseTypeSnapshot
+  }
+```
 - Tarification metier alignee avec les compteurs:
   - `TariffBillingMode`:
     - `SINGLE_RATE`

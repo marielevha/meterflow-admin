@@ -8,6 +8,9 @@ import {
   PaymentMethod,
   ReadingEventType,
   ReadingStatus,
+  ServicePhaseType,
+  ServicePowerUnit,
+  ServiceUsageCategory,
   TaskEventType,
   TaskItemStatus,
   TaskPriority,
@@ -165,6 +168,45 @@ export function translateReadingSource(value: string | null | undefined, t: Tran
 export function translateTariffBillingMode(mode: TariffBillingMode | string, t: Translator) {
   if (mode === TariffBillingMode.TIME_OF_USE || mode === "TIME_OF_USE") return t("billing.timeOfUse");
   return t("billing.singleRate");
+}
+
+export function translateContractUsageCategory(category: ServiceUsageCategory | string, t: Translator) {
+  switch (category) {
+    case ServiceUsageCategory.PROFESSIONAL:
+    case "PROFESSIONAL":
+      return t("billing.usageCategoryProfessional");
+    case ServiceUsageCategory.ADMINISTRATION:
+    case "ADMINISTRATION":
+      return t("billing.usageCategoryAdministration");
+    case ServiceUsageCategory.INDUSTRIAL:
+    case "INDUSTRIAL":
+      return t("billing.usageCategoryIndustrial");
+    case ServiceUsageCategory.PUBLIC_LIGHTING:
+    case "PUBLIC_LIGHTING":
+      return t("billing.usageCategoryPublicLighting");
+    default:
+      return t("billing.usageCategoryResidential");
+  }
+}
+
+export function translateContractPowerUnit(unit: ServicePowerUnit | string, t: Translator) {
+  if (unit === ServicePowerUnit.KVA || unit === "KVA") return t("billing.powerUnitKva");
+  if (unit === ServicePowerUnit.KW || unit === "KW") return t("billing.powerUnitKw");
+  if (unit === ServicePowerUnit.KWH || unit === "KWH") return t("billing.powerUnitKwh");
+  return t("billing.powerUnitAmpere");
+}
+
+export function translateContractPhaseType(phaseType: ServicePhaseType | string, t: Translator) {
+  if (phaseType === ServicePhaseType.THREE_PHASE || phaseType === "THREE_PHASE") {
+    return t("billing.phaseTypeThreePhase");
+  }
+  return t("billing.phaseTypeSinglePhase");
+}
+
+export function translateContractStatus(status: "ACTIVE" | "PENDING" | "ENDED" | string, t: Translator) {
+  if (status === "PENDING") return t("billing.contractStatusPending");
+  if (status === "ENDED") return t("billing.contractStatusEnded");
+  return t("billing.contractStatusActive");
 }
 
 export function translateBillingCampaignStatus(status: BillingCampaignStatus | string, t: Translator) {

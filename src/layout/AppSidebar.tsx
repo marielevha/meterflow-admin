@@ -91,6 +91,7 @@ const navItems: NavItem[] = [
       { name: "Overview", path: "/admin/billing", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingOverviewView] },
       { name: "Cities", path: "/admin/billing/cities", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCitiesView] },
       { name: "Zones", path: "/admin/billing/zones", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingZonesView] },
+      { name: "Contracts", path: "/admin/billing/contracts", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingContractsView] },
       { name: "Tariffs", path: "/admin/billing/tariffs", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingTariffsView] },
       { name: "Campaigns", path: "/admin/billing/campaigns", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingCampaignsView] },
       { name: "Invoices", path: "/admin/billing/invoices", pro: false, requiredAnyOfPermissions: [...ADMIN_PERMISSION_GROUPS.billingInvoicesView] },

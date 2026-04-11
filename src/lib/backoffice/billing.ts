@@ -6,13 +6,15 @@ import {
   InvoiceStatus,
   PaymentMethod,
   Prisma,
+  ServicePhaseType,
+  ServicePowerUnit,
+  ServiceUsageCategory,
   TariffBillingMode,
   TaxApplicationScope,
   TaxRuleType,
   UserRole,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { activeMeterAssignmentCustomerSelect, getActiveMeterAssignment } from "@/lib/meters/assignments";
 import {
   buildInvoiceCanceledNotification,
   buildInvoiceDeliveryNotification,
@@ -21,6 +23,14 @@ import {
   createCustomerNotification,
   pushCustomerNotification,
 } from "@/lib/mobile/customerNotifications";
+import {
+  billingMeterAssignmentSelect,
+  resolveBillingAssignmentForPeriod,
+  resolveServiceContractForPeriod,
+  resolveTariffPlanForContract,
+  serviceContractBillingSelect,
+  validateTariffPlanScopeConflict,
+} from "@/lib/backoffice/serviceContracts";
 import { getAppSettings } from "@/lib/settings/serverSettings";
 
 type StaffUser = {
@@ -49,6 +59,11 @@ type CreateTariffPlanInput = {
   description?: string;
   zoneId?: string | null;
   billingMode?: TariffBillingMode;
+  usageCategory?: ServiceUsageCategory;
+  subscribedPowerUnit?: ServicePowerUnit;
+  subscribedPowerMin?: number | null;
+  subscribedPowerMax?: number | null;
+  phaseType?: ServicePhaseType | null;
   currency?: string;
   singleUnitPrice?: number;
   hpUnitPrice?: number;
@@ -280,6 +295,26 @@ function normalizeBillingMode(mode: unknown): TariffBillingMode {
     : TariffBillingMode.SINGLE_RATE;
 }
 
+function normalizeUsageCategory(value: unknown): ServiceUsageCategory {
+  if (value === ServiceUsageCategory.PROFESSIONAL) return ServiceUsageCategory.PROFESSIONAL;
+  if (value === ServiceUsageCategory.ADMINISTRATION) return ServiceUsageCategory.ADMINISTRATION;
+  if (value === ServiceUsageCategory.INDUSTRIAL) return ServiceUsageCategory.INDUSTRIAL;
+  if (value === ServiceUsageCategory.PUBLIC_LIGHTING) return ServiceUsageCategory.PUBLIC_LIGHTING;
+  return ServiceUsageCategory.RESIDENTIAL;
+}
+
+function normalizePowerUnit(value: unknown): ServicePowerUnit {
+  if (value === ServicePowerUnit.KW) return ServicePowerUnit.KW;
+  if (value === ServicePowerUnit.KWH) return ServicePowerUnit.KWH;
+  return value === ServicePowerUnit.KVA ? ServicePowerUnit.KVA : ServicePowerUnit.AMPERE;
+}
+
+function normalizePhaseType(value: unknown): ServicePhaseType | null {
+  if (value === ServicePhaseType.SINGLE_PHASE) return ServicePhaseType.SINGLE_PHASE;
+  if (value === ServicePhaseType.THREE_PHASE) return ServicePhaseType.THREE_PHASE;
+  return null;
+}
+
 function normalizeTaxType(type: unknown): TaxRuleType {
   return type === TaxRuleType.FIXED ? TaxRuleType.FIXED : TaxRuleType.PERCENT;
 }
@@ -326,47 +361,6 @@ function normalizeTaxRules(taxes: CreateTaxRuleInput[], fallbackZoneId?: string 
   }
 
   return { ok: true as const, taxes: normalized };
-}
-
-async function resolveTariffPlanId(inputTariffPlanId?: string | null, zoneIds?: string[]) {
-  const resolvedZoneIds = (zoneIds || []).filter(Boolean);
-  const singleZoneId = resolvedZoneIds.length === 1 ? resolvedZoneIds[0] : null;
-
-  if (inputTariffPlanId) {
-    const plan = await prisma.tariffPlan.findFirst({
-      where: {
-        id: inputTariffPlanId,
-        deletedAt: null,
-        isActive: true,
-        ...(singleZoneId ? { OR: [{ zoneId: singleZoneId }, { zoneId: null }] } : {}),
-      },
-      select: { id: true },
-    });
-    return plan?.id || null;
-  }
-
-  const defaultPlan = await prisma.tariffPlan.findFirst({
-    where: {
-      deletedAt: null,
-      isDefault: true,
-      isActive: true,
-      ...(singleZoneId ? { OR: [{ zoneId: singleZoneId }, { zoneId: null }] } : { zoneId: null }),
-    },
-    orderBy: [{ zoneId: "desc" }, { createdAt: "asc" }],
-    select: { id: true },
-  });
-  if (defaultPlan) return defaultPlan.id;
-
-  const anyPlan = await prisma.tariffPlan.findFirst({
-    where: {
-      deletedAt: null,
-      isActive: true,
-      ...(singleZoneId ? { OR: [{ zoneId: singleZoneId }, { zoneId: null }] } : { zoneId: null }),
-    },
-    orderBy: [{ zoneId: "desc" }, { createdAt: "asc" }],
-    select: { id: true },
-  });
-  return anyPlan?.id || null;
 }
 
 async function generateInvoiceNumber(periodDate: Date) {
@@ -674,6 +668,17 @@ export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPl
   const description = toTrimmed(payload.description);
   const zoneId = toTrimmed(payload.zoneId);
   const billingMode = normalizeBillingMode(payload.billingMode);
+  const usageCategory = normalizeUsageCategory(payload.usageCategory);
+  const subscribedPowerUnit = normalizePowerUnit(payload.subscribedPowerUnit);
+  const subscribedPowerMin =
+    payload.subscribedPowerMin === null || payload.subscribedPowerMin === undefined
+      ? null
+      : Math.max(0, toNumber(payload.subscribedPowerMin));
+  const subscribedPowerMax =
+    payload.subscribedPowerMax === null || payload.subscribedPowerMax === undefined
+      ? null
+      : Math.max(0, toNumber(payload.subscribedPowerMax));
+  const phaseType = normalizePhaseType(payload.phaseType);
   const currency = toTrimmed(payload.currency)?.toUpperCase() || "XAF";
   const singleUnitPrice = Math.max(0, toNumber(payload.singleUnitPrice));
   const hpUnitPrice = Math.max(0, toNumber(payload.hpUnitPrice));
@@ -691,6 +696,9 @@ export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPl
   }
   if (effectiveFrom && effectiveTo && effectiveTo <= effectiveFrom) {
     return { status: 400, body: { error: "invalid_effective_range" } };
+  }
+  if (subscribedPowerMax !== null && subscribedPowerMin !== null && subscribedPowerMax < subscribedPowerMin) {
+    return { status: 400, body: { error: "invalid_power_band" } };
   }
   if (
     (billingMode === TariffBillingMode.SINGLE_RATE && singleUnitPrice <= 0) ||
@@ -731,6 +739,25 @@ export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPl
   }
 
   try {
+    await validateTariffPlanScopeConflict({
+      zoneId: zone?.id ?? null,
+      billingMode,
+      usageCategory,
+      subscribedPowerUnit,
+      phaseType,
+      subscribedPowerMin,
+      subscribedPowerMax,
+      effectiveFrom,
+      effectiveTo,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "tariff_plan_scope_conflict") {
+      return { status: 409, body: { error: "tariff_plan_scope_conflict" } };
+    }
+    return { status: 500, body: { error: "failed_to_create_tariff_plan" } };
+  }
+
+  try {
     const created = await prisma.$transaction(async (tx) => {
       if (isDefault) {
         await tx.tariffPlan.updateMany({
@@ -746,6 +773,13 @@ export async function createTariffPlan(staff: StaffUser, payload: CreateTariffPl
           description,
           zoneId: zone?.id ?? null,
           billingMode,
+          usageCategory,
+          subscribedPowerUnit,
+          subscribedPowerMin:
+            subscribedPowerMin !== null ? toDecimal(subscribedPowerMin, M3_SCALE) : null,
+          subscribedPowerMax:
+            subscribedPowerMax !== null ? toDecimal(subscribedPowerMax, M3_SCALE) : null,
+          phaseType,
           currency,
           singleUnitPrice:
             billingMode === TariffBillingMode.SINGLE_RATE ? toDecimal(singleUnitPrice, M3_SCALE) : null,
@@ -825,11 +859,134 @@ export async function updateTariffPlan(
 ) {
   const existing = await prisma.tariffPlan.findFirst({
     where: { id: tariffPlanId, deletedAt: null },
-    select: { id: true },
+    select: {
+      id: true,
+      zoneId: true,
+      billingMode: true,
+      usageCategory: true,
+      subscribedPowerUnit: true,
+      subscribedPowerMin: true,
+      subscribedPowerMax: true,
+      phaseType: true,
+      currency: true,
+      singleUnitPrice: true,
+      hpUnitPrice: true,
+      hcUnitPrice: true,
+      fixedCharge: true,
+      taxPercent: true,
+      lateFeePercent: true,
+      effectiveFrom: true,
+      effectiveTo: true,
+      isDefault: true,
+    },
   });
   if (!existing) return { status: 404, body: { error: "tariff_plan_not_found" } };
+
+  const nextZoneId = payload.zoneId !== undefined ? toTrimmed(payload.zoneId) : existing.zoneId;
+  const zone = nextZoneId ? await resolveZone(nextZoneId) : null;
+  if (nextZoneId && !zone) {
+    return { status: 400, body: { error: "zone_not_found" } };
+  }
+
   const billingMode =
-    payload.billingMode !== undefined ? normalizeBillingMode(payload.billingMode) : undefined;
+    payload.billingMode !== undefined ? normalizeBillingMode(payload.billingMode) : existing.billingMode;
+  const usageCategory =
+    payload.usageCategory !== undefined
+      ? normalizeUsageCategory(payload.usageCategory)
+      : existing.usageCategory;
+  const subscribedPowerUnit =
+    payload.subscribedPowerUnit !== undefined
+      ? normalizePowerUnit(payload.subscribedPowerUnit)
+      : existing.subscribedPowerUnit;
+  const subscribedPowerMin =
+    payload.subscribedPowerMin !== undefined
+      ? payload.subscribedPowerMin === null
+        ? null
+        : Math.max(0, toNumber(payload.subscribedPowerMin))
+      : existing.subscribedPowerMin
+        ? decimalToNumber(existing.subscribedPowerMin)
+        : null;
+  const subscribedPowerMax =
+    payload.subscribedPowerMax !== undefined
+      ? payload.subscribedPowerMax === null
+        ? null
+        : Math.max(0, toNumber(payload.subscribedPowerMax))
+      : existing.subscribedPowerMax
+        ? decimalToNumber(existing.subscribedPowerMax)
+        : null;
+  const phaseType =
+    payload.phaseType !== undefined ? normalizePhaseType(payload.phaseType) : existing.phaseType;
+  const singleUnitPrice =
+    payload.singleUnitPrice !== undefined
+      ? Math.max(0, toNumber(payload.singleUnitPrice))
+      : decimalToNumber(existing.singleUnitPrice);
+  const hpUnitPrice =
+    payload.hpUnitPrice !== undefined
+      ? Math.max(0, toNumber(payload.hpUnitPrice))
+      : decimalToNumber(existing.hpUnitPrice);
+  const hcUnitPrice =
+    payload.hcUnitPrice !== undefined
+      ? Math.max(0, toNumber(payload.hcUnitPrice))
+      : decimalToNumber(existing.hcUnitPrice);
+  const fixedCharge =
+    payload.fixedCharge !== undefined
+      ? Math.max(0, toNumber(payload.fixedCharge))
+      : decimalToNumber(existing.fixedCharge);
+  const taxPercent =
+    payload.taxPercent !== undefined
+      ? Math.max(0, toNumber(payload.taxPercent))
+      : decimalToNumber(existing.taxPercent);
+  const lateFeePercent =
+    payload.lateFeePercent !== undefined
+      ? Math.max(0, toNumber(payload.lateFeePercent))
+      : decimalToNumber(existing.lateFeePercent);
+  const effectiveFrom =
+    payload.effectiveFrom !== undefined ? toDate(payload.effectiveFrom) : existing.effectiveFrom;
+  const effectiveTo =
+    payload.effectiveTo !== undefined ? toDate(payload.effectiveTo) : existing.effectiveTo;
+
+  if (effectiveFrom && effectiveTo && effectiveTo <= effectiveFrom) {
+    return { status: 400, body: { error: "invalid_effective_range" } };
+  }
+  if (subscribedPowerMax !== null && subscribedPowerMin !== null && subscribedPowerMax < subscribedPowerMin) {
+    return { status: 400, body: { error: "invalid_power_band" } };
+  }
+  if (
+    (billingMode === TariffBillingMode.SINGLE_RATE && singleUnitPrice <= 0) ||
+    (billingMode === TariffBillingMode.TIME_OF_USE && (hpUnitPrice <= 0 || hcUnitPrice <= 0))
+  ) {
+    return {
+      status: 400,
+      body: {
+        error:
+          billingMode === TariffBillingMode.SINGLE_RATE
+            ? "single_unit_price_required"
+            : "hp_hc_unit_prices_required",
+      },
+    };
+  }
+
+  try {
+    await validateTariffPlanScopeConflict(
+      {
+        zoneId: zone?.id ?? null,
+        billingMode,
+        usageCategory,
+        subscribedPowerUnit,
+        phaseType,
+        subscribedPowerMin,
+        subscribedPowerMax,
+        effectiveFrom,
+        effectiveTo,
+      },
+      tariffPlanId,
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message === "tariff_plan_scope_conflict") {
+      return { status: 409, body: { error: "tariff_plan_scope_conflict" } };
+    }
+    return { status: 500, body: { error: "failed_to_update_tariff_plan" } };
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     if (payload.isDefault) {
@@ -845,36 +1002,27 @@ export async function updateTariffPlan(
         code: toTrimmed(payload.code)?.toUpperCase() || undefined,
         name: toTrimmed(payload.name) || undefined,
         description: payload.description !== undefined ? toTrimmed(payload.description) : undefined,
-        zoneId: payload.zoneId !== undefined ? toTrimmed(payload.zoneId) : undefined,
+        zoneId: payload.zoneId !== undefined ? zone?.id ?? null : undefined,
         billingMode,
+        usageCategory,
+        subscribedPowerUnit,
+        subscribedPowerMin:
+          subscribedPowerMin !== null ? toDecimal(subscribedPowerMin, M3_SCALE) : null,
+        subscribedPowerMax:
+          subscribedPowerMax !== null ? toDecimal(subscribedPowerMax, M3_SCALE) : null,
+        phaseType,
         currency: toTrimmed(payload.currency)?.toUpperCase() || undefined,
         singleUnitPrice:
-          payload.singleUnitPrice !== undefined
-            ? toDecimal(Math.max(0, toNumber(payload.singleUnitPrice)), M3_SCALE)
-            : undefined,
+          billingMode === TariffBillingMode.SINGLE_RATE ? toDecimal(singleUnitPrice, M3_SCALE) : null,
         hpUnitPrice:
-          payload.hpUnitPrice !== undefined
-            ? toDecimal(Math.max(0, toNumber(payload.hpUnitPrice)), M3_SCALE)
-            : undefined,
+          billingMode === TariffBillingMode.TIME_OF_USE ? toDecimal(hpUnitPrice, M3_SCALE) : null,
         hcUnitPrice:
-          payload.hcUnitPrice !== undefined
-            ? toDecimal(Math.max(0, toNumber(payload.hcUnitPrice)), M3_SCALE)
-            : undefined,
-        fixedCharge:
-          payload.fixedCharge !== undefined
-            ? toDecimal(Math.max(0, toNumber(payload.fixedCharge)))
-            : undefined,
-        taxPercent:
-          payload.taxPercent !== undefined
-            ? toDecimal(Math.max(0, toNumber(payload.taxPercent)))
-            : undefined,
-        lateFeePercent:
-          payload.lateFeePercent !== undefined
-            ? toDecimal(Math.max(0, toNumber(payload.lateFeePercent)))
-            : undefined,
-        effectiveFrom:
-          payload.effectiveFrom !== undefined ? toDate(payload.effectiveFrom) : undefined,
-        effectiveTo: payload.effectiveTo !== undefined ? toDate(payload.effectiveTo) : undefined,
+          billingMode === TariffBillingMode.TIME_OF_USE ? toDecimal(hcUnitPrice, M3_SCALE) : null,
+        fixedCharge: toDecimal(fixedCharge),
+        taxPercent: toDecimal(taxPercent),
+        lateFeePercent: toDecimal(lateFeePercent),
+        effectiveFrom,
+        effectiveTo,
         isDefault: payload.isDefault,
         isActive: payload.isActive,
       },
@@ -982,21 +1130,20 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
   }
 
   const selectedZoneIds = selectedZones.map((zone) => zone.id);
-  const tariffPlanId = await resolveTariffPlanId(toTrimmed(payload.tariffPlanId), selectedZoneIds);
-  if (!tariffPlanId) {
-    return { status: 400, body: { error: "active_tariff_plan_required" } };
-  }
+  const preferredTariffPlanId = toTrimmed(payload.tariffPlanId);
 
   const settings = await getAppSettings();
 
-  const selectedTariff = await prisma.tariffPlan.findFirst({
-    where: { id: tariffPlanId, deletedAt: null, isActive: true },
-    select: { zoneId: true, code: true },
-  });
-  if (!selectedTariff) {
-    return { status: 400, body: { error: "active_tariff_plan_required" } };
+  const selectedTariff = preferredTariffPlanId
+    ? await prisma.tariffPlan.findFirst({
+        where: { id: preferredTariffPlanId, deletedAt: null, isActive: true },
+        select: { zoneId: true, code: true },
+      })
+    : null;
+  if (preferredTariffPlanId && !selectedTariff) {
+    return { status: 400, body: { error: "preferred_tariff_plan_not_found" } };
   }
-  if (selectedTariff.zoneId) {
+  if (selectedTariff?.zoneId) {
     if (selectedZoneIds.length !== 1) {
       return { status: 400, body: { error: "tariff_requires_single_matching_zone" } };
     }
@@ -1004,9 +1151,18 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
       return { status: 400, body: { error: "tariff_zone_mismatch" } };
     }
   }
-  if (!selectedTariff.zoneId && selectedZoneIds.length === 0) {
-    // Global campaigns remain allowed. No extra validation needed.
-  } else if (selectedZoneIds.length > 0 && selectedTariff.zoneId && selectedTariff.zoneId !== selectedZoneIds[0]) {
+  if (
+    selectedTariff &&
+    !selectedTariff.zoneId &&
+    selectedZoneIds.length === 0
+  ) {
+    // A preferred global fallback remains valid on a global campaign.
+  } else if (
+    selectedTariff &&
+    selectedZoneIds.length > 0 &&
+    selectedTariff.zoneId &&
+    selectedTariff.zoneId !== selectedZoneIds[0]
+  ) {
     return { status: 400, body: { error: "tariff_zone_mismatch" } };
   }
 
@@ -1034,7 +1190,7 @@ export async function createBillingCampaign(staff: StaffUser, payload: CreateCam
               ? `${selectedZones.length} zones`
               : null,
         notes,
-        tariffPlanId,
+        tariffPlanId: preferredTariffPlanId,
         createdById: staff.id,
         settingsSnapshot: settings,
         zones: {
@@ -1088,27 +1244,10 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           },
         },
       },
-      tariffPlan: {
-        include: {
-          taxes: {
-            where: { deletedAt: null, taxRule: { deletedAt: null, isActive: true } },
-            orderBy: { sortOrder: "asc" },
-            include: {
-              taxRule: true,
-            },
-          },
-        },
-      },
+      tariffPlan: { select: { id: true, code: true, name: true } },
     },
   });
   if (!campaign) return { status: 404, body: { error: "campaign_not_found" } };
-  if (!campaign.tariffPlan || !campaign.tariffPlan.isActive || campaign.tariffPlan.deletedAt) {
-    return { status: 400, body: { error: "tariff_plan_not_available" } };
-  }
-  const tariffPlan = campaign.tariffPlan;
-  if (!isDateWithinRange(campaign.periodEnd, tariffPlan.effectiveFrom, tariffPlan.effectiveTo)) {
-    return { status: 400, body: { error: "tariff_plan_not_effective_for_campaign" } };
-  }
   if (campaign.finalizedAt) {
     return { status: 409, body: { error: "campaign_cycle_finalized" } };
   }
@@ -1121,9 +1260,6 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
   const cutoffAt = campaign.cutoffAt ?? campaign.periodEnd;
   const campaignZoneIds = campaign.zones.map((link) => link.zoneId);
   const campaignZones = campaign.zones.map((link) => link.zone);
-  const effectiveTaxLinks = tariffPlan.taxes.filter((link) =>
-    isDateWithinRange(campaign.periodEnd, link.taxRule.effectiveFrom, link.taxRule.effectiveTo)
-  );
 
   const meters = await prisma.meter.findMany({
     where: {
@@ -1137,19 +1273,131 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
       status: true,
       type: true,
       zoneId: true,
-      ...activeMeterAssignmentCustomerSelect,
     },
   });
+  const meterIds = meters.map((meter) => meter.id);
+  const [assignments, contracts, tariffPlans] = await prisma.$transaction([
+    prisma.meterAssignment.findMany({
+      where: {
+        meterId: { in: meterIds },
+        deletedAt: null,
+        assignedAt: { lte: campaign.periodEnd },
+        OR: [{ endedAt: null }, { endedAt: { gte: campaign.periodStart } }],
+      },
+      orderBy: [{ assignedAt: "asc" }, { createdAt: "asc" }],
+      select: billingMeterAssignmentSelect,
+    }),
+    prisma.serviceContract.findMany({
+      where: {
+        meterId: { in: meterIds },
+        deletedAt: null,
+        effectiveFrom: { lte: campaign.periodEnd },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: campaign.periodStart } }],
+      },
+      orderBy: [{ effectiveFrom: "asc" }, { createdAt: "asc" }],
+      select: serviceContractBillingSelect,
+    }),
+    prisma.tariffPlan.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        AND: [
+          {
+            OR: [
+              { zoneId: null },
+              ...(campaignZoneIds.length > 0 ? [{ zoneId: { in: campaignZoneIds } }] : []),
+            ],
+          },
+          {
+            OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: campaign.periodStart } }],
+          },
+          {
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: campaign.periodEnd } }],
+          },
+        ],
+      },
+      include: {
+        taxes: {
+          where: {
+            deletedAt: null,
+            taxRule: {
+              deletedAt: null,
+              isActive: true,
+            },
+          },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            taxRule: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const assignmentsByMeter = new Map<string, typeof assignments>();
+  for (const assignment of assignments) {
+    const list = assignmentsByMeter.get(assignment.meterId) ?? [];
+    list.push(assignment);
+    assignmentsByMeter.set(assignment.meterId, list);
+  }
+
+  const contractsByMeter = new Map<string, typeof contracts>();
+  for (const contract of contracts) {
+    const list = contractsByMeter.get(contract.meterId) ?? [];
+    list.push(contract);
+    contractsByMeter.set(contract.meterId, list);
+  }
 
   let createdCount = 0;
   let skippedCount = 0;
+  const skipReasons: Record<string, number> = {};
+
+  const incrementSkipReason = (reason: string) => {
+    skipReasons[reason] = (skipReasons[reason] ?? 0) + 1;
+  };
 
   for (const meter of meters) {
-    const activeAssignment = getActiveMeterAssignment(meter);
-    if (!activeAssignment) {
+    const assignmentResolution = resolveBillingAssignmentForPeriod(
+      assignmentsByMeter.get(meter.id) ?? [],
+      campaign.periodStart,
+      campaign.periodEnd,
+    );
+    if (!assignmentResolution.ok) {
       skippedCount += 1;
+      incrementSkipReason(assignmentResolution.error);
       continue;
     }
+
+    const contractResolution = resolveServiceContractForPeriod(
+      contractsByMeter.get(meter.id) ?? [],
+      assignmentResolution.assignment.customerId,
+      campaign.periodStart,
+      campaign.periodEnd,
+    );
+    if (!contractResolution.ok) {
+      skippedCount += 1;
+      incrementSkipReason(contractResolution.error);
+      continue;
+    }
+
+    const tariffResolution = resolveTariffPlanForContract({
+      tariffPlans,
+      preferredTariffPlanId: campaign.tariffPlanId,
+      meterZoneId: meter.zoneId,
+      meterType: meter.type,
+      periodStart: campaign.periodStart,
+      periodEnd: campaign.periodEnd,
+      contract: contractResolution.contract,
+    });
+    if (!tariffResolution.ok) {
+      skippedCount += 1;
+      incrementSkipReason(tariffResolution.error);
+      continue;
+    }
+    const tariffPlan = tariffResolution.plan;
+    const effectiveTaxLinks = tariffPlan.taxes.filter((link) =>
+      isDateWithinRange(campaign.periodEnd, link.taxRule.effectiveFrom, link.taxRule.effectiveTo)
+    );
 
     const reading = await prisma.reading.findFirst({
       where: {
@@ -1179,6 +1427,7 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
     });
     if (existing) {
       skippedCount += 1;
+      incrementSkipReason("invoice_already_exists");
       continue;
     }
 
@@ -1336,8 +1585,9 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
         data: {
           invoiceNumber,
           campaignId: campaign.id,
-          tariffPlanId: campaign.tariffPlanId,
-          customerId: activeAssignment.customerId,
+          tariffPlanId: tariffPlan.id,
+          serviceContractId: contractResolution.contract.id,
+          customerId: assignmentResolution.assignment.customerId,
           meterId: meter.id,
           sourceReadingId: reading?.id ?? null,
           fromReadingId,
@@ -1345,6 +1595,13 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           generatedById: staff.id,
           status: hasException ? InvoiceStatus.PENDING_REVIEW : InvoiceStatus.DRAFT,
           currency: tariffPlan.currency,
+          contractNumberSnapshot: contractResolution.contract.contractNumber,
+          policeNumberSnapshot: contractResolution.contract.policeNumber,
+          usageCategorySnapshot: contractResolution.contract.usageCategory,
+          billingModeSnapshot: contractResolution.contract.billingMode,
+          subscribedPowerValueSnapshot: contractResolution.contract.subscribedPowerValue,
+          subscribedPowerUnitSnapshot: contractResolution.contract.subscribedPowerUnit,
+          phaseTypeSnapshot: contractResolution.contract.phaseType,
           periodStart: campaign.periodStart,
           periodEnd: campaign.periodEnd,
           dueDate: new Date(campaign.periodEnd.getTime() + 15 * 24 * 60 * 60 * 1000),
@@ -1372,6 +1629,15 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
             meterSerial: meter.serialNumber,
             billingMode: tariffPlan.billingMode,
             taxRate,
+            serviceContract: {
+              id: contractResolution.contract.id,
+              contractNumber: contractResolution.contract.contractNumber,
+              policeNumber: contractResolution.contract.policeNumber,
+              usageCategory: contractResolution.contract.usageCategory,
+              subscribedPowerValue: decimalToNumber(contractResolution.contract.subscribedPowerValue),
+              subscribedPowerUnit: contractResolution.contract.subscribedPowerUnit,
+              phaseType: contractResolution.contract.phaseType,
+            },
             cycle: {
               fromReadingId,
               toReadingId,
@@ -1449,6 +1715,8 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
           type: "GENERATED",
           payload: {
             campaignId: campaign.id,
+            serviceContractId: contractResolution.contract.id,
+            tariffPlanId: tariffPlan.id,
             fromReadingId,
             toReadingId,
             consumptionPrimary,
@@ -1488,6 +1756,7 @@ export async function generateCampaignInvoices(staff: StaffUser, campaignId: str
       createdCount,
       skippedCount,
       meterCount: meters.length,
+      skipReasons,
     },
   };
 }
@@ -1615,6 +1884,8 @@ export async function listInvoices(filters: InvoiceFilters) {
           OR: [
             { invoiceNumber: { contains: search, mode: "insensitive" } },
             { meter: { serialNumber: { contains: search, mode: "insensitive" } } },
+            { contractNumberSnapshot: { contains: search, mode: "insensitive" } },
+            { policeNumberSnapshot: { contains: search, mode: "insensitive" } },
             { customer: { phone: { contains: search, mode: "insensitive" } } },
             { customer: { username: { contains: search, mode: "insensitive" } } },
           ],
@@ -1628,6 +1899,7 @@ export async function listInvoices(filters: InvoiceFilters) {
       where,
       include: {
         campaign: { select: { id: true, code: true, name: true } },
+        tariffPlan: { select: { id: true, code: true, name: true } },
         meter: { select: { id: true, serialNumber: true, city: true, zone: true } },
         customer: {
           select: { id: true, firstName: true, lastName: true, username: true, phone: true },
@@ -1656,7 +1928,33 @@ export async function getInvoiceDetail(invoiceId: string) {
     where: { id: invoiceId, deletedAt: null },
     include: {
       campaign: { select: { id: true, code: true, name: true, periodStart: true, periodEnd: true } },
-      tariffPlan: { select: { id: true, code: true, name: true } },
+      tariffPlan: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          billingMode: true,
+          usageCategory: true,
+          subscribedPowerMin: true,
+          subscribedPowerMax: true,
+          subscribedPowerUnit: true,
+          phaseType: true,
+        },
+      },
+      serviceContract: {
+        select: {
+          id: true,
+          contractNumber: true,
+          policeNumber: true,
+          usageCategory: true,
+          billingMode: true,
+          subscribedPowerValue: true,
+          subscribedPowerUnit: true,
+          phaseType: true,
+          effectiveFrom: true,
+          effectiveTo: true,
+        },
+      },
       meter: { select: { id: true, serialNumber: true, meterReference: true, city: true, zone: true } },
       customer: {
         select: { id: true, firstName: true, lastName: true, username: true, phone: true, email: true },

@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { Prisma, TariffBillingMode } from "@prisma/client";
+import { Prisma, ServicePhaseType, ServicePowerUnit, ServiceUsageCategory, TariffBillingMode } from "@prisma/client";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingCreatePanel from "@/components/billing/BillingCreatePanel";
@@ -8,6 +8,9 @@ import TariffPlanStatusSwitch from "@/components/billing/TariffPlanStatusSwitch"
 import Label from "@/components/form/Label";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  translateContractPhaseType,
+  translateContractPowerUnit,
+  translateContractUsageCategory,
   translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
@@ -207,6 +210,52 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                     <option value={TariffBillingMode.TIME_OF_USE}>{t("billing.timeOfUse")}</option>
                   </select>
                 </Field>
+                <Field label={t("billing.usageCategoryLabel")}>
+                  <select
+                    name="usageCategory"
+                    defaultValue={ServiceUsageCategory.RESIDENTIAL}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  >
+                    {Object.values(ServiceUsageCategory).map((category) => (
+                      <option key={category} value={category}>
+                        {translateContractUsageCategory(category, t)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={t("billing.subscribedPowerUnitLabel")}>
+                  <select
+                    name="subscribedPowerUnit"
+                    defaultValue={ServicePowerUnit.AMPERE}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  >
+                    {Object.values(ServicePowerUnit).map((unit) => (
+                      <option key={unit} value={unit}>
+                        {translateContractPowerUnit(unit, t)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={t("billing.subscribedPowerMinLabel")}>
+                  <Input name="subscribedPowerMin" type="number" step="0.001" placeholder="5" />
+                </Field>
+                <Field label={t("billing.subscribedPowerMaxLabel")}>
+                  <Input name="subscribedPowerMax" type="number" step="0.001" placeholder="15" />
+                </Field>
+                <Field label={t("billing.phaseTypeLabel")}>
+                  <select
+                    name="phaseType"
+                    defaultValue=""
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  >
+                    <option value="">{t("billing.anyPhaseOption")}</option>
+                    {Object.values(ServicePhaseType).map((phaseType) => (
+                      <option key={phaseType} value={phaseType}>
+                        {translateContractPhaseType(phaseType, t)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
                 <Field label={t("billing.currencyLabel")}>
                   <Input name="currency" placeholder="XAF" defaultValue="XAF" />
                 </Field>
@@ -357,6 +406,23 @@ export default async function BillingTariffsPage({ searchParams }: { searchParam
                         <TableCell className="align-top px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           <p>{t("billing.campaignsUsage", { count: plan._count.campaigns })}</p>
                           <p>{t("billing.invoicesUsage", { count: plan._count.invoices })}</p>
+                          <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                            {translateContractUsageCategory(plan.usageCategory, t)}
+                          </p>
+                          <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                            {plan.subscribedPowerMin !== null || plan.subscribedPowerMax !== null
+                              ? t("billing.powerBandLine", {
+                                  min: plan.subscribedPowerMin?.toString() || "0",
+                                  max: plan.subscribedPowerMax?.toString() || t("billing.noUpperBound"),
+                                  unit: translateContractPowerUnit(plan.subscribedPowerUnit, t),
+                                })
+                              : t("billing.allPowerBands")}
+                          </p>
+                          <p className="break-words text-xs text-gray-500 dark:text-gray-400">
+                            {plan.phaseType
+                              ? translateContractPhaseType(plan.phaseType, t)
+                              : t("billing.anyPhaseOption")}
+                          </p>
                           <p className="break-words text-xs text-gray-500 dark:text-gray-400">
                             {plan.effectiveFrom
                               ? t("billing.fromDate", { date: plan.effectiveFrom.toISOString().slice(0, 10) })

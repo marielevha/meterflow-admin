@@ -12,6 +12,7 @@ import {
   createCustomerNotification,
   pushCustomerNotification,
 } from "@/lib/mobile/customerNotifications";
+import { closeActiveServiceContractsForMeter } from "@/lib/backoffice/serviceContracts";
 import { prisma } from "@/lib/prisma";
 
 const ACTIVE_ASSIGNMENT_WHERE = {
@@ -211,6 +212,10 @@ export async function setMeterCustomerAssignment(
           endedById: actorUserId,
         },
       });
+      await closeActiveServiceContractsForMeter(tx, {
+        meterId,
+        endedById: actorUserId,
+      });
 
       if (!(source === MeterAssignmentSource.MOBILE_CLAIM && actorUserId === existing.customerId)) {
         notifications.push(
@@ -257,6 +262,10 @@ export async function setMeterCustomerAssignment(
           endedAt: new Date(),
           endedById: actorUserId,
         },
+      });
+      await closeActiveServiceContractsForMeter(tx, {
+        meterId,
+        endedById: actorUserId,
       });
 
       if (!(source === MeterAssignmentSource.MOBILE_CLAIM && actorUserId === existing.customerId)) {

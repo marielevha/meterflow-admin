@@ -27,6 +27,8 @@ export default async function BillingPage() {
   let campaignCount = 0;
   let activeCampaignCount = 0;
   let tariffCount = 0;
+  let contractCount = 0;
+  let activeContractCount = 0;
   let invoiceCount = 0;
   let issuedCount = 0;
   let paidCount = 0;
@@ -39,6 +41,8 @@ export default async function BillingPage() {
       campaignCount,
       activeCampaignCount,
       tariffCount,
+      contractCount,
+      activeContractCount,
       invoiceCount,
       issuedCount,
       paidCount,
@@ -54,6 +58,14 @@ export default async function BillingPage() {
         },
       }),
       prisma.tariffPlan.count({ where: { deletedAt: null, isActive: true } }),
+      prisma.serviceContract.count({ where: { deletedAt: null } }),
+      prisma.serviceContract.count({
+        where: {
+          deletedAt: null,
+          effectiveFrom: { lte: new Date() },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+        },
+      }),
       prisma.invoice.count({ where: { deletedAt: null } }),
       prisma.invoice.count({ where: { deletedAt: null, status: InvoiceStatus.ISSUED } }),
       prisma.invoice.count({ where: { deletedAt: null, status: InvoiceStatus.PAID } }),
@@ -73,7 +85,7 @@ export default async function BillingPage() {
     <div>
       <PageBreadcrumb pageTitle={t("billing.pageTitle")} />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard label={t("billing.statCities")} value={cityCount} hint={t("billing.statCitiesHint")} />
         <StatCard label={t("billing.statZones")} value={zoneCount} hint={t("billing.statZonesHint")} />
         <StatCard
@@ -83,13 +95,18 @@ export default async function BillingPage() {
         />
         <StatCard label={t("billing.statActiveTariffs")} value={tariffCount} hint={t("billing.statActiveTariffsHint")} />
         <StatCard
+          label={t("billing.statContracts")}
+          value={contractCount}
+          hint={t("billing.statContractsHint", { count: activeContractCount })}
+        />
+        <StatCard
           label={t("billing.statInvoices")}
           value={invoiceCount}
           hint={t("billing.statInvoicesHint", { issued: issuedCount, paid: paidCount, overdue: overdueCount })}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-6">
         {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingCitiesView) ? (
           <QuickLink
             title={t("billing.statCities")}
@@ -104,6 +121,14 @@ export default async function BillingPage() {
             description={t("billing.zonesCardDescription")}
             href="/admin/billing/zones"
             actionLabel={t("billing.manageZones")}
+          />
+        ) : null}
+        {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingContractsView) ? (
+          <QuickLink
+            title={t("billing.contractsCardTitle")}
+            description={t("billing.contractsCardDescription")}
+            href="/admin/billing/contracts"
+            actionLabel={t("billing.manageContracts")}
           />
         ) : null}
         {hasAnyPermissionCode(permissionCodes, ADMIN_PERMISSION_GROUPS.billingTariffsView) ? (

@@ -5,9 +5,13 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import BillingSchemaNotice from "@/components/billing/BillingSchemaNotice";
 import {
+  translateContractPhaseType,
+  translateContractPowerUnit,
+  translateContractUsageCategory,
   translateDeliveryChannel,
   translateInvoiceStatus,
   translatePaymentMethod,
+  translateTariffBillingMode,
 } from "@/lib/admin-i18n/labels";
 import { getAdminTranslator } from "@/lib/admin-i18n/server";
 import {
@@ -116,6 +120,44 @@ export default async function BillingInvoiceDetailPage({
               <Field label={t("billing.locationLabel")} value={`${invoice.meter.city || "-"} / ${invoice.meter.zone || "-"}`} />
               <Field label={t("common.status")} value={translateInvoiceStatus(invoice.status, t)} />
               <Field label={t("billing.campaignLabel")} value={invoice.campaign?.code || t("billing.notAvailableShort")} />
+              <Field label={t("billing.contractNumberLabel")} value={invoice.contractNumberSnapshot || t("billing.noContractNumber")} />
+              <Field label={t("billing.policeNumberLabel")} value={invoice.policeNumberSnapshot || t("billing.noPoliceNumber")} />
+              <Field
+                label={t("billing.usageCategoryLabel")}
+                value={
+                  invoice.usageCategorySnapshot
+                    ? translateContractUsageCategory(invoice.usageCategorySnapshot, t)
+                    : t("billing.notAvailableShort")
+                }
+              />
+              <Field
+                label={t("billing.billingMode")}
+                value={
+                  invoice.billingModeSnapshot
+                    ? translateTariffBillingMode(invoice.billingModeSnapshot, t)
+                    : t("billing.notAvailableShort")
+                }
+              />
+              <Field
+                label={t("billing.subscribedPowerLabel")}
+                value={
+                  invoice.subscribedPowerValueSnapshot && invoice.subscribedPowerUnitSnapshot
+                    ? `${invoice.subscribedPowerValueSnapshot.toString()} ${translateContractPowerUnit(invoice.subscribedPowerUnitSnapshot, t)}`
+                    : t("billing.notAvailableShort")
+                }
+              />
+              <Field
+                label={t("billing.phaseTypeLabel")}
+                value={
+                  invoice.phaseTypeSnapshot
+                    ? translateContractPhaseType(invoice.phaseTypeSnapshot, t)
+                    : t("billing.notAvailableShort")
+                }
+              />
+              <Field
+                label={t("billing.tariffPlan")}
+                value={invoice.tariffPlan ? `${invoice.tariffPlan.code} · ${invoice.tariffPlan.name}` : t("billing.notAvailableShort")}
+              />
               <Field label={t("billing.periodColumnShort")} value={`${invoice.periodStart.toISOString().slice(0, 10)} → ${invoice.periodEnd.toISOString().slice(0, 10)}`} />
               <Field label={t("billing.dueLabel")} value={invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : t("billing.notAvailableShort")} />
               <Field label={t("billing.fromIndex")} value={invoice.fromPrimaryIndex?.toString() || t("billing.notAvailableShort")} />
